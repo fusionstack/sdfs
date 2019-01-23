@@ -550,7 +550,6 @@ static int __md_mkvol_online(const char *name, int disk)
         return 1;
 }
 
-
 typedef struct {
         struct list_head hook;
         char name[MAX_NAME_LEN];
@@ -574,7 +573,7 @@ static int __md_mkvol_getredis_disk(const char *hostname, int *disk_array, int *
         for (int i = 0; i < array->num_node; i++) {
                 node = array->nodes[i];
 
-                DINFO("disk[%s], total %u\n", node->key, node->value, array->num_node);
+                DBUG("disk[%s], total %u\n", node->key, node->value, array->num_node);
                 disk = atoi(node->key);
                 if (__md_mkvol_online(hostname, disk)) {
                         disk_array[count] = disk;
@@ -637,6 +636,29 @@ static int __md_mkvol_getredis(struct list_head *list, int *list_count)
         return 0;
 err_free:
         free_etcd_node(array);
+err_ret:
+        return ret;
+}
+
+static int __md_mkvol_trigger(struct list_head *list)
+{
+        int ret;
+        char key[MAX_PATH_LEN];
+        redis_list_t *ent;
+        struct list_head *pos;
+
+        list_for_each(pos, list) {
+                ent = (void *)pos;
+
+                for (int i = 0; i < ent->count; i++) {
+                        snprintf(key, MAX_NAME_LEN, "%s/disk/%d/trigger", ent->name, i);
+                        ret = etcd_update_text(ETCD_REDIS, key, "1", NULL, -1);
+                        if (ret)
+                                GOTO(err_ret, ret);
+                }
+        }
+
+        return 0;
 err_ret:
         return ret;
 }
@@ -733,6 +755,10 @@ inline static int __md_mkvol_set_redis(const char *name, int sharding, int repli
         if (ret)
                 GOTO(err_free, ret);
 
+        ret = __md_mkvol_trigger(&list);
+        if (ret)
+                GOTO(err_free, ret);
+        
         list_for_each_safe(pos, n, &list) {
                 list_del(pos);
                 yfree((void **)&pos);
@@ -762,12 +788,6 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
         uint64_t volid;
 
-#if 1
-        ret = __md_mkvol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_ha);
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
-        
         snprintf(key, MAX_NAME_LEN, "%s/sharding", name);
         snprintf(value, MAX_NAME_LEN, "%d", mdsconf.redis_sharding);
         ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
@@ -806,6 +826,10 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
                         GOTO(err_ret, ret);
         }
 
+        ret = __md_mkvol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_ha);
+        if (ret)
+                GOTO(err_ret, ret);
+        
 #if 0
         (void) parent;
         (void) setattr;

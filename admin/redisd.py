@@ -802,17 +802,20 @@ class RedisDisk(Daemon):
         #dmsg("begin service1")
 
         key = "/sdfs/redis/%s/disk/%d/trigger" % (self.hostname, self.localid)
-        index = None
+        index = 0
         while (1):
             dmsg("%s instence %u" % (self.workdir, len(self.instence)))
 
             #try:
             res = self.etcd.watch(key, index)
-            dmsg("watch %s return, value %s, idx %u" % (key, res.value, res.etcd_index))
-            self.etcd.write(key, "0")
-            res = self.etcd.read(key)
-            #print str(res)
-            index = res.etcd_index + 1
+            dmsg("watch %s return, value %s, idx %u:%u" % (key, res.value, res.etcd_index, index))
+            if (res.value == "0"):
+                index = res.etcd_index + 1
+                continue
+            else:
+                self.etcd.write(key, "0")
+                res = self.etcd.read(key)
+                index = res.etcd_index + 1
             #except:
             #    derror("watch error")
             #    continue

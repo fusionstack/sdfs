@@ -69,7 +69,7 @@ class Node:
         return services
 
     def _start_service(self):
-        derror("samba, nfs-ganesha start unimplemented")
+        #derror("samba, nfs-ganesha start unimplemented")
         return
         #start nfs service
         _exec_nfs = "systemctl start nfs-ganesha"
@@ -116,8 +116,8 @@ class Node:
             os.system(cmd)
             
     def start(self, role=None, service=None, op="all"):
-        lfile = "/var/run/uss.start.lock"
-        lock = lock_file(lfile)
+        #lfile = "/var/run/uss.start.lock"
+        #lock = lock_file(lfile)
 
         check_sysctl(self.config, fix = True)
 
