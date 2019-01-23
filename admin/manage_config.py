@@ -37,7 +37,7 @@ def modify_file(filename, data):
 def get_content_as_list():
     delimeter = "-------------------------------------------------------------\n"
     list_record = []
-    _exec = "/opt/sdfs/app/bin/sdfs.share -l -p nfs"
+    _exec = "/opt/sdfs/app/bin/uss.share -l -p nfs"
     try:
         result, err = exec_shell(_exec, p=True, need_return=True, timeout=60)
     except Exception as e:
@@ -58,8 +58,8 @@ def get_export(list_record):
         if len(record) == 0:
             continue
         export_path = record.split('\n')[1].split(':')[1].strip(' ')
-        clients = record.split('\n')[5].split(':')[1].strip(' ')
-        access_type = record.split('\n')[6].split(':')[1].strip(' ')
+        clients = record.split('\n')[3].split(':')[1].strip(' ')
+        access_type = record.split('\n')[4].split(':')[1].strip(' ')
         client_pair["Clients"] = clients
         access_pair["Access_Type"] = access_type
         client_list.update(client_pair)

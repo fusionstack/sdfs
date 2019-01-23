@@ -9,7 +9,6 @@
 #include "file_proto.h"
 #include "md_proto.h"
 #include "chk_meta.h"
-#include "round_journal.h"
 #include "sdfs_conf.h"
 
 typedef chkid_t objid_t;

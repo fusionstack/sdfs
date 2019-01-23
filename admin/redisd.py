@@ -92,11 +92,12 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 #class Redisd(Daemon):
 class Redisd():
-    def __init__(self, workdir, diskid):
+    def __init__(self, workdir, diskid, disk_idx):
         self.config = Config()
         self.workdir = workdir
         self.diskid = diskid
         self.localid = int(self.workdir.split('/')[-1])
+        self.disk_idx = disk_idx
         self.hostname = socket.gethostname()
         self.etcd = etcd.Client(host='127.0.0.1', port=2379)
         self.id = None
@@ -166,49 +167,6 @@ class Redisd():
         _check_config(dist, "bind", " ", hostname, True)
         return True
 
-    def __init_register_ha(self, slot, seq):
-        #if (seq == 0 or self.config.solomode):
-        if (seq == 0):
-            return True
-
-        for i in range(seq):
-            key = "/sdfs/volume/%s/solt/%d/redis/%d" % (self.volume, slot, i)
-            try:
-                value = self.etcd.read(key).value
-                array = value.split(" ")
-                host = array[0]
-                if not self.config.solomode and host == self.hostname:
-                        dmsg("skip " + value)
-                        return False
-                diskid = array[2]
-                if (diskid == self.diskid):
-                    dmsg("skip " + value)
-                    return False
-            except etcd.EtcdKeyNotFound:
-                #dmsg("get " + key + " fail")
-                continue
-
-        return True
-        
-    def __init_register__(self, seq, addr):
-        count = self.sharding
-        
-        for i in range(count):
-            if not self.__init_register_ha(i, seq):
-                continue
-            
-            key = "/sdfs/volume/%s/solt/%d/redis/%d" % (self.volume, i, seq)
-            dmsg("set (%s, %s)" % (key, addr))
-            try:
-                self.etcd.write(key, addr, prevExist=False)
-                dmsg("key %s succss" % (key))
-                return (i, seq)
-            except etcd.EtcdAlreadyExist:
-                dmsg("key %s exist" % (key))
-                continue
-
-        return None
-            
     def __init_register_port(self, path, hostname):
         prefix = "/sdfs/redis/%s" % (hostname)
 
@@ -219,7 +177,7 @@ class Redisd():
         
         idx = None
         for i in range(NODE_PORT):
-            key = prefix + "/" + str(i)
+            key = prefix + "/port/" + str(i)
             try:
                 self.etcd.write(key, "", prevExist=False)
                 idx = i
@@ -237,20 +195,25 @@ class Redisd():
             self.port = str(self.config.redis_baseport + self.port_idx)
             return True
         
-    def __init_register(self, path, hostname):
+    def __init_register_new__(self, slot, replica, addr):
+        key = "/sdfs/volume/%s/slot/%d/redis/%d" % (self.volume, slot, replica)
+        dmsg("set (%s, %s)" % (key, addr))
+        try:
+            self.etcd.write(key, addr, prevExist=False)
+            dmsg("key %s succss" % (key))
+            return True
+        except etcd.EtcdAlreadyExist:
+            dmsg("key %s exist" % (key))
+            return False
+    
+    def __init_register_new(self, path, hostname, reg):
         if not self.__init_register_port(path, hostname):
             return False
 
         self.hostname = hostname
         addr = self.__redis_addr()
 
-        reg = None
-        for i in range(self.replica):
-            reg = self.__init_register__(i, addr)
-            if (reg):
-                break;
-
-        if (reg == None):
+        if not self.__init_register_new__(reg[0], reg[1], addr):
             derror("register fail")
             return False
 
@@ -260,26 +223,27 @@ class Redisd():
         self.id = reg
         return True
 
+    
     def __etcd_create(self, key, value):
-        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], key)
         self.etcd.write(key, value, prevExist=False)
 
     def __etcd_set(self, key, value):
-        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], key)
         self.etcd.write(key, value)
         
     def __etcd_get(self, key):
-        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], key)
         dmsg(key)
         res = self.etcd.read(key)
         return res.value
 
     def __etcd_delete(self, key):
-        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], key)
         self.etcd.delete(key)
     
     def __etcd_update_dbversion(self):
-        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], "dbversion")
+        key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], "dbversion")
         res = self.etcd.read(key)
         idx = res.modifiedIndex
         version = int(res.value)
@@ -377,13 +341,44 @@ class Redisd():
                     break
 
         return True
-                
+
+
+    def __register_get(self):
+        for i in range(self.sharding):
+            for j in range(self.replica):
+                key = "/sdfs/volume/%s/wait/%d/redis/%d.wait" % (self.volume, i, j)
+                try:
+                    value = self.etcd.read(key).value
+                    array = value.split(",")
+                    if (array[0] == self.hostname and int(array[1]) == self.disk_idx):
+                        dmsg("use %s" % (value))
+                        self.etcd.delete(key)
+                        return (i, j)
+                except:
+                    continue
+
+        return None
+
+    
     def init(self, volume):
         self.volume = volume;
+
+        if not self.__layout_global():
+            dwarn("load global layout fail")
+            return False
+        
+        res = self.__register_get()
+        if (res == None):
+            dwarn("get register fail")
+            return False
+
+        dmsg("register %s to volume %s slot(%u, %u)" % (self.workdir, self.volume,
+                                                        res[0], res[1]))
+        
         path = self.workdir
         if (os.path.exists(path + "/config")) :
             derror("%s already inited" % (path))
-            exit(1)
+            return False
 
         config_tmp = os.path.join(path, "config.tmp")
         config = os.path.join(path, "config")
@@ -391,11 +386,7 @@ class Redisd():
         #dmsg(cmd)
         os.system(cmd)
 
-        if not self.__layout_global():
-            dwarn("load global layout fail")
-            return False
-        
-        if not self.__init_register(config_tmp, socket.gethostname()):
+        if not self.__init_register_new(config_tmp, socket.gethostname(), res):
             dwarn("init register fail")
             return False
 
@@ -635,7 +626,7 @@ class Redisd():
         dmsg("health check begin")
         def __health__(args):
             ctx = args
-            cmd = "/opt/sdfs/app/bin/sdfs.health -s /sdfs/volume/%s/solt/%d  > /opt/sdfs/log/health_%s_%d.log 2>&1" % (ctx.volume, ctx.sharding, ctx.volume, ctx.sharding)
+            cmd = "/opt/sdfs/app/bin/sdfs.health -s /sdfs/volume/%s/slot/%d  > /opt/sdfs/log/health_%s_%d.log 2>&1" % (ctx.volume, ctx.sharding, ctx.volume, ctx.sharding)
             dmsg(cmd)
             os.system(cmd)
         
@@ -784,11 +775,13 @@ class RedisDisk(Daemon):
         for i in range(DISK_INSTENCE):
             dir =  "%s/%d" % (self.workdir, i)
             if (os.path.exists(dir + "/config")):
-                redis = Redisd(dir, self.diskid)
+                redis = Redisd(dir, self.diskid, self.localid)
                 self.instence.append(redis)
         
         super(RedisDisk, self).__init__(pidfile, '/dev/null', log, log, self.workdir)
-
+ 
+        self.__update_instence()
+       
     def init(self):
         path = self.workdir
         if (os.path.exists(path + "/inited")) :
@@ -808,19 +801,46 @@ class RedisDisk(Daemon):
 
         #dmsg("begin service1")
 
-        while (self.running):
+        key = "/sdfs/redis/%s/disk/%d/trigger" % (self.hostname, self.localid)
+        index = None
+        while (1):
             dmsg("%s instence %u" % (self.workdir, len(self.instence)))
+
+            #try:
+            res = self.etcd.watch(key, index)
+            dmsg("watch %s return, value %s, idx %u" % (key, res.value, res.etcd_index))
+            self.etcd.write(key, "0")
+            res = self.etcd.read(key)
+            #print str(res)
+            index = res.etcd_index + 1
+            #except:
+            #    derror("watch error")
+            #    continue
+            
+            if not self.running:
+                break
+
             time.sleep(3)
             self.__check_volume()
             self.__check_remove()
 
         dmsg("stoped")
 
+    def __update_instence(self):
+        key = "/sdfs/redis/%s/disk/%d/instence" % (self.hostname, self.localid)
+
+        self.etcd.write(key, str(len(self.instence)))
+
+        key = "/sdfs/redis/%s/disk/%d/trigger" % (self.hostname, self.localid)
+        self.etcd.write(key, "0")
+        
     def __check_remove(self):
         for i in self.instence:
             if (i.removed()):
                 self.instence.remove(i)
-        
+
+        self.__update_instence()
+                
     def __check_volume(self):
         try:
             r = self.etcd.read("/sdfs/volume")._children
@@ -848,9 +868,9 @@ class RedisDisk(Daemon):
 
         lst = []
         for i in range(sharding):
-            solt = "/sdfs/volume/%s/solt/%d/redis" % (volume, i)
+            slot = "/sdfs/volume/%s/slot/%d/redis" % (volume, i)
             try:
-                r = self.etcd.read(solt)._children
+                r = self.etcd.read(slot)._children
                 for i in r:
                     lst.append(i["key"])
             except etcd.EtcdKeyNotFound:
@@ -885,14 +905,16 @@ class RedisDisk(Daemon):
 
         dmsg("workdir: " + workdir)
 
-        redis = Redisd(workdir, self.diskid)
+        redis = Redisd(workdir, self.diskid, self.localid)
         if not redis.init(volume):
             dwarn("register %s to %s fail\n" % (workdir, volume))
             return False
         
-        redis = Redisd(workdir, self.diskid)
+        redis = Redisd(workdir, self.diskid, self.localid)
         redis.start_loop()
         self.instence.append(redis)
+
+        self.__update_instence()
 
         return True
 

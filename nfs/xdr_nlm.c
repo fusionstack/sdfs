@@ -70,7 +70,7 @@ int xdr_nlm_lock(xdr_t *xdrs, struct nlm_lock *lock)
                 goto out;
         if (__xdr_bytes(xdrs, (char**)&lock->fh.val,(u_int*)&lock->fh.len,64))
                 goto out;
-        if (__xdr_bytes(xdrs, (char**)&lock->oh.len,(u_int*)&lock->oh.len,1024))
+        if (__xdr_bytes(xdrs, (char**)&lock->oh.data,(u_int*)&lock->oh.len,1024))
                 goto out;
         if (__xdr_uint32(xdrs, &lock->svid))
                 goto out;

@@ -13,6 +13,8 @@
 
 static void usage(char *prog)
 {
+        prog = "mkdir";
+        
         fprintf(stderr, "\nusage:\n");
         fprintf(stderr, "%s [-vehg]\n", prog);
         fprintf(stderr, "%s [--help|-h]\n", prog);

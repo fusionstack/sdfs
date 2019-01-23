@@ -37,6 +37,8 @@ typedef struct {
 
 extern jobtracker_t *jobtracker;
 
+#if 1
+
 int __jnl_pread(jnl_handle_t *jnl, void *buf, int _size, int64_t _off)
 {
         int ret, fd, no, soff, ssize, size;
@@ -663,3 +665,5 @@ int jnl_pwrite(jnl_handle_t *jnl, const char *buf, uint32_t len, uint64_t offset
 err_ret:
         return ret;
 }
+
+#endif

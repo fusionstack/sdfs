@@ -55,11 +55,16 @@
 #include "configure.h"
 #include "sdfs_conf.h"
 #include "nlm_nsm.h"
+#include "nlm_async.h"
 #include "core.h"
 #include "nfs_events.h"
 #include "yfs_limit.h"
 #include "sdfs_id.h"
 #include "dbg.h"
+
+#if 1
+static int __grace_period__  = 0;
+#endif
 
 #define __FREE_ARGS(__func__, __request__)              \
         do {                                            \
@@ -103,6 +108,7 @@ static void __nlock2slock(int exclusive, struct nlm_lock *alock, sdfs_lock_t *sl
         
         slock->sid = alock->svid;
         slock->owner  = crc32_sum(alock->oh.data, alock->oh.len);
+        //slock->owner = 0;
         slock->start = alock->l_offset;
         slock->length = alock->l_len;
         slock->type = exclusive ? SDFS_WRLOCK : SDFS_RDLOCK;
@@ -147,7 +153,7 @@ static int __nlm4_test_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 
         (void) gid;
         (void) uid;
-        
+
         fileid = (fileid_t *)args->alock.fh.val;
 
         lock = (void *)_lock;
@@ -159,34 +165,27 @@ static int __nlm4_test_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 
         __nlock2slock(args->exclusive, &args->alock, lock);
 
-retry:
-        ret = sdfs_setlock(fileid, lock);
+        memcpy(owner, lock, SDFS_LOCK_SIZE(lock));
+        ret = sdfs_getlock(fileid, owner);
         if (ret) {
-                if (ret == EWOULDBLOCK) {
-                        memcpy(owner, lock, SDFS_LOCK_SIZE(lock));
-                        ret = sdfs_getlock(fileid, owner);
-                        if (ret) {
-                                if (ret == ENOENT) {
-                                        DWARN(FID_FORMAT" unlocked\n", FID_ARG(fileid));
-                                        goto retry;
-                                } else
-                                        GOTO(err_rep, ret);
-                        }
-
-                        if (owner->owner == lock->owner && owner->sid == lock->sid) {
-                                res.test_stat.status = NLM4_GRANTED;
-                                __slock2holder(lock, &res.test_stat.nlm_testrply_u.holder);
-                        } else {
-                                res.test_stat.status = NLM4_DENIED;
-                                __slock2holder(owner, &res.test_stat.nlm_testrply_u.holder);
-                        }
-                } else 
+                if (ret == ENOENT) {
+                        res.test_stat.status = NLM4_GRANTED;
+                        memset(&res.test_stat.nlm_testrply_u.holder,
+                               0x0, sizeof(res.test_stat.nlm_testrply_u.holder));
+                        goto out;
+                } else
                         GOTO(err_rep, ret);
-        } else {
-                __slock2holder(lock, &res.test_stat.nlm_testrply_u.holder);
-                res.test_stat.status = NLM4_GRANTED;
         }
-       
+
+        if (owner->owner == lock->owner && owner->sid == lock->sid) {
+                res.test_stat.status = NLM4_GRANTED;
+                __slock2holder(lock, &res.test_stat.nlm_testrply_u.holder);
+        } else {
+                res.test_stat.status = NLM4_DENIED;
+                __slock2holder(owner, &res.test_stat.nlm_testrply_u.holder);
+        }
+
+out:
         //cookies
         res.cookies.len = args->cookies.len;
         res.cookies.data = (void *)cookie;
@@ -201,12 +200,74 @@ retry:
 
         return 0;
 err_rep:
+        res.test_stat.status = NLM4_DENIED;
         sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                            &res, (xdr_ret_t)xdr_nlm_testres);
 err_ret:
         __FREE_ARGS(nlm_test, buf);
         return ret;
 }
+
+static int __nlm4_lock_grace(const fileid_t *fileid, const sdfs_lock_t *lock)
+{
+        int ret;
+        sdfs_lock_t *owner;
+        char _owner[MAX_LOCK_LEN];
+
+        owner = (void *)_owner;
+        memcpy(owner, lock, SDFS_LOCK_SIZE(lock));
+        ret = sdfs_getlock(fileid, owner);
+        if (ret) {
+                GOTO(err_ret, ret);
+        }
+
+        if (owner->owner != lock->owner || owner->sid != lock->sid) {
+                ret = EWOULDBLOCK;
+                GOTO(err_ret, ret);
+        }
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+static int __nlm4_lock_wait(const fileid_t *fileid, const sdfs_lock_t *lock)
+{
+        int ret, cancel;
+        
+        cancel = 0;
+        ret = nlm4_async_reg(fileid, lock, &cancel);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        while (1) {
+                if (cancel) {
+                        ret = EAGAIN;
+                        DINFO("lock "FID_FORMAT" canceled\n", FID_ARG(fileid));
+                        GOTO(err_reg, ret);
+                }
+
+                ret = sdfs_setlock(fileid, lock);
+                if (ret) {
+                        schedule_sleep("nlm", 100 * 1000);
+                        continue;
+                } else {
+                        DINFO("lock "FID_FORMAT" granted\n", FID_ARG(fileid));
+                        break;
+                }
+        }
+
+        ret = nlm4_async_unreg(fileid, lock, &cancel);
+        if (ret)
+                GOTO(err_ret, ret);
+        
+        return 0;
+err_reg:
+        nlm4_async_unreg(fileid, lock, &cancel);
+err_ret:
+        return ret;
+}
+        
 
 static int __nlm4_lock_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                            uid_t uid, gid_t gid, nfsarg_t *_arg, buffer_t *buf)
@@ -215,9 +276,9 @@ static int __nlm4_lock_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         nlm_lockargs *args = &_arg->lockargs;
         nlm_res res;
         fileid_t *fileid;
-        sdfs_lock_t *lock, *owner;
-        char _lock[MAX_LOCK_LEN], _owner[MAX_LOCK_LEN];
-        char cookie[MAX_BUF_LEN];//, holder;
+        sdfs_lock_t *lock;
+        char _lock[MAX_LOCK_LEN];
+        char cookie[MAX_BUF_LEN];
 
         YASSERT(args->cookies.len < MAX_BUF_LEN);
 
@@ -231,49 +292,41 @@ static int __nlm4_lock_svc(const sockid_t *sockid, const sunrpc_request_t *req,
               args->exclusive, args->alock.svid);
 
         lock = (void *)_lock;
-        owner = (void *)_owner;
         __nlock2slock(args->exclusive, &args->alock, lock);
 
-retry:
-        ret = sdfs_setlock(fileid, lock);
-        if (ret) {
-                if (ret == EWOULDBLOCK) {
-                        if (args->reclaim) {
-                                memcpy(owner, lock, SDFS_LOCK_SIZE(lock));
-                                ret = sdfs_getlock(fileid, owner);
-                                if (ret) {
-                                        if (ret == ENOENT) {
-                                                DWARN(FID_FORMAT" unlocked\n", FID_ARG(fileid));
-                                                goto retry;
-                                        } else
-                                                GOTO(err_rep, ret);
-                                }
-
-                                if (owner->owner == lock->owner && owner->sid == lock->sid) {
-                                        res.stat = NLM4_GRANTED;
-                                } else {
-                                        YASSERT(args->block == 0);
-                                        
-                                        if (args->block)
-                                                res.stat = NLM4_BLOCKED;
-                                        else
-                                                res.stat = NLM4_DENIED;
-                                }
-                        } else {
-                                YASSERT(args->block == 0);
-
-                                if (args->block)
-                                        res.stat = NLM4_BLOCKED;
-                                else
-                                        res.stat = NLM4_DENIED;
-                        }
-                        
-                } else
+        if (unlikely(__grace_period__)) {
+                if (args->reclaim == 0) {
+                        ret = EPERM;
+                        res.stat = NLM4_DENIED_GRACE_PERIOD;
                         GOTO(err_ret, ret);
+                }
+                
+                ret = __nlm4_lock_grace(fileid, lock);
+                if (ret) {
+                        res.stat = NLM4_DENIED_GRACE_PERIOD;
+                        GOTO(err_rep, ret);
+                }
         } else {
+                ret = sdfs_setlock(fileid, lock);
+                if (ret) {
+                        if (ret == EWOULDBLOCK) {
+                                res.stat = NLM4_BLOCKED;
+                                ret = sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
+                                                   &res, (xdr_ret_t)xdr_nlm_res);
+                                if (ret)
+                                        GOTO(err_ret, ret);
+
+                                ret = __nlm4_lock_wait(fileid, lock);
+                                if (ret)
+                                        GOTO(err_ret, ret);
+                        } else
+                                GOTO(err_ret, ret);
+
+                }
+                
                 res.stat = NLM4_GRANTED;
         }
-
+        
         /*cookies
          */
         res.cookies.len = args->cookies.len;
@@ -286,7 +339,6 @@ retry:
                 GOTO(err_ret, ret);
         
         __FREE_ARGS(nlm_lock, buf);
-       
 
         return 0;
 err_rep:
@@ -321,8 +373,11 @@ static int __nlm4_unlock_svc(const sockid_t *sockid, const sunrpc_request_t *req
         lock->type = SDFS_UNLOCK;
         
         ret = sdfs_setlock(fileid, lock);
-        if (ret)
+        if (ret) {
                 GOTO(err_rep, ret);
+        }
+
+        res.stat = NLM4_GRANTED;
         
         //cookies
         res.cookies.len = args->cookies.len;
@@ -338,6 +393,7 @@ static int __nlm4_unlock_svc(const sockid_t *sockid, const sunrpc_request_t *req
         
         return 0;
 err_rep:
+        res.stat = NLM4_DENIED;
         sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                            &res, (xdr_ret_t)xdr_nlm_res);
 err_ret:
@@ -352,6 +408,8 @@ static int __nlm4_cancel_svc(const sockid_t *sockid, const sunrpc_request_t *req
         nlm_cancargs *args = &_arg->cancargs;
         nlm_res res;
         fileid_t *fileid;
+        sdfs_lock_t *lock;
+        char _lock[MAX_LOCK_LEN];
 
         (void) gid;
         (void) uid;
@@ -362,6 +420,12 @@ static int __nlm4_cancel_svc(const sockid_t *sockid, const sunrpc_request_t *req
               FID_ARG(fileid), (LLU)args->alock.l_offset, (LLU)args->alock.l_len,
               args->exclusive, args->alock.svid);
 
+        lock = (void *)_lock;
+        __nlock2slock(args->exclusive, &args->alock, lock);
+        ret = nlm4_async_cancel(fileid, lock);
+        if (ret)
+                GOTO(err_rep, ret);
+        
         res.stat = NLM4_GRANTED;
 
         //cookies
@@ -376,10 +440,12 @@ static int __nlm4_cancel_svc(const sockid_t *sockid, const sunrpc_request_t *req
         __FREE_ARGS(nlm_canc, buf);
 
         return 0;
-//err_rep:
-        //sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
-        //&res, (xdr_ret_t)xdr_nlm_res);
+err_rep:
+        res.stat = NLM4_GRANTED;
+        sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
+                     &res, (xdr_ret_t)xdr_nlm_res);
 err_ret:
+        __FREE_ARGS(nlm_canc, buf);
         return ret;
 
 }
@@ -933,7 +999,7 @@ int nfs_nlm4(const sockid_t *sockid, const sunrpc_request_t *req,
                 break;
 #endif
         default:
-                DERROR("error procedure\n");
+                DERROR("error procedure %d\n", req->procedure);
         }
         
         if (handler == NULL) {
@@ -942,6 +1008,9 @@ int nfs_nlm4(const sockid_t *sockid, const sunrpc_request_t *req,
                 GOTO(err_ret, ret);
         }
 
+        xdr.op = __XDR_DECODE;
+        xdr.buf = buf;
+        
         if (xdr_arg) {
                 if (xdr_arg(&xdr, &nfsarg)) {
                         ret = EINVAL;

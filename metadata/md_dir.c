@@ -469,6 +469,292 @@ int md_readlink(const fileid_t *fileid, char *_buf)
         return inodeop->readlink(fileid, _buf);
 }
 
+#if 1
+
+typedef struct {
+        char name[MAX_NAME_LEN];
+        int port;
+} redis_addr_t;
+
+
+static int __md_mkvol_slot(const char *name, int sharding, int replica, const redis_addr_t *addr)
+{
+        int ret, i, j, k;
+        char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
+
+        k = 0;
+        for (i = 0; i < sharding; i++) {
+                for (j = 0; j < replica; j++) {
+                        snprintf(key, MAX_NAME_LEN, "%s/wait/%d/redis/%d.wait", name, i, j);
+                        snprintf(value, MAX_NAME_LEN, "%s,%d", addr[i].name, addr[k].port);
+                        k++;
+                        
+                        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
+                        if (ret) {
+                                if (ret == EEXIST) {
+                                        continue;
+                                } else {
+                                        GOTO(err_ret, ret);
+                                }
+                        }
+                }
+        }
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+static int __md_mkvol_online(const char *name, int disk)
+{
+        int ret, instence;
+        char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
+        
+        snprintf(key, MAX_NAME_LEN, "%s/disk/%d/instence", name, disk);
+        ret = etcd_get_text(ETCD_REDIS, key, value, NULL);
+        if (ret)
+                return 0;
+
+        instence = atoi(value);
+        if (instence >= 32) {
+                DINFO("skip disk %s:%d\n", name, disk);
+                return 0;
+        }
+
+        snprintf(key, MAX_NAME_LEN, "%s/disk/%d/trigger", name, disk);
+        ret = etcd_update_text(ETCD_REDIS, key, "1", NULL, -1);
+        if (ret)
+                return 0;
+
+        int retry = 0;
+        while (1) {
+                ret = etcd_get_text(ETCD_REDIS, key, value, NULL);
+                if (ret)
+                        return 0;
+
+                if (atoi(value) != 0) {
+                        DINFO("disk %s:%d, trigger %s, retry %u\n", name, disk, value, retry);
+
+                        if (retry > 100) {
+                                DWARN("disk %s:%d, trigger %s not online\n", name, disk, value);
+                                return 0;
+                        } else {
+                                retry++;
+                                usleep(100 * 1000);
+                        }
+                } else {
+                        break;
+                }
+        }
+        
+        return 1;
+}
+
+
+typedef struct {
+        struct list_head hook;
+        char name[MAX_NAME_LEN];
+        int count;
+        int disk[0];
+} redis_list_t;
+
+
+static int __md_mkvol_getredis_disk(const char *hostname, int *disk_array, int *_count)
+{
+        int ret;
+        etcd_node_t *array, *node;
+        char key[MAX_PATH_LEN];
+
+        snprintf(key, MAX_NAME_LEN, "%s/%s/disk", ETCD_REDIS, hostname);
+        ret = etcd_list(key, &array);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        int count = 0, disk;
+        for (int i = 0; i < array->num_node; i++) {
+                node = array->nodes[i];
+
+                DINFO("disk[%s], total %u\n", node->key, node->value, array->num_node);
+                disk = atoi(node->key);
+                if (__md_mkvol_online(hostname, disk)) {
+                        disk_array[count] = disk;
+                        count++;
+                }
+        }
+
+        *_count = count;
+
+        free_etcd_node(array);
+
+        if (count == 0) {
+                ret = ENONET;
+                GOTO(err_ret, ret);
+        }
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+static int __md_mkvol_getredis(struct list_head *list, int *list_count)
+{
+        int ret, i;
+        etcd_node_t *array, *node;
+        int disk[128], count;
+        redis_list_t *ent;
+
+        ret = etcd_list(ETCD_REDIS, &array);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        for (i = 0; i < array->num_node; i++) {
+                node = array->nodes[i];
+
+                DBUG("key %s value %s\n", node->key, node->value);
+                ret = __md_mkvol_getredis_disk(node->key, disk, &count);
+                if (ret) {
+                        if (ret == ENONET) {
+                                continue;
+                        } else
+                                GOTO(err_free, ret);
+                }
+
+                ret = ymalloc((void *)&ent, sizeof(*ent) + sizeof(int) * count);
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+        
+                memcpy(ent->disk, disk, sizeof(int) * count);
+                strcpy(ent->name, node->key);
+                ent->count = count;
+
+                list_add_tail(&ent->hook, list);
+        }
+
+        *list_count = array->num_node;
+
+        free_etcd_node(array);
+        
+        return 0;
+err_free:
+        free_etcd_node(array);
+err_ret:
+        return ret;
+}
+
+static int __md_mkvol_getredis_solo(struct list_head *_list, int list_count,
+                                    int replica, redis_addr_t *addr)
+{
+        int ret;
+        redis_list_t *ent;
+
+        YASSERT(gloconf.solomode);
+        YASSERT(list_count == 1);
+
+        ent = (void *)_list->next;
+
+        if (ent->count < replica) {
+                ret = ENOSPC;
+                GOTO(err_ret, ret);
+        }
+
+        int idx = _random();
+        for (int i = 0; i < replica; i++) {
+                strcpy(addr[i].name, ent->name);
+                addr[i].port = ent->disk[(i + idx) % ent->count];
+        }
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+static int __md_mkvol_getredis_replica(struct list_head *_list, int list_count,
+                                       int replica, redis_addr_t *addr)
+{
+        int ret;
+        struct list_head list, *pos;
+        redis_list_t *ent;
+
+        if (gloconf.solomode && list_count == 1) {
+                return __md_mkvol_getredis_solo(_list, list_count, replica, addr);
+        } else if (replica > list_count) {
+                ret = ENOSPC;
+                GOTO(err_ret, ret);
+        }
+
+        INIT_LIST_HEAD(&list);
+        list_splice_init(_list, &list);
+
+        int i = 0;
+        list_for_each(pos, &list) {
+                ent = (void *)pos;
+
+                strcpy(addr[i].name, ent->name);
+                addr[i].port = ent->disk[_random() % ent->count];
+ 
+                DINFO("replica[%d], node %s:%u, total %u\n", i, addr[i].name, addr[i].port, ent->count);
+                i++;
+        }
+
+        list_splice_init(&list, _list);
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+inline static int __md_mkvol_set_redis(const char *name, int sharding, int replica)
+{
+        int ret, count;
+        struct list_head list;
+        redis_addr_t *addr;
+        struct list_head *pos, *n;
+
+        INIT_LIST_HEAD(&list);
+        ret = __md_mkvol_getredis(&list, &count);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        ret = ymalloc((void *)&addr, sizeof(*addr) * sharding * replica);
+        if (ret)
+                UNIMPLEMENTED(__DUMP__);
+
+
+        int idx = 0;
+        for (int i = 0; i < mdsconf.redis_sharding; i++) {
+                ret = __md_mkvol_getredis_replica(&list, count, replica, &addr[idx]);
+                if (ret)
+                        GOTO(err_free, ret);
+                
+                idx += replica;
+        }
+
+        ret = __md_mkvol_slot(name, sharding, replica, addr);
+        if (ret)
+                GOTO(err_free, ret);
+
+        list_for_each_safe(pos, n, &list) {
+                list_del(pos);
+                yfree((void **)&pos);
+        }
+
+        yfree((void **)&addr);
+        
+        return 0;
+err_free:
+        list_for_each_safe(pos, n, &list) {
+                list_del(pos);
+                yfree((void **)&pos);
+        }
+
+        yfree((void **)&addr);
+err_ret:
+        return ret;
+}
+
+
+#endif
+        
 int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
 {
         int ret;
@@ -476,6 +762,12 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
         uint64_t volid;
 
+#if 1
+        ret = __md_mkvol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_ha);
+        if (ret)
+                GOTO(err_ret, ret);
+#endif
+        
         snprintf(key, MAX_NAME_LEN, "%s/sharding", name);
         snprintf(value, MAX_NAME_LEN, "%d", mdsconf.redis_sharding);
         ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
@@ -674,13 +966,13 @@ err_ret:
         return ret;
 }
 
-static int __md_rmvol_sharding(const char *name, int solt, int replica)
+static int __md_rmvol_sharding(const char *name, int slot, int replica)
 {
         int ret, i, retry;
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
 
         for (i = 0; i < replica; i++) {
-                snprintf(key, MAX_NAME_LEN, "%s/solt/%u/redis/%u", name, solt, i);
+                snprintf(key, MAX_NAME_LEN, "%s/slot/%u/redis/%u", name, slot, i);
 
                 retry = 0;
         retry:
@@ -703,7 +995,7 @@ static int __md_rmvol_sharding(const char *name, int solt, int replica)
                 }
         }
 
-        snprintf(key, MAX_NAME_LEN, "%s/solt/%u", name, solt);
+        snprintf(key, MAX_NAME_LEN, "%s/slot/%u", name, slot);
         ret = etcd_del_dir(ETCD_VOLUME, key, 1);
         if (ret) {
                 if (ret == ENOKEY) {
@@ -722,7 +1014,7 @@ static int __md_rmvol_cleanup(const char *name)
         int ret;
         char key[MAX_PATH_LEN];
         
-        snprintf(key, MAX_NAME_LEN, "%s/solt", name);
+        snprintf(key, MAX_NAME_LEN, "%s/slot", name);
         ret = etcd_del_dir(ETCD_VOLUME, key, 0);
         if (ret) {
                 if (ret == ENOKEY) {

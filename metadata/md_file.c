@@ -199,11 +199,7 @@ static sdfs_lock_t *__md_lock_find(const sdfs_lock_t *lock, char *buf, size_t si
         while (left) {
                 YASSERT(left == SDFS_LOCK_SIZE(pos));
 
-                if (lock->type == pos->type &&
-                    lock->sid == pos->sid &&
-                    lock->owner == pos->owner &&
-                    lock->start == pos->start &&
-                    lock->length == pos->length) {
+                if (sdfs_lock_equal(NULL, lock, NULL, pos)) {
                         return pos;
                 }
 

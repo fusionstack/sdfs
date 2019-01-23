@@ -2,8 +2,7 @@
 
 Simple Distributed File System
 
-Dependencies:
-===========================================================
+#Dependencies:
     epel-release \ 
     cmake libtool automake gcc gcc-g++ redhat-lsb \
     libuuid-devel libaio-devel flex bison python2-futurist \
@@ -25,8 +24,7 @@ Dependencies:
     ./configure 
     make install
 
-Installation
-===========================================================
+#Installation
     cd ${SRC_DIR}
     mkdir build
     cd build
@@ -34,8 +32,7 @@ Installation
     make
     sudo make install
 
-Configuration
-===========================================================
+#Configuration
 vim /opt/sdfs/etc/cluster.conf
 
 update hosts in first column, for example:
@@ -60,13 +57,10 @@ update hosts, for example:
 192.168.140.32 auto1.host155.vmnode32
 192.168.140.33 auto1.host155.vmnode33
 
-
-Create
-===========================================================
+#Create
 
 /opt/sdfs/app/admin/cluster.py create --hosts auto1.host155.vmnode31,auto1.host155.vmnode32,auto1.host155.vmnode33
 
-Auto Testing
-===========================================================
+#Auto Testing
     cd test
     test.py

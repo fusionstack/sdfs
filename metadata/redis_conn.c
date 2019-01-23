@@ -49,7 +49,7 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
         char addr[MAX_BUF_LEN], key[MAX_BUF_LEN];
         char *list[2];
 
-        snprintf(key, MAX_NAME_LEN, "%s/solt/%d/master", volume, sharding);
+        snprintf(key, MAX_NAME_LEN, "%s/slot/%d/master", volume, sharding);
         ret = etcd_get_text(ETCD_VOLUME, key, addr, NULL);
         if(ret)
                 GOTO(err_ret, ret);

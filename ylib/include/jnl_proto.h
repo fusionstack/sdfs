@@ -7,7 +7,6 @@
 #include "sdfs_conf.h"
 #include "job.h"
 #include "sdfs_buffer.h"
-#include "round_journal.h"
 #include "ylock.h"
 
 #define MAX_JNL_LEN (8 * 1024 * 1024)
@@ -56,6 +55,7 @@ typedef struct {
 
 #pragma pack()
 
+#if 1
 /* journal.c */
 int64_t jnl_append(jnl_handle_t *, const char *buf, uint32_t len, job_t *job,
                    int commit, uint64_t *version);
@@ -73,5 +73,5 @@ int jnl_append1(jnl_handle_t *jnl, const char *_buf, uint32_t _size);
 int jnl_write(jnl_handle_t *jnl, const char *_buf, uint32_t _size, uint64_t offset);
 int jnl_pwrite(jnl_handle_t *jnl, const char *buf, uint32_t len, uint64_t offset);
 
-
+#endif
 #endif

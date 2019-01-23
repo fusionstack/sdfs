@@ -546,6 +546,7 @@ class Node:
             pass
 
         tasks = [("app/admin/node.py", "app/bin/sdfs.node"),
+                 ("app/admin/sdfs.py", "app/bin/sdfs"),
                  ("app/admin/cluster.py", "app/bin/sdfs.cluster"),
                  ("app/admin/minio.py", "app/bin/sdfs.minio")]
         for t in tasks:

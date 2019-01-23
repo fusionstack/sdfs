@@ -133,9 +133,7 @@ add_library(ylib SHARED
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/privilege.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/md5.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/squeue.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/round_journal.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/analysis.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/heap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mini_hashtb.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bh.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/fnotify.c
@@ -295,6 +293,7 @@ set (YNFS_SRC_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/xdr_nlm.c
     #${CMAKE_CURRENT_SOURCE_DIR}/nfs/nlm_events.c
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/nlm4.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/nfs/nlm_async.c
     #${CMAKE_CURRENT_SOURCE_DIR}/nfs/nlm_lkcache.c
     #${CMAKE_CURRENT_SOURCE_DIR}/nfs/nlm_nsm.c
     #${CMAKE_CURRENT_SOURCE_DIR}/nfs/hostcache.c
@@ -657,7 +656,7 @@ ENDIF()
 
 # build a CPack driven installer package
 include (InstallRequiredSystemLibraries)
-set (CPACK_RESOURCE_FILE_LICENSE  "${CMAKE_CURRENT_SOURCE_DIR}/License.txt")
+set (CPACK_RESOURCE_FILE_LICENSE  "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 #set (CPACK_SET_DESTDIR true)
 #set (CPACK_PACKAGE_INSTALL_DIRECTORY "./sdfs")
 set (CPACK_PACKAGE_VERSION_MAJOR "${USS_VERSION_MAJOR}")

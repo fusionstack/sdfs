@@ -303,7 +303,24 @@ typedef struct {
         char opaque[0];
 } sdfs_lock_t;
 
-#define SDFS_LOCK_SIZE(__lock__) (sizeof(__lock__) + __lock__->len)
+#define SDFS_LOCK_SIZE(__lock__) (sizeof(*__lock__) + __lock__->len)
+
+static inline int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
+                                  const fileid_t *file2, const sdfs_lock_t *lock2)
+{
+        if (file1 && file2 && chkid_cmp(file1, file2))
+                return 0;
+
+        if (lock1->type == lock2->type &&
+            lock1->sid == lock2->sid &&
+            lock1->owner == lock2->owner &&
+            lock1->start == lock2->start &&
+            lock1->length == lock2->length)
+                return 1;
+        else
+                return 0;
+}
+
 
 int sdfs_init(const char *name);
 

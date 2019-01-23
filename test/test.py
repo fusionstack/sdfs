@@ -516,6 +516,7 @@ def test():
     script_path = os.path.join(CUR_PATH, 'script')
 
     #test_objmv()
+    
     exec_shell("python2 %s/test_list.py --length 10 --home %s >> %s/fileop.log 2>&1" % (CUR_PATH, TEST_PATH, LOG_PATH))
     exec_shell("python2 %s/nfs_test.py --home %s  >> %s/nfs.log 2>&1" % (script_path, TEST_PATH, LOG_PATH))
     exec_shell("python2 %s/ftp_test.py --home %s  >> %s/ftp.log 2>&1" % (script_path, TEST_PATH, LOG_PATH))

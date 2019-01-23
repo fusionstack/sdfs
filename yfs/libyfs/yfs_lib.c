@@ -6,7 +6,6 @@
 
 #define DBG_SUBSYS S_YFSLIB
 
-#include "round_journal.h"
 #include "md_lib.h"
 #include "../../ynet/rpc/rpc_proto.h"
 #include "fnotify.h"

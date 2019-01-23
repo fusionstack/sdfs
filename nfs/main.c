@@ -29,6 +29,7 @@
 #include "proc.h"
 #include "sdfs_quota.h"
 #include "core.h"
+#include "nlm_async.h"
 #include "io_analysis.h"
 #include "allocator.h"
 #include "dbg.h"
@@ -267,6 +268,10 @@ retry:
         if (ret)
                 GOTO(err_ret, ret);
 
+        ret = nlm4_async_init();
+        if (ret)
+                GOTO(err_ret, ret);
+        
         ret = register_nlm_service();
         if (ret) {
                 DERROR("you need portmap installed...\n");
