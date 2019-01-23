@@ -1,0 +1,76 @@
+##############################################################
+# settings
+##############################################################
+rootdir   := ~/gcov
+srcdir    := code              # code dir
+builddir  := build             # build dir
+resultdir := results           # dir for html pages
+infohost  := info.host         # info file on every host
+infototal := info.total        # the resulting info file
+
+# *MUST* CHANGE according to our settings
+hosts := 192.168.1.13
+hosts += 192.168.1.14
+hosts += 192.168.1.15
+hosts += 192.168.1.16
+
+infolist := $(patsubst %,-a info.%, $(hosts))
+
+PROGS := c60d yfs_mds yfs_cds yftp_server proxy_server
+
+.PHONY: clean build test cov recov gcno gcda ok collect genhtml cmake
+
+##############################################################
+# on every node
+##############################################################
+all:
+	@echo "*** Reading Makefile for details! ***"
+
+cmake:
+	-mkdir build
+ifeq ($(CONFIG_VERSION), 1)
+	cd build && cmake -DCMAKE_INSTALL_PREFIX=/sysy/yfs -DCONFIG_GCOV=1 -DNO_VERSION=0 ../code && make
+else
+	cd build && cmake -DCMAKE_INSTALL_PREFIX=/sysy/yfs -DCONFIG_GCOV=1 -DNO_VERSION=1 ../code && make
+endif
+
+clean:
+	-make -C $(builddir) clean
+	-find $(builddir) -name '*.gcno'|xargs rm -f
+	-find $(builddir) -name '*.gcda'|xargs rm -f
+
+build:
+	make -C $(builddir)
+	make -C $(builddir) install
+
+test:
+	for i in $(PROGS); do \
+		/sysy/yfs/app/sbin/$$i -v; \
+	done
+
+cov:
+	lcov -d $(builddir) -c -o $(infohost)
+
+recov: clean build test cov
+
+gcno:
+	find $(builddir) -name '*.gcno'
+
+gcda:
+	find $(builddir) -name '*.gcda'
+
+##############################################################
+# on control node
+##############################################################
+ok: collect genhtml
+
+# get $(infohost)
+collect:
+	for i in $(hosts); do \
+		rsync -avz root@$$i:$(rootdir)/$(infohost) info.$$i; \
+	done
+
+# and then generate html pages
+genhtml:
+	lcov $(infolist) -o $(infototal)
+	genhtml -o $(resultdir) $(infototal)

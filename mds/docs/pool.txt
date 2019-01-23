@@ -1,0 +1,17 @@
+in mds image file
+
+file -> chunkid (md ops log)
+
+in mds mem
+
+filepool:
+
+file -> chunkid (skiplist)
+del_list (skiplist)
+delfile_list (list)
+
+chunkpool:
+
+chunkid -> file
+
+chunkid

@@ -1,0 +1,29 @@
+mdp chkget:
+
+1, choose mds handler
+
+*serviceno = hash_str(chkget_req->path) % servicenum;
+
+2, choose disk pool
+
+#if 0
+        if (mds_info.diskid > (unsigned)dp->group)
+                grp = chunkid.id % dp->group;
+        else
+                grp = (chunkid.id % mds_info.diskid) % dp->group;
+#else
+        if (mds_info.diskid > (unsigned)dp->group)
+                grp = random() % dp->group;
+        else
+                grp = (random() % dp->group) % dp->group;
+#endif
+
+mdp diskjoin:
+
+1, choose mds handler
+
+*serviceno = diskjoin_req->img.diskid.id % servicenum;
+
+2, choose disk pool
+
+grp = diskinfo->diskid.id % dp->group;

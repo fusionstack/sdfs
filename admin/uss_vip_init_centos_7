@@ -1,0 +1,13 @@
+[Unit]
+Description=uss_vip
+DefaultDependencies=no
+After=network.target local-fs.target
+
+[Service]
+Type=forking
+ExecStart=/opt/fusionnas/app/bin/uss.node vipstart
+ExecStop=/opt/fusionnas/app/bin/uss.node vipstop
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

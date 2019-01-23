@@ -1,0 +1,42 @@
+AC_INIT([yftp],[0.0.1])
+AC_CANONICAL_TARGET
+AM_INIT_AUTOMAKE
+AC_CONFIG_HEADERS([include/config.h])
+
+AC_PROG_CC
+AC_PROG_LIBTOOL
+AC_PROG_INSTALL
+
+case $target_os in
+    *linux*)    arch=linux;;
+    *bsd*)      arch=bsd;;
+    *)          arch=unknown;;
+esac
+
+if test "$ac_env_CFLAGS_set" != set; then
+    CFLAGS="-Wall -Werror -g"
+fi
+
+CPPFLAGS="$CPPFLAGS -W -Wall -D_GNU_SOURCE -D_REENTRANT -I../../parser/include -I../../ynet/include -I../../ylib/include/ -I../../yfs/include/"
+
+LIBS=-lpthread
+
+AC_CHECK_FUNCS([pthread_rwlock_init])
+
+subdirs=" \
+	include \
+	src \
+	"
+
+AC_SUBST(subdirs)
+
+AM_CONDITIONAL(LINUX, test "$arch" = linux)
+AM_CONDITIONAL(BSD, test "$arch" = bsd)
+
+AC_CONFIG_FILES([ \
+	Makefile \
+	include/Makefile \
+	src/Makefile \
+	])
+
+AC_OUTPUT

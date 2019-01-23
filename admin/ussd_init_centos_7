@@ -1,0 +1,13 @@
+[Unit]
+Description=uss_node
+DefaultDependencies=no
+After=network.target local-fs.target
+
+[Service]
+Type=forking
+ExecStart=/opt/fusionnas/app/bin/uss.node start
+ExecStop=/opt/fusionnas/app/bin/uss.node stop
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

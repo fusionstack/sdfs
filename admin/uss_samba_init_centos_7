@@ -1,0 +1,14 @@
+[Unit]
+Description=uss_samba
+DefaultDependencies=no
+After=network.target local-fs.target
+
+[Service]
+Type=forking
+ExecStart=/opt/fusionnas/app/admin/samba.py start
+ExecReload=/opt/fusionnas/app/admin/samba.py reload
+ExecStop=/opt/fusionnas/app/admin/samba.py stop
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

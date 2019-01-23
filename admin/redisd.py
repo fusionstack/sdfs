@@ -1,0 +1,971 @@
+#!/usr/bin/env python2
+
+import os
+import sys
+import socket
+import time
+import subprocess
+import fcntl
+import types
+import errno
+import getopt
+import random
+import threading
+import traceback
+import json
+import urllib2
+import etcd
+import uuid
+
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from SocketServer import ThreadingMixIn
+#import BaseHTTPServer
+from SimpleHTTPServer import SimpleHTTPRequestHandler
+from signal import SIGTERM 
+
+#sys.path.insert(0, os.path.split(os.path.realpath(__file__))[0] + "/../")
+
+from daemon import Daemon
+from config import Config
+from utils import dmsg, derror, dwarn, _check_config, set_value, get_value, exec_shell, _str2dict
+
+DISK_INSTENCE = 32
+NODE_PORT = 100
+
+class Handler(BaseHTTPRequestHandler):
+    def __sendfile(self, path):
+        size = os.path.getsize(path)
+        dmsg("%s size %u" % (path, size))
+
+        fd = open(path, 'r')
+        left = size
+        while (left > 0):
+            if (left > 524288):
+                cp = 524288
+            else:
+                cp = left
+
+            #_dmsg("send %s %u"  % (path, cp))
+            buf = fd.read(cp)
+            self.wfile.write(buf)
+            left -= cp
+
+        fd.close()
+
+        return
+
+    def __get_io(self):
+        config = Config()
+        tmp = config.home + '/tmp/dump'
+        name ='io.' + str(int(time.time()))
+        tar = tmp +'/' +  name + '.' + 'tar.gz'
+        os.system('mkdir -p %s/dump/io' % (tmp))
+        cmd = 'mv %s/io %s/%s > /dev/null 2>&1' % (tmp, tmp, name)
+        #_dmsg(cmd)
+        os.system(cmd)
+        cmd = 'tar czvf %s -C %s %s >> /dev/null && rm -rf %s' % (tar, tmp, name, tmp + '/' + name)
+        #_dmsg(cmd)
+        os.system(cmd)
+
+        self.send_response(200)
+        size = os.path.getsize(tar)
+        self.send_header('Content-type', 'application/gzip')
+        self.send_header('Content-length', str(size))
+        self.end_headers()
+
+        self.__sendfile(tar)
+
+        cmd = 'rm %s' % (tar)
+        #_dmsg(cmd)
+        os.system(cmd)
+        return
+
+    def do_GET(self):
+        if (self.path == '/io.tar.gz'):
+            self.__get_io()
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Handle requests in a separate thread."""
+
+#class Redisd(Daemon):
+class Redisd():
+    def __init__(self, workdir, diskid):
+        self.config = Config()
+        self.workdir = workdir
+        self.diskid = diskid
+        self.localid = int(self.workdir.split('/')[-1])
+        self.hostname = socket.gethostname()
+        self.etcd = etcd.Client(host='127.0.0.1', port=2379)
+        self.id = None
+        self.volume = None
+        self.running = True
+        self.replica_info = None
+        self.disk_check = time.time();
+        self.__redis_pid(False);
+
+        os.system('mkdir -p ' + self.workdir + '/run')
+
+        self.__layout_local()
+        self.__layout_global()
+
+    def __layout_local(self):
+        config = os.path.join(self.workdir, "config")
+
+        #dmsg("load local layout")
+        try:
+            self.volume = get_value(config + "/volume")
+            if (self.volume[-1] == '\n'):
+                self.volume = self.volume[:-1]
+            
+            v = get_value(config + "/id")
+            t = v[1:-1].split(',')
+            self.id = (int(t[0]), int(t[1]))
+
+            v = get_value(config + "/port")
+            self.port_idx = int(v)
+            self.port = str(self.config.redis_baseport + self.port_idx)
+            return True
+        except:
+            self.port = None
+            #dmsg("load local layout fail")
+            return False
+
+    def __layout_global(self):
+        #dmsg("load global layout")
+        if not self.volume:
+            return False
+        
+        try:
+            #print (self.volume + "/sharding")
+            self.sharding = int(self.etcd.read("/sdfs/volume/" + self.volume + "/sharding").value)
+            self.replica = int(self.etcd.read("/sdfs/volume/" +self.volume + "/replica").value)
+
+            #dmsg("%s sharding %d replica %d" % (self.volume, self.sharding, self.replica))
+            return True
+        except etcd.EtcdKeyNotFound:
+            return False
+
+        
+    def __init_redisconf(self, path, hostname):
+        src = os.path.join(self.config.home, "etc/redis.conf.tpl")
+        dist = os.path.join(path, "redis.conf")
+        cmd = "cp " + src + " " + dist
+        os.system(cmd)
+
+        cmd = "mkdir -p " + self.workdir + "/data"
+        os.system(cmd)
+        #cmd = "chmod a+w " + self.workdir + "/data"
+        #os.system(cmd)
+        _check_config(dist, "port", " ", self.port, True)
+        _check_config(dist, "dir", " ", self.workdir + "/data", True)
+        _check_config(dist, "pidfile", " ", self.workdir + "/run/redis-server.pid", True)
+        _check_config(dist, "logfile", " ", self.workdir + "/redis.log", True)
+        _check_config(dist, "bind", " ", hostname, True)
+        return True
+
+    def __init_register_ha(self, slot, seq):
+        #if (seq == 0 or self.config.solomode):
+        if (seq == 0):
+            return True
+
+        for i in range(seq):
+            key = "/sdfs/volume/%s/solt/%d/redis/%d" % (self.volume, slot, i)
+            try:
+                value = self.etcd.read(key).value
+                array = value.split(" ")
+                host = array[0]
+                if not self.config.solomode and host == self.hostname:
+                        dmsg("skip " + value)
+                        return False
+                diskid = array[2]
+                if (diskid == self.diskid):
+                    dmsg("skip " + value)
+                    return False
+            except etcd.EtcdKeyNotFound:
+                #dmsg("get " + key + " fail")
+                continue
+
+        return True
+        
+    def __init_register__(self, seq, addr):
+        count = self.sharding
+        
+        for i in range(count):
+            if not self.__init_register_ha(i, seq):
+                continue
+            
+            key = "/sdfs/volume/%s/solt/%d/redis/%d" % (self.volume, i, seq)
+            dmsg("set (%s, %s)" % (key, addr))
+            try:
+                self.etcd.write(key, addr, prevExist=False)
+                dmsg("key %s succss" % (key))
+                return (i, seq)
+            except etcd.EtcdAlreadyExist:
+                dmsg("key %s exist" % (key))
+                continue
+
+        return None
+            
+    def __init_register_port(self, path, hostname):
+        prefix = "/sdfs/redis/%s" % (hostname)
+
+        if (os.path.exists(path + "/port")):
+            self.port_idx = int(get_value(path + "/port"))
+            self.port = str(self.config.redis_baseport + self.port_idx)
+            return True
+        
+        idx = None
+        for i in range(NODE_PORT):
+            key = prefix + "/" + str(i)
+            try:
+                self.etcd.write(key, "", prevExist=False)
+                idx = i
+                break;
+            except etcd.EtcdAlreadyExist:
+                continue;
+
+        if (idx == None):
+            derror("no port space in " + prefix )
+            return False
+        else:
+            dmsg("register port " + str(idx))
+            set_value(path + "/port", str(idx))
+            self.port_idx = idx
+            self.port = str(self.config.redis_baseport + self.port_idx)
+            return True
+        
+    def __init_register(self, path, hostname):
+        if not self.__init_register_port(path, hostname):
+            return False
+
+        self.hostname = hostname
+        addr = self.__redis_addr()
+
+        reg = None
+        for i in range(self.replica):
+            reg = self.__init_register__(i, addr)
+            if (reg):
+                break;
+
+        if (reg == None):
+            derror("register fail")
+            return False
+
+        dmsg("register %s %s " % (self.volume, str(reg)))
+        set_value(path + "/id", str(reg))
+        set_value(path + "/volume", self.volume)
+        self.id = reg
+        return True
+
+    def __etcd_create(self, key, value):
+        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        self.etcd.write(key, value, prevExist=False)
+
+    def __etcd_set(self, key, value):
+        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        self.etcd.write(key, value)
+        
+    def __etcd_get(self, key):
+        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        dmsg(key)
+        res = self.etcd.read(key)
+        return res.value
+
+    def __etcd_delete(self, key):
+        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], key)
+        self.etcd.delete(key)
+    
+    def __etcd_update_dbversion(self):
+        key = "/sdfs/volume/%s/solt/%d/%s" % (self.volume, self.id[0], "dbversion")
+        res = self.etcd.read(key)
+        idx = res.modifiedIndex
+        version = int(res.value)
+
+        try:
+            res = self.etcd.write(key, version + 1, prevIndex=idx)
+        except etcd.EtcdCompareFailed:
+            return -1
+
+        return version + 1
+        
+    def redis_stop(self):
+        try:
+            os.kill(self.redis_pid, SIGTERM)
+        except:
+            pass
+        
+        pidfile = os.path.join(self.workdir, 'run/redis-server.pid')
+
+        cmd = "rm %s > /dev/null 2>&1" % (pidfile)
+        try:
+            #pid = int(get_value(pidfile))
+            #os.kill(pid, SIGTERM)
+            os.system(cmd)
+        except OSError:
+            pass
+
+    def __redis_pid(self, force):
+        pidfile = os.path.join(self.workdir, 'run/redis-server.pid')
+
+        while (1):
+            if os.path.exists(pidfile):
+                self.redis_pid = int(get_value(pidfile))
+                break;
+            else:
+                if force:
+                    time.sleep(0.1)
+                else:
+                    break;
+                    
+    def __redis_start(self):
+        cmd = "redis-server %s/config/redis.conf" % (self.workdir)
+        os.system(cmd)
+
+        pidfile = os.path.join(self.workdir, 'run/redis-server.pid')
+
+        self.__redis_pid(True);
+        
+    def __init_redis_master(self, config):
+        try:
+            self.__etcd_create("dbversion", "0")
+            dmsg("create dbversion " + str(self.id))
+        except etcd.EtcdAlreadyExist:
+            dmsg("dbversion exist")
+            pass
+
+        #self.__etcd_create("master", self.hostname + " " + self.port)
+        
+        #cmd = "redis-server %s/redis.conf" % (config)
+        #os.system(cmd)
+
+        #cmd = "redis-cli -h %s -p %s set dbversion 0" % (self.hostname, self.port)
+        #os.system(cmd)
+
+        #self.redis_stop(self)
+
+    def __init_redis_slave(self, config):
+        retry = 0
+        while (self.running):
+            try:
+                self.__etcd_get("dbversion")
+                return True
+            except:
+                if (retry > 100):
+                    dwarn("get dbversion " + str(self.id) + " fail")
+                    return False
+                time.sleep(0.1)
+                retry = retry + 1
+
+        #master = self.__etcd_get("master")
+        #redis_config = config + "/redis.conf"
+        #_check_config(redis_config, "slaveof", " ", master, True)
+
+        #cmd = "redis-server %s/redis.conf" % (config)
+        #os.system(cmd)
+        
+    def __init_redis(self, config):
+        while (self.running):
+            locked = self.__lock()
+            if (locked):
+                self.__init_redis_master(config)
+                break;
+            else:
+                if (self.__init_redis_slave(config)):
+                    break
+
+        return True
+                
+    def init(self, volume):
+        self.volume = volume;
+        path = self.workdir
+        if (os.path.exists(path + "/config")) :
+            derror("%s already inited" % (path))
+            exit(1)
+
+        config_tmp = os.path.join(path, "config.tmp")
+        config = os.path.join(path, "config")
+        cmd = "mkdir -p " + config_tmp
+        #dmsg(cmd)
+        os.system(cmd)
+
+        if not self.__layout_global():
+            dwarn("load global layout fail")
+            return False
+        
+        if not self.__init_register(config_tmp, socket.gethostname()):
+            dwarn("init register fail")
+            return False
+
+        if not self.__init_redisconf(config_tmp, socket.gethostname()):
+            dwarn("init redis.conf fail")
+            return False
+            
+        if not self.__init_redis(config_tmp):
+            dwarn("init redis fail")
+            return False
+
+        self.running = False
+        #dmsg("running " + str(self.running))
+
+        cmd = "mv " + config_tmp + " " + config
+        os.system(cmd)
+
+        self.__layout_local()
+        return True
+
+    def __redis_ismaster(self):
+        #return self.lock.is_acquired
+
+        #dmsg("%s redis master check" % (self.workdir))
+        if not self.lock.is_acquired:
+            #dmsg("%s not locked" % (self.workdir))
+            return False
+
+        cmd = "redis-cli -h %s -p %s info replication | grep role | awk -F ':' '{print $2}'" % (self.hostname, self.port)
+        #dmsg(cmd)
+        retry = 0
+        while (self.running):
+            try:
+                res = exec_shell(cmd, need_return=True, p=False)
+                break;
+            except Exp, e:
+                time.sleep(1)
+                retry += 1;
+                continue;
+
+        #dmsg("result " + str(res))
+        #return self.lock.is_acquired
+            
+        r = res[0]
+
+        #return True
+        if (r.find("master") != -1):
+            return True
+        else:
+            derror("%s lost master, role %s" % (self.workdir, r))
+            self.lock.release()
+            return False
+        
+
+    def __lock(self, background = True):
+        path = self.workdir
+        #dmsg(str(self.id))
+        #print "xxx:" + self.volume
+        name = "volume(%s,%d)" % (self.volume, self.id[0])
+        #print name
+        self.lock = etcd.Lock(self.etcd, name)
+        self.lock.acquire(blocking=False, lock_ttl=10)
+        self.running = True
+
+ 
+        def __lock__(args):
+            ctx = args
+            while (ctx.running):
+                try:
+                    ret = ctx.lock.acquire(blocking=False,  lock_ttl=10)
+                    if (ret):
+                        dmsg("%s run as master %s" % (self.workdir, name))
+                    else:
+                        dmsg("%s run as slave %s" % (self.workdir, name))
+
+                except etcd.EtcdException:
+                    derror(self.workdir + " etcd error fail, acquire:" + str(self.lock.is_acquired))
+                    #print(str(etcd.EtcdException))
+                    
+                time.sleep(3)
+
+            ctx.lock.release()
+
+        if (background):
+            self.lockthread = threading.Thread(target=__lock__, args=[self])
+            self.lockthread.start()
+        return self.lock.is_acquired
+
+    def removed(self):
+        try:
+            sharding = int(self.etcd.read("/sdfs/volume/" + self.volume + "/sharding").value)
+            replica = int(self.etcd.read("/sdfs/volume/" + self.volume + "/replica").value)
+
+        except etcd.EtcdKeyNotFound:
+            dmsg("volume %s removed, exiting.." % (self.volume))
+            self.__exit()
+            return True
+
+        return False
+
+    def __exit(self):
+        self.running = False
+
+        self.remove()
+
+        try:
+            dmsg("%s waiting lock thread exiting ..." % (self.workdir))
+            self.lockthread.join()
+            dmsg("lock thread exited")
+        except AttributeError:
+            pass
+
+        try:
+            dmsg("%s waiting mainloop thread exiting ..." % (self.workdir))
+            self.loop.join()
+            dmsg("%s mainloop thread exited" % (self.workdir))
+        except AttributeError:
+            pass
+
+        self.redis_stop()
+
+        removedir = self.workdir + "/../removed"
+        cmd = "mkdir -p " + removedir
+        print cmd
+        os.system(cmd)
+        cmd = "mv %s %s/%d.%s" % (self.workdir, removedir, self.localid, str(uuid.uuid1()))
+        print cmd
+        os.system(cmd)
+
+        dmsg("%s exited" % (self.workdir))
+        
+    def __redis_dbversion(self):
+        cmd = "redis-cli -h %s -p %s get dbversion" % (socket.gethostname(), self.port)
+
+        retry = 0
+        while (self.running):
+            try:
+                res = exec_shell(cmd, need_return=True)
+                break;
+            except:
+                if (retry > 10):
+                    self.running = False
+                    exit(1)
+                time.sleep(1)
+                retry += 1;
+                continue;
+                
+        r = res[0][:-1]
+        if (len(r) == 0):
+            return 0
+        else:
+            return int(r)
+
+    def __get_replica_info(self):
+        cmd = "redis-cli -h %s -p %s info replication" % (self.hostname, self.port)
+
+        res = exec_shell(cmd, p=False, need_return=True)
+        d = _str2dict(res[0])
+        return d
+
+    def __wait_sync(self):
+        dbversion_local = self.__redis_dbversion()
+
+        dbversion_etcd = int(self.__etcd_get("dbversion"))
+
+        blocklist = "blocklist/" + self.hostname + ":" + self.port
+        blocked = None
+        try:
+            blocked = self.__etcd_get(blocklist)
+        except etcd.EtcdKeyNotFound:
+            pass
+
+        if (dbversion_etcd == dbversion_local or not blocked):
+            return
+
+        derror("dbversion not equal local %d remote %d"
+               % (dbversion_local, dbversion_etcd))
+        
+        self.__etcd_set(blocklist, "blocked")
+        master = self.__run_slave__()
+
+        while (1):
+            info = self.__get_replica_info()
+            if (info['master_repl_offset'] == info['slave_repl_offset']):
+                break;
+        
+        dmsg("sync finish from master %s, remove block %s\n" %s (master, blocklist))
+        self.__etcd_delete(blocklist)
+
+    def __update_dbversion(self):
+        dbversion = self.__etcd_update_dbversion()
+        if (dbversion == -1):
+            dwarn("master fail\n")
+            return
+
+        dmsg("update dbversion to %d" % (dbversion))
+        cmd = "redis-cli -h %s -p %s set dbversion %d" % (self.hostname, self.port, dbversion)
+        os.system(cmd)
+
+    def __replica_changed(self):
+        retval = False
+        
+        replica_info = self.__get_replica_info()
+        if (self.replica_info == None):
+            retval = False
+        elif (self.replica_info['connected_slaves'] != replica_info['connected_slaves']):
+            dmsg("replica changed %s -> %s" % (self.replica_info['connected_slaves'],
+                                               replica_info['connected_slaves']))
+            retval = True
+        else:
+            retval = False
+
+        self.replica_info = replica_info
+        #dmsg("retval: " + str(retval))
+        return retval
+
+    def __disk_check(self):
+        now = time.time()
+        if (now - self.disk_check < 3):
+            return
+
+        path = self.workdir + "/disk_check"
+
+        try:
+            _set_value(path, "disk_check");
+        except:
+            derror("write %s fail" % (path))
+            self.redis_stop()
+
+    def __heath_check(self):
+        now = time.time()
+        if (now - self.last_check < (60 * 10)):
+            return;
+
+        self.last_check = now
+
+        dmsg("health check begin")
+        def __health__(args):
+            ctx = args
+            cmd = "/opt/sdfs/app/bin/sdfs.health -s /sdfs/volume/%s/solt/%d  > /opt/sdfs/log/health_%s_%d.log 2>&1" % (ctx.volume, ctx.sharding, ctx.volume, ctx.sharding)
+            dmsg(cmd)
+            os.system(cmd)
+        
+        self.health_thread = threading.Thread(target=__health__, args=[self])
+        self.health_thread.start()
+            
+    def __run_master(self):
+        dmsg("run as master")
+        cmd = "redis-cli -h %s -p %s SLAVEOF NO ONE" % (self.hostname, self.port)
+        os.system(cmd)
+        self.last_check = time.time()
+
+        self.__update_dbversion()
+        self.__etcd_set("master", self.hostname + " " + self.port)
+
+        while (self.running):
+            if (not self.__redis_ismaster()):
+                dwarn("master fail\n")
+                break;
+            else:
+                if (self.__replica_changed()):
+                    self.__update_dbversion()
+
+                self.__heath_check()
+            time.sleep(0.1)
+                
+    def __set_slave__(self):
+        retry = 0
+
+        while (1):
+            try:
+                master = self.__etcd_get("master")
+            except etcd.EtcdKeyNotFound:
+                dwarn("master not found, retry %d" % retry)
+                retry = retry + 1
+                if (retry > 5):
+                    break;
+                else:
+                    time.sleep(1)
+                    continue
+                
+            dmsg("%s get master %s" % (self.workdir, master))
+            cmd = "redis-cli -h %s -p %s SLAVEOF %s" % (self.hostname, self.port, master)
+            os.system(cmd)
+            return master
+
+    def __run_slave(self):
+        dmsg("%s run as slave" % (self.workdir))
+        master = self.__set_slave__()
+
+        if (master == None):
+            dmsg("set slave fail")
+            return
+        
+        while (self.running):
+            if (self.lock.is_acquired):
+                dwarn("%s master %s fail\n" % (self.workdir, master))
+                break;
+            else:
+                time.sleep(1)
+
+    def __redis_addr(self):
+        return self.hostname + " " + self.port + " " + self.diskid
+                
+    def run(self):
+        key = "redis/%s" % (self.id[1])
+
+        addr = self.__redis_addr()
+        try:
+            value = self.__etcd_get(key)
+        except etcd.EtcdKeyNotFound:
+            dmsg("%s:(%s) not exist" % (key, addr))
+            exit(1)
+
+        if (value != addr):
+            dmsg("server replaced %s -> %s" % (addr, value))
+            exit(1)
+
+        self.__redis_start()
+        self.__wait_sync()
+
+        self.__lock()
+
+        while (self.running):
+            if (self.lock.is_acquired):
+                self.__run_master()
+            else:
+                self.__run_slave()
+
+    def status(self):
+        cmd = "redis-cli -h %s -p %s info replication" % (self.hostname, self.port)
+
+        try:
+            (out, err) = exec_shell(cmd, p=False, need_return=True)
+            return out
+        except:
+            return None
+
+    def remove(self):
+        key = "redis/%s" % (self.id[1])
+        try:
+            self.__etcd_delete(key)
+        except etcd.EtcdKeyNotFound:
+            pass
+        
+    def stop(self):
+        self.redis_stop()
+        #super(Redisd, self).stop()
+
+    def start_loop(self):
+        def __loop__(args):
+            ctx = args
+            ctx.run()
+        
+        self.loop = threading.Thread(target=__loop__, args=[self])
+        self.loop.start()
+        
+class RedisDisk(Daemon):
+    def __init__(self, workdir):
+        self.config = Config()
+        self.workdir = workdir
+        self.localid = int(self.workdir.split('/')[-1])
+        self.hostname = socket.gethostname()
+        self.etcd = etcd.Client(host='127.0.0.1', port=2379)
+        self.id = None
+        self.running = True
+        self.replica_info = None
+        self.disk_check = time.time();
+        self.instence = []
+
+        diskid = os.path.join(self.workdir, "inited")
+        try:
+            self.diskid = get_value(diskid)
+            #dmsg("diskid %s" % (self.diskid))
+        except:
+            self.diskid = None
+            #dmsg("diskid not exist")
+            pass
+
+        os.system('mkdir -p ' + self.config.home + '/log')
+        os.system('mkdir -p ' + self.workdir + '/run')
+        pidfile = os.path.join(self.workdir, 'run/redisd.pid')
+        log = self.config.home + '/log/redis_disk_%d.log' % (self.localid)
+        os.system('touch ' + log)
+
+        for i in range(DISK_INSTENCE):
+            dir =  "%s/%d" % (self.workdir, i)
+            if (os.path.exists(dir + "/config")):
+                redis = Redisd(dir, self.diskid)
+                self.instence.append(redis)
+        
+        super(RedisDisk, self).__init__(pidfile, '/dev/null', log, log, self.workdir)
+
+    def init(self):
+        path = self.workdir
+        if (os.path.exists(path + "/inited")) :
+            derror("%s already inited" % (path))
+            return False
+
+        self.diskid = str(uuid.uuid1())
+        set_value(path + "/inited", self.diskid)
+        self.running = False
+        return True
+
+    def run(self):
+        #dmsg("begin service")
+        
+        for i in self.instence:
+            i.start_loop()
+
+        #dmsg("begin service1")
+
+        while (self.running):
+            dmsg("%s instence %u" % (self.workdir, len(self.instence)))
+            time.sleep(3)
+            self.__check_volume()
+            self.__check_remove()
+
+        dmsg("stoped")
+
+    def __check_remove(self):
+        for i in self.instence:
+            if (i.removed()):
+                self.instence.remove(i)
+        
+    def __check_volume(self):
+        try:
+            r = self.etcd.read("/sdfs/volume")._children
+            lst = []
+            for i in r:
+                lst.append(i["key"].split("/")[-1])
+        except etcd.EtcdKeyNotFound:
+            return False
+
+        for i in lst:
+            self.__check_volume__(i)
+
+        return True
+        #dmsg(str(lst))
+
+    def __check_volume__(self, volume):
+        #print volume
+        try:
+            sharding = int(self.etcd.read("/sdfs/volume/" + volume + "/sharding").value)
+            replica = int(self.etcd.read("/sdfs/volume/" + volume + "/replica").value)
+
+            #dmsg("%s sharding %d replica %d" % (volume, sharding, replica))
+        except etcd.EtcdKeyNotFound:
+            return False
+
+        lst = []
+        for i in range(sharding):
+            solt = "/sdfs/volume/%s/solt/%d/redis" % (volume, i)
+            try:
+                r = self.etcd.read(solt)._children
+                for i in r:
+                    lst.append(i["key"])
+            except etcd.EtcdKeyNotFound:
+                pass
+
+        #print "sharing + replica :" + str(lst)
+
+        count = sharding * replica - len(lst)
+        if (count == 0):
+            #dmsg("%s registed" % (volume))
+            return False
+        else:
+            dmsg("%s need registed" % (volume))
+
+        for i in range(count):
+            self.__register(volume)
+
+    def __register(self, volume):
+        workdir = None
+        for i in range(DISK_INSTENCE):
+            dir =  "%s/%d" % (self.workdir, i)
+            if (os.path.exists(dir + "/config")):
+                continue
+
+            cmd = "mkdir " + dir
+            os.system(cmd)
+            workdir = dir
+            break;
+
+        if not workdir:
+            return False
+
+        dmsg("workdir: " + workdir)
+
+        redis = Redisd(workdir, self.diskid)
+        if not redis.init(volume):
+            dwarn("register %s to %s fail\n" % (workdir, volume))
+            return False
+        
+        redis = Redisd(workdir, self.diskid)
+        redis.start_loop()
+        self.instence.append(redis)
+
+        return True
+
+    #def stop(self):
+    #    dmsg("stop redis")
+
+    def stop(self):
+        for i in self.instence:
+            i.redis_stop()
+        
+        super(RedisDisk, self).stop()
+
+    def status(self):
+        s = []
+        for i in self.instence:
+            s.append(i.status())
+
+        return s
+    
+def usage():
+    print ("usage:")
+    print (sys.argv[0] + " --init <workdir>")
+    print (sys.argv[0] + " --start <workdir>")
+    print (sys.argv[0] + " --stop <workdir>")
+    print (sys.argv[0] + " --remove <workdir>")
+    #print (sys.argv[0] + " --test")
+    print (sys.argv[0])
+
+def main():
+    op = ''
+    ext = None
+    try:
+        opts, args = getopt.getopt(
+                sys.argv[1:], 
+            'h', ['start', 'stop', 'help', 'test', 'init', 'status', 'remove', 'restart']
+                )
+    except getopt.GetoptError, err:
+        print str(err)
+        usage()
+
+    redisdisk = RedisDisk(sys.argv[2])
+    for o, a in opts:
+        if o in ('--help'):
+            usage()
+            exit(0)
+        elif (o == '--start'):
+            op = o
+            redisdisk.start()
+        elif (o == '--stop'):
+            op = o
+            redisdisk.stop()
+        elif (o == '--init'):
+            op = o
+            redisdisk.init()
+        elif (o == '--test'):
+            redisdisk.run()
+        elif (o == '--status'):
+            res = redisdisk.status()
+            if (res):
+                for i in res:
+                    print i
+            else:
+                print "offline"
+        elif (o == '--remove'):
+            redisdisk.remove()
+        elif (o == '--restart'):
+            redisdisk.restart()
+        else:
+            assert False, 'oops, unhandled option: %s, -h for help' % o
+            exit(1)
+
+if __name__ == '__main__':
+    if (len(sys.argv) == 1):
+        usage()
+    else:
+        main()

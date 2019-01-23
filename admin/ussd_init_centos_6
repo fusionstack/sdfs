@@ -1,0 +1,24 @@
+#!/bin/sh
+#chkconfig: 2345 42 42 
+#description: lichd service 
+
+RETVAL=0
+case "$1" in
+        status)
+                lich.node --stat
+                ;;
+        start)
+                lich.node --start
+                ;;
+        stop)
+                lich.node --stop
+                ;;
+        restart)
+                lich.node --stop
+                lich.node --start
+                ;;
+        *)
+                echo $"Usage: $0 {start|stop|restart|status}"
+                RETVAL=2
+esac
+exit $RETVAL

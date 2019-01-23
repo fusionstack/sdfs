@@ -1,0 +1,2 @@
+OPTIONS="-L /opt/fusionnas/log/nfs-ganesha.log -f /etc/ganesha/ganesha.conf"
+EPOCH_EXEC="/bin/true"

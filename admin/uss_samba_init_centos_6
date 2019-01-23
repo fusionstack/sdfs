@@ -1,0 +1,21 @@
+#!/bin/sh
+#chkconfig: 2345 42 42 
+#description: uss_ucarp service 
+
+RETVAL=0
+case "$1" in
+        start)
+                /opt/fusionnas/app/admin/samba.py start
+                ;;
+        stop)
+                /opt/fusionnas/app/admin/samba.py stop
+                ;;
+        restart)
+                /opt/fusionnas/app/admin/samba.py stop
+                /opt/fusionnas/app/admin/samba.py start
+                ;;
+        *)
+                echo $"Usage: $0 {start|stop|restart}"
+                RETVAL=2
+esac
+exit $RETVAL

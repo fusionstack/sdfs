@@ -1,0 +1,12 @@
+[Unit]
+Description=uss_ucarp
+DefaultDependencies=no
+After=network.target local-fs.target
+
+[Service]
+Type=forking
+ExecStart=/opt/fusionnas/app/bin/uss.node ucarpstart
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,192 @@
+globals {
+        #集群副本个数,默认值为2，最大值31
+        chunk_rep 2;
+
+        #rpc的超时值，如果不设置，默认为20，设置的值不能小于5
+        rpc_timeout 20;
+
+        # 本地网络配置
+        network 192.168.6.0;
+        mask 255.255.255.0;
+
+        #是否进行性能数据统计，如果不设置默认为1
+        # 0 表示不做性能数据的统计
+        # 1 表示系统会在内存中记录部分性能数据
+        # 2 表示不仅在内存中记录了部分性能数据，并且当某个任务的完成时间超过了5s, 就会在日志中打印出警告，如果超过了30s会打印为错误。
+        performance_analysis 1;
+
+        #集群只有2个cds时，设置io_mode 为 random 或 sequence
+        #io_mode random;
+
+        #服务缓存大小，默认值128M
+        #cache_size 256M; 
+
+        #工作目录
+        #home /opt/fusionnas;
+
+        #cache 写数据方式，write_back write_through，默认write_back
+        #write_back 1;
+
+        #挂载点检测，默认开启
+        #check_mountpoint on;
+
+        #版本检测，默认不开启
+        check_version off;
+
+        #license检测，默认开启
+        #check_license on;
+
+        #异常时是否重启，默认开启
+        #restart 1;
+
+        #设置vip
+        #master_vip uss-01:eno16777984,uss-02:eno16777984,192.168.6.0/24;
+
+        #maxcore on;
+
+        #集群名称
+        #cluster_name;
+
+        #网络包crc校验，默认不开启
+        #net_crc off;
+
+        #更新目录时间
+        #dir_refresh 300;
+
+        #zookeeper 配置主机。单节点模式只配置一台主机。
+        zk_hosts uss-01:2181,uss-02:2181,uss-03:2181;
+
+        #配置zk_hosts的myid,默认在配置文件中完成
+        #zk_myid 1;
+
+        #单节点模式需配置为1
+        test 0
+
+        #leveldb性能调优项
+        #leveldb_max_open_files 1000; #打开文件的最大数量， 默认1000
+        #leveldb_wbuf_size 4194304;  #写数据缓冲区大小， 默认4M
+        #leveldb_cache_size 4194304; #缓存大小， 默认4M
+        #leveldb_block_size 4096;   #块大小， 默认为4096字节
+        #leveldb_paranoid_checks 0; #数据库有内部数据损坏，是否抛出一个错误， 默认不抛出错误
+        #leveldb_check_sums 1;      #是否对读取的数据进行校验和检查，默认启用检查
+        #leveldb_sync 1;            #写数据是否同步， 默认启用同步
+        #leveldb_bloom_filter 0;    #保存key的N个bit数据，可以降低磁盘的读操作， 默认不保存
+
+        #sdevents threads, 默认值是128， 最大值是256
+        #sdevents_threads 128;
+
+        #jobdock size, 默认值是8196
+        #jobdock_size 8196;
+
+        #yfs_jobtracker，默认值是128
+        #yfs_jobtracker 128;
+
+        #nfs_jobtracker，默认值是8
+        #nfs_jobtracker 8
+
+        #objs_jobtracker，默认值是8
+        #objs_jobtracker 8
+
+        #inodec_entry_max 1000*100; #默认 20M
+        #objc_entry_max 1000*100; #默认 40M
+        #objs_entry_max 1000*100; #默认 50M
+        #chunk_entry_max 1000*100; #默认 40M
+        #fname_entry_max 1000*10; #默认 3M
+
+        #gloconf.disk_mt 0; //默认 不开启
+        #gloconf.disk_mt_ssd 128; //线程个数
+        #gloconf.disk_mt_hdd 2;
+
+        #gloconf.preload_chk = 1; //默认 开启
+
+        #gloconf.lookup_cache = 1; //默认 开启
+
+        #gloconf.disk_worker = 1; //默认为1， 最大16
+
+        #main_loop_worker 2; #yfslib 几个schedule, 默认2
+        #schedule_physical_package_id -1; #设置yfslib schedule绑定哪个物理cpu, 默认-1, 不绑定
+
+        # 存储使用的网络
+        networks {
+                192.168.6.0/24;
+        }
+}
+
+mds {
+    #单节点模式配置为 object_hardend off;
+    object_hardend on;
+    #磁盘预留空间，默认为100G
+    disk_keep 10G;
+    #leveldb_physical_package_id -1; #设置leveldb_queue绑定哪个物理cpu, 默认-1, 不绑定
+    #schedule_physical_package_id -1; #设置schedule绑定哪个物理cpu, 默认-1, 不绑定
+
+    #leveldb_queue 6; #一共几个leveldb线程池, 最多48个, 默认6个
+    #leveldb_queue_pb 1; #leveldb线程池中，有几个用来处理写, 最多8个，默认1个
+    #leveldb_queue_worker 1; #每个线程池几个线程，最多2个, 默认1个
+
+    #main_loop_threads 6; #几个schedule, 默认为6
+}
+
+cds {
+    #异步删除，默认开启
+    unlink_async on;
+    #0:recover manually, 1:recover when write, 2:recover when access
+    ha_mode 0;
+    #磁盘上允许io等待个数，最大256
+    queue_depth 127;
+    #pool最大数量
+    prealloc_max 256;
+    #纠删码读写时是否需要加锁。 1 表示加锁， 0 表示不加锁。默认加锁。
+    ec_lock 1;
+    #cds是否以sync方式写入磁盘。1 表示sync，0表示cache。 默认是1、sync。
+    io_sync 1;
+
+    #qos 同步周期,默认1秒
+    lvm_qos_refresh 1;
+}
+
+
+yiscsi {
+        iqn iqn.2017-04.com.meidisen;
+#       lun_blk_shift must between [9,12]
+#       lun_blk_shift 12;       # 1 << 12 = 4096
+}
+
+
+yweb {
+    #webport
+    #use_ratelimit
+}
+
+
+ynfs {
+    #use_export
+    #rsize 1048576
+    #wsize 1048576
+    #nfs 工作队列流量控制，默认4096
+    #job_qos 4096
+}
+
+
+#backtrace 是否开启打印错误堆栈, 如果不设置，默认不开启
+log {
+#    log_ylib off;
+#    log_yliblock off;
+#    log_ylibmem off;
+#    log_ylibskiplist off;
+#    log_ylibnls off;
+#    log_ysock off;
+#    log_ynet off;
+#    log_yrpc off;
+#    log_yfscdc off;
+#    log_yfsmdc off;
+#    log_fsmachine off;
+#    log_yfslib off;
+#    log_yiscsi off;
+#    log_ynfs off;
+#    log_yfsmds on;
+#    log_cdsmachine off;
+#    log_yfscds off;
+#    log_yfscds_robot off;
+#    log_proxy off;
+}

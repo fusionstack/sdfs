@@ -1,0 +1,21 @@
+#!/bin/sh
+#chkconfig: 2345 42 42 
+#description: uss_vip service 
+
+RETVAL=0
+case "$1" in
+        start)
+                uss.node vipstart
+                ;;
+        stop)
+                uss.node vipstop
+                ;;
+        restart)
+                uss.node vipstop
+                uss.node vipstart
+                ;;
+        *)
+                echo $"Usage: $0 {start|stop|restart}"
+                RETVAL=2
+esac
+exit $RETVAL

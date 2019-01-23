@@ -1,0 +1,11 @@
+#ifndef __GET_VERSION_H__
+#define __GET_VERSION_H__
+
+#include <stdio.h>
+
+#define get_version() \
+do { \
+        fprintf(stdout, "%s\n", YVERSION); \
+} while (0)
+
+#endif /* __GET_VERSION_H__ */

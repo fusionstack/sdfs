@@ -1,0 +1,21 @@
+#!/bin/sh
+#chkconfig: 2345 42 42 
+#description: uss_ucarp service 
+
+RETVAL=0
+case "$1" in
+        start)
+                uss.node ucarpstart
+                ;;
+        stop)
+                uss.node ucarpstop
+                ;;
+        restart)
+                uss.node ucarpstop
+                uss.node ucarpstart
+                ;;
+        *)
+                echo $"Usage: $0 {start|stop|restart}"
+                RETVAL=2
+esac
+exit $RETVAL
