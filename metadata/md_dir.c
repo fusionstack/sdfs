@@ -799,7 +799,7 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
         }
 
         snprintf(key, MAX_NAME_LEN, "%s/replica", name);
-        snprintf(value, MAX_NAME_LEN, "%d", mdsconf.redis_ha);
+        snprintf(value, MAX_NAME_LEN, "%d", mdsconf.redis_replica);
         ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
         if (ret) {
                 if (ret == EEXIST) {
@@ -826,7 +826,7 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
                         GOTO(err_ret, ret);
         }
 
-        ret = __md_mkvol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_ha);
+        ret = __md_mkvol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_replica);
         if (ret)
                 GOTO(err_ret, ret);
         

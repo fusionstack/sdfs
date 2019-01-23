@@ -493,7 +493,7 @@ def test_init():
     os.system(cmd)
    
     config = Config(TEST_PATH)
-    count = config.redis_sharding * config.redis_ha
+    count = config.redis_sharding * config.redis_replica
 
     #for i in count
     r = "redis[" + ','.join(str(i) for i in range(count)) + ']'
@@ -503,7 +503,7 @@ def test_init():
     os.system(cmd)
     
     config = Config(TEST_PATH)
-    count = config.redis_sharding * config.redis_ha
+    count = config.redis_sharding * config.redis_replica
     #for i in range(count):
     #    os.system("mkdir -p %s/data/redis/%d" % (TEST_PATH, i))
 

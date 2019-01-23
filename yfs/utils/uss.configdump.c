@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
                "mdsconf.db:%s\n"
                "mdsconf.redis_baseport:%d\n"
                "mdsconf.redis_sharding:%d\n"
-               "mdsconf.redis_ha:%d\n",
+               "mdsconf.redis_replica:%d\n",
                gloconf.cluster_name,
                hostname,
                SDFS_HOME,
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
                mdsconf.db,
                mdsconf.redis_baseport,
                mdsconf.redis_sharding,
-               mdsconf.redis_ha);
+               mdsconf.redis_replica);
 
         return 0;
 err_ret:

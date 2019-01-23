@@ -145,7 +145,7 @@ int conf_init(const char *conf_path)
         strcpy(gloconf.nfs, "native");
         gloconf.lease_timeout = 20;
         mdsconf.redis_sharding = 3;
-        mdsconf.redis_ha = 2;
+        mdsconf.redis_replica = 2;
         mdsconf.redis_baseport = REDIS_BASEPORT;
 
         snprintf(gloconf.workdir, MAX_PATH_LEN, "%s/data", SDFS_HOME);
@@ -541,8 +541,8 @@ int set_value(const char* key, const char* value, int type)
                 gloconf.solomode = _value;
         else if (keyis("redis_sharding", key))
                 mdsconf.redis_sharding = _value;
-        else if (keyis("redis_ha", key))
-                mdsconf.redis_ha = _value;
+        else if (keyis("redis_replica", key))
+                mdsconf.redis_replica = _value;
         else if (keyis("redis_wait", key))
                 mdsconf.redis_wait = _value;
         else if (keyis("redis_thread", key))

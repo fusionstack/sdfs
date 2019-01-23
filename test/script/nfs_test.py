@@ -409,7 +409,7 @@ def nfs_test(mount_point='/mnt/nfs'):
     t_unlink(mount_point)
     logging.info('!!!t_unlink succ!!!')
 
-    cmd = "umount /mnt/nfs"
+    cmd = "umount -f /mnt/nfs"
     os.system(cmd)
     
 if __name__ == '__main__':

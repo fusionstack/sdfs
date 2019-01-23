@@ -121,7 +121,7 @@ struct mdsconf_t
 
         int main_loop_threads;
         int redis_sharding;
-        int redis_ha;
+        int redis_replica;
         int redis_baseport;
 };
 
