@@ -533,7 +533,7 @@ static int __md_mkvol_online(const char *name, int disk)
                         return 0;
 
                 if (atoi(value) != 0) {
-                        DINFO("disk %s:%d, trigger %s, retry %u\n", name, disk, value, retry);
+                        DBUG("disk %s:%d, trigger %s, retry %u\n", name, disk, value, retry);
 
                         if (retry > 100) {
                                 DWARN("disk %s:%d, trigger %s not online\n", name, disk, value);

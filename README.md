@@ -36,35 +36,40 @@ Installation
 
 Configuration
 ===========================================================
-vim /opt/sdfs/etc/cluster.conf
+    vim /opt/sdfs/etc/cluster.conf
 
-update hosts in first column, for example:
+    update hosts in first column, for example:
 
-auto1.host155.vmnode31  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
-auto1.host155.vmnode32  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
-auto1.host155.vmnode33  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
+    auto1.host155.vmnode31  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
+    auto1.host155.vmnode32  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
+    auto1.host155.vmnode33  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
 
-vim /opt/sdfs/etc/sdfs.conf 
+    vim /opt/sdfs/etc/sdfs.conf 
 
-update gloconf.networks , for example:
+    update gloconf.networks , for example:
 
-networks {
+    networks {
         192.168.140.0/8;
-}
+    }
 
-vim /etc/hosts
+    vim /etc/hosts
 
-update hosts, for example:
+    update hosts, for example:
 
-192.168.140.31 auto1.host155.vmnode31
-192.168.140.32 auto1.host155.vmnode32
-192.168.140.33 auto1.host155.vmnode33
+    192.168.140.31 auto1.host155.vmnode31
+    192.168.140.32 auto1.host155.vmnode32
+    192.168.140.33 auto1.host155.vmnode33
 
 
 Create
 ===========================================================
 
-/opt/sdfs/app/admin/cluster.py create --hosts auto1.host155.vmnode31,auto1.host155.vmnode32,auto1.host155.vmnode33
+    /opt/sdfs/app/admin/cluster.py create --hosts auto1.host155.vmnode31,auto1.host155.vmnode32,auto1.host155.vmnode33
+
+Usage
+===========================================================
+
+    sdfs --help
 
 Auto Testing
 ===========================================================
