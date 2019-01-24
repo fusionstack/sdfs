@@ -156,6 +156,11 @@ static int __conn_add(const nid_t *nid)
                 goto out;
         }
 #endif
+
+        if (netable_connected(nid)) {
+                netable_update(nid);
+                goto out;
+        }
         
         snprintf(key, MAX_NAME_LEN, "%u.info", nid->id);
 
@@ -168,10 +173,6 @@ static int __conn_add(const nid_t *nid)
         ret = urlsafe_b64_decode(tmp, strlen(tmp), (void *)info, &len);
         YASSERT(ret == 0);        
 
-        if (netable_connected(nid)) {
-                netable_update(nid);
-                goto out;
-        }
 
 #if 0
         __faultdomain_last_update__ = 0;
