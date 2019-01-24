@@ -385,7 +385,7 @@ def nfs_test(mount_point='/mnt/nfs'):
     os.system(cmd)
     cmd = "mkdir -p /mnt/nfs"
     os.system(cmd)
-    cmd = "mount -o nfsvers=3,soft,noacl,nolock 127.0.0.1:/nfs_test /mnt/nfs"
+    cmd = "mount -o nfsvers=3,noacl,nolock 127.0.0.1:/nfs_test /mnt/nfs"
     os.system(cmd)
     
     t_chmod(mount_point)
@@ -409,9 +409,6 @@ def nfs_test(mount_point='/mnt/nfs'):
     t_unlink(mount_point)
     logging.info('!!!t_unlink succ!!!')
 
-    cmd = "umount -f /mnt/nfs"
-    os.system(cmd)
-    
 if __name__ == '__main__':
     #  --home 参数先保留
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
