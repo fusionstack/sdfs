@@ -235,6 +235,6 @@ typedef struct {
 
 #define SDFS_SYSTEM_VOL "system"
 
-#define REDIS_CONN_POOL 32
+#define REDIS_CONN_POOL 64
 
 #endif
