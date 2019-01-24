@@ -101,11 +101,7 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
         int ret, count, i;
         __conn_t *conn;
 
-#if 1
         count = ng.daemon ? REDIS_CONN_POOL : 1;
-#else
-        count = REDIS_CONN_POOL;
-#endif
 
         ret = ymalloc((void **)&conn, sizeof(*conn) * count);
         if(ret)
@@ -194,11 +190,7 @@ static int __redis_conn_get__(__conn_t *conn, redis_handler_t *handler)
                 GOTO(err_ret, ret);
         }
 
-        if (conn->used) {
-                ret = EBUSY;
-                goto err_ret;
-        }
-
+        YASSERT(conn->used == 0);
         conn->used = 1;
         handler->conn = conn->conn;
         handler->magic = conn->magic;
@@ -208,42 +200,31 @@ err_ret:
         return ret;
 }
 
-static int __redis_conn_get_sharding(__conn_sharding_t *sharding, redis_handler_t *handler)
+static int __redis_conn_get_sharding(__conn_sharding_t *sharding, int worker, redis_handler_t *handler)
 {
-        int ret, i, idx, retry = 0;
+        int ret;
 
-retry:
         ret = sy_rwlock_wrlock(&sharding->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
-        sharding->sequence++;
-        for (i = 0; i < sharding->count; i++) {
-                idx = (i + sharding->sequence) % sharding->count;
-                
-                ret = __redis_conn_get__(&sharding->conn[idx], handler);
-                if(ret)
-                        continue;
+        YASSERT(worker <= sharding->count && worker >= 0);
+        ret = __redis_conn_get__(&sharding->conn[worker], handler);
+        if(ret)
+                GOTO(err_lock, ret);
 
-                handler->idx = idx;
-                break;
-        }
+        handler->idx = worker;
 
         sy_rwlock_unlock(&sharding->lock);
         
-        if (i == sharding->count) {
-                ret = ENONET;
-                USLEEP_RETRY(err_ret, ret, retry, retry, 1000, (1000));
-        }
-        
         return 0;
-//err_lock:
-//        sy_rwlock_unlock(&sharding->lock);
+err_lock:
+        sy_rwlock_unlock(&sharding->lock);
 err_ret:
         return ret;
 }
 
-int redis_conn_get(uint64_t volid, int sharding, redis_handler_t *handler)
+int redis_conn_get(uint64_t volid, int sharding, int worker, redis_handler_t *handler)
 {
         int ret, idx;
         redis_vol_t *vol;
@@ -258,7 +239,7 @@ int redis_conn_get(uint64_t volid, int sharding, redis_handler_t *handler)
 
         idx = sharding % vol->sharding;
         handler->sharding = idx;
-        ret = __redis_conn_get_sharding(&vol->shardings[handler->sharding], handler);
+        ret = __redis_conn_get_sharding(&vol->shardings[handler->sharding], worker, handler);
         if(ret)
                 GOTO(err_lock, ret);
 
