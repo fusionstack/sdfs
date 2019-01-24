@@ -4,7 +4,7 @@ Simple Distributed File System
 
 Dependencies:
 ===========================================================
-    epel-release \ 
+    yum install -y epel-release \
     cmake libtool automake gcc gcc-g++ redhat-lsb \
     libuuid-devel libaio-devel flex bison python2-futurist \
     jemalloc-devel libtirpc-devel libattr libattr-devel \
@@ -16,6 +16,15 @@ Dependencies:
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     python get-pip.py
     pip install python-etcd futurist
+    # or:
+    # wget http://www.dnspython.org/kits/1.16.0/dnspython-1.16.0.tar.gz
+    # tar -xzvf dnspython-1.16.0.tar.gz
+    # cd dnspython-1.16.0
+    # python setup.py install
+    # wget https://files.pythonhosted.org/packages/a1/da/616a4d073642da5dd432e5289b7c1cb0963cc5dde23d1ecb8d726821ab41/python-etcd-0.4.5.tar.gz
+    # tar -xzvf python-etcd-0.4.5.tar.gz
+    # cd python-etcd-0.4.5
+    # python setup.py install
 
 
     yum install -y yasm
@@ -36,9 +45,17 @@ Installation
 
 Configuration
 ===========================================================
+    1.prepare disk, from 0 to num_of_your_disks for each node
+    mkdir -p /opt/sdfs/data/cds/0
+    mkfs.ext4 /dev/sdx
+    blkid /dev/sdx
+    echo 'UUID="you-disk-uuid" /opt/sdfs/data/cds/0 ext4 user_xattr,noatime,defaults 0 0' >> /etc/fstab
+    mount /dev/sdx /opt/sdfs/data/cds/0
+
+    2.modify config, only modify one of your nodes:
     vim /opt/sdfs/etc/cluster.conf
 
-    update hosts in first column, for example:
+    update hosts in first column, cds with num_of_disks for example:
 
     auto1.host155.vmnode31  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
     auto1.host155.vmnode32  redis[0,1] mond[0] cds[0,1,2,3,4,5,6] nfs[0]
@@ -46,7 +63,7 @@ Configuration
 
     vim /opt/sdfs/etc/sdfs.conf 
 
-    update gloconf.networks , for example:
+    update gloconf.networks, if only single host,then add config:solomode on; for example:
 
     networks {
         192.168.140.0/8;
@@ -64,6 +81,7 @@ Configuration
 Create
 ===========================================================
 
+    /opt/sdfs/app/admin/cluster.py sshkey --hosts auto1.host155.vmnode31,auto1.host155.vmnode32,auto1.host155.vmnode33
     /opt/sdfs/app/admin/cluster.py create --hosts auto1.host155.vmnode31,auto1.host155.vmnode32,auto1.host155.vmnode33
 
 Usage
