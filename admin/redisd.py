@@ -822,15 +822,14 @@ class RedisDisk(Daemon):
             dmsg("%s instence %u" % (self.workdir, len(self.instence)))
 
             try:
-                dmsg("etcd write " + key)
+                dmsg("etcd watch " + key)
                 res = self.etcd.watch(key, index)
             except etcd.EtcdWatchTimedOut:
                 derror("watch timeout");
                 continue
             except etcd.EtcdEventIndexCleared:
                 derror("watch outdated");
-                index = index + 1
-                continue
+                res = self.etcd.read(key)
 
             dmsg("watch %s return, value %s, idx %u:%u" % (key, res.value, res.etcd_index, index))
             if (res.value == "0"):
