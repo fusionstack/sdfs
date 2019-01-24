@@ -220,6 +220,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_chunk_recovery.c
 	${CMAKE_CURRENT_SOURCE_DIR}/license/src/license_helper.c
 	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_dir.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_vol.c
 	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_node.c
 	#${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_super.c
 	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_chunk.c

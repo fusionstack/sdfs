@@ -248,7 +248,7 @@ static int  __etcd_set__(const char *key, const char *value,
         etcd_session sess;
         char *host;
 
-        DINFO("set %s\n", key);
+        DBUG("set %s\n", key);
         
         host = strdup(__ETCD_SRV__);
         ret = __etcd_open_str(host, &sess);
