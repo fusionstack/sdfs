@@ -351,6 +351,13 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
         uint64_t volid;
 
+        snprintf(key, MAX_NAME_LEN, "%s/id", name);
+        ret = etcd_get_text(ETCD_VOLUME, key, (void *)&fileid, NULL);
+        if (ret == 0) {
+                ret = EEXIST;
+                GOTO(err_ret, ret);
+        }
+        
         snprintf(key, MAX_NAME_LEN, "%s/sharding", name);
         snprintf(value, MAX_NAME_LEN, "%d", mdsconf.redis_sharding);
         ret = etcd_create_text(ETCD_VOLUME, key, value, -1);

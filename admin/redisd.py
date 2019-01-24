@@ -806,8 +806,16 @@ class RedisDisk(Daemon):
         while (1):
             dmsg("%s instence %u" % (self.workdir, len(self.instence)))
 
-            #try:
-            res = self.etcd.watch(key, index)
+            try:
+                res = self.etcd.watch(key, index)
+            except etcd.EtcdWatchTimedOut:
+                derror("watch timeout");
+                continue
+            except etcd.EtcdEventIndexCleared:
+                derror("watch outdated");
+                index = index + 1
+                continue
+
             dmsg("watch %s return, value %s, idx %u:%u" % (key, res.value, res.etcd_index, index))
             if (res.value == "0"):
                 index = res.etcd_index + 1
