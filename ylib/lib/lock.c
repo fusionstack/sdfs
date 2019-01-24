@@ -59,6 +59,7 @@ int sy_rwlock_init(sy_rwlock_t *rwlock, const char *name)
 #if LOCK_DEBUG
         rwlock->last_unlock = 0;
         rwlock->count = 0;
+#endif
         
         if (name) {
                 if (strlen(name) > MAX_LOCK_NAME - 1)
@@ -68,7 +69,6 @@ int sy_rwlock_init(sy_rwlock_t *rwlock, const char *name)
         } else {
                 rwlock->name[0] = '\0';
         }
-#endif
 
         return 0;
 err_ret:
@@ -244,7 +244,7 @@ STATIC int __sy_rwlock_lock(sy_rwlock_t *rwlock, char type, int tmo)
 {
         int ret, retry = 0;
         lock_wait_t lock_wait;
-        char *name = type == 'r' ? "rdlock" : "rwlock";
+        //char *name = type == 'r' ? "rdlock" : "rwlock";
 
         if (ng.daemon) {
                 YASSERT(schedule_status() != SCHEDULE_STATUS_IDLE);
@@ -299,12 +299,13 @@ retry:
 #if LOCK_DEBUG
                 YASSERT(rwlock->count >= 0);
                 rwlock->count++;
-                DINFO("locked %p %c count %d, writer %d\n", rwlock, type, rwlock->count, rwlock->lock.__data.__cur_writer);
+                DINFO("locked %p %c count %d, writer %d\n", rwlock, type,
+                      rwlock->count, rwlock->lock.__data.__cur_writer);
 #endif
                 sy_spin_unlock(&rwlock->spin);
         }
 
-        ANALYSIS_END(0, 1000 * 50, name);
+        ANALYSIS_END(0, 1000 * 50, rwlock->name);
 
         return 0;
 err_lock:

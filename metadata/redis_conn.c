@@ -22,14 +22,14 @@ typedef struct{
 } __conn_t;
 
 typedef struct{
-        sy_rwlock_t lock;
+        pthread_rwlock_t lock;
         int sequence;
         int count;
         __conn_t *conn;
 } __conn_sharding_t;
 
 typedef struct {
-        sy_rwlock_t lock;
+        pthread_rwlock_t lock;
         int sequence;
         int sharding;
         __conn_sharding_t *shardings;
@@ -39,6 +39,7 @@ typedef struct {
 
 //static redis_vol_t *__conn__;
 static int __conn_magic__ = 0;
+
 
 static int __redis_vol_get(uint64_t volid, redis_vol_t **_vol, int flag);
 
@@ -125,7 +126,8 @@ err_ret:
         return ret;
 }
 
-static int __redis_vol_connect(uint64_t volid, const char *volume, int sharding, redis_vol_t **_vol)
+static int __redis_vol_connect(uint64_t volid, const char *volume, int sharding,
+                               redis_vol_t **_vol)
 {
         int ret, i, retry = 0;
         redis_vol_t *vol;
@@ -146,12 +148,12 @@ static int __redis_vol_connect(uint64_t volid, const char *volume, int sharding,
         if(ret)
                 UNIMPLEMENTED(__DUMP__);
 
-        ret = sy_rwlock_init(&vol->lock, NULL);
+        ret = pthread_rwlock_init(&vol->lock, NULL);
         if(ret)
                 UNIMPLEMENTED(__DUMP__);
         
         for (i = 0; i < vol->sharding; i++) {
-                ret = sy_rwlock_init(&vol->shardings[i].lock, NULL);
+                ret = pthread_rwlock_init(&vol->shardings[i].lock, NULL);
                 if(ret)
                         UNIMPLEMENTED(__DUMP__);
 
@@ -200,11 +202,12 @@ err_ret:
         return ret;
 }
 
-static int __redis_conn_get_sharding(__conn_sharding_t *sharding, int worker, redis_handler_t *handler)
+static int __redis_conn_get_sharding(__conn_sharding_t *sharding, int worker,
+                                     redis_handler_t *handler)
 {
         int ret;
 
-        ret = sy_rwlock_wrlock(&sharding->lock);
+        ret = pthread_rwlock_wrlock(&sharding->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -215,11 +218,11 @@ static int __redis_conn_get_sharding(__conn_sharding_t *sharding, int worker, re
 
         handler->idx = worker;
 
-        sy_rwlock_unlock(&sharding->lock);
+        pthread_rwlock_unlock(&sharding->lock);
         
         return 0;
 err_lock:
-        sy_rwlock_unlock(&sharding->lock);
+        pthread_rwlock_unlock(&sharding->lock);
 err_ret:
         return ret;
 }
@@ -229,11 +232,13 @@ int redis_conn_get(uint64_t volid, int sharding, int worker, redis_handler_t *ha
         int ret, idx;
         redis_vol_t *vol;
 
+        YASSERT(!schedule_running());
+        
         ret = __redis_vol_get(volid, &vol, O_CREAT);
         if(ret)
                 GOTO(err_ret, ret);
         
-        ret = sy_rwlock_rdlock(&vol->lock);
+        ret = pthread_rwlock_rdlock(&vol->lock);
         if(ret)
                 GOTO(err_release, ret);
 
@@ -245,14 +250,14 @@ int redis_conn_get(uint64_t volid, int sharding, int worker, redis_handler_t *ha
 
         handler->volid = volid;
         
-        sy_rwlock_unlock(&vol->lock);
+        pthread_rwlock_unlock(&vol->lock);
         redis_vol_release(volid);
         
         DBUG("use vol (%d,%d)\n", handler->sharding, handler->idx);
 
         return 0;
 err_lock:
-        sy_rwlock_unlock(&vol->lock);
+        pthread_rwlock_unlock(&vol->lock);
 err_release:
         redis_vol_release(volid);
 err_ret:
@@ -265,7 +270,7 @@ static int __redis_conn_release__(const char *volume, __conn_sharding_t *shardin
         int ret;
         __conn_t *conn;
 
-        ret = sy_rwlock_wrlock(&sharding->lock);
+        ret = pthread_rwlock_wrlock(&sharding->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -285,11 +290,11 @@ static int __redis_conn_release__(const char *volume, __conn_sharding_t *shardin
                 }
         }
 
-        sy_rwlock_unlock(&sharding->lock);
+        pthread_rwlock_unlock(&sharding->lock);
 
         return 0;
 err_lock:
-        sy_rwlock_unlock(&sharding->lock);
+        pthread_rwlock_unlock(&sharding->lock);
 err_ret:
         return ret;
 }
@@ -303,7 +308,7 @@ int redis_conn_release(const redis_handler_t *handler)
         if(ret)
                 GOTO(err_ret, ret);
         
-        ret = sy_rwlock_rdlock(&vol->lock);
+        ret = pthread_rwlock_rdlock(&vol->lock);
         if(ret)
                 GOTO(err_release, ret);
 
@@ -311,21 +316,21 @@ int redis_conn_release(const redis_handler_t *handler)
         if(ret)
                 GOTO(err_lock, ret);
 
-        sy_rwlock_unlock(&vol->lock);
+        pthread_rwlock_unlock(&vol->lock);
         redis_vol_release(handler->volid);
 
         DBUG("release vol (%d,%d)\n", handler->sharding, handler->idx);
         
         return 0;
 err_lock:
-        sy_rwlock_unlock(&vol->lock);
+        pthread_rwlock_unlock(&vol->lock);
 err_release:
         redis_vol_release(handler->volid);
 err_ret:
         return ret;
 }
 
-int redis_conn_new(uint64_t volid, uint8_t *idx)
+static int __redis_conn_new__(uint64_t volid, uint8_t *idx)
 {
         int ret, seq;
         redis_vol_t *vol;
@@ -357,12 +362,47 @@ err_ret:
         return ret;
 }
 
+static int __redis_conn_new(va_list ap)
+{
+        uint64_t volid = va_arg(ap, uint64_t);
+        uint8_t *idx = va_arg(ap, uint8_t *);
+
+        va_end(ap);
+
+        return __redis_conn_new__(volid, idx);
+}
+
+
+int redis_conn_new(uint64_t volid, uint8_t *idx)
+{
+        int ret;
+
+        ANALYSIS_BEGIN(0);
+        
+        if (schedule_running()) {
+                ret = schedule_newthread(SCHE_THREAD_ETCD, ++__conn_magic__, FALSE,
+                                          "redis newid", -1, __redis_conn_new, volid, idx);
+        } else {
+                ret = __redis_conn_new__(volid, idx);
+        }
+        if (ret)
+                GOTO(err_ret, ret);
+
+        
+        ANALYSIS_END(0, IO_WARN, NULL);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+
 static int __redis_conn_close__(__conn_sharding_t *sharding, const redis_handler_t *handler)
 {
         int ret;
         __conn_t *conn;
 
-        ret = sy_rwlock_wrlock(&sharding->lock);
+        ret = pthread_rwlock_wrlock(&sharding->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -374,7 +414,7 @@ static int __redis_conn_close__(__conn_sharding_t *sharding, const redis_handler
                 conn->erased = 1;
         }
 
-        sy_rwlock_unlock(&sharding->lock);
+        pthread_rwlock_unlock(&sharding->lock);
         
         return 0;
 err_ret:
@@ -390,7 +430,7 @@ int redis_conn_close(const redis_handler_t *handler)
         if(ret)
                 GOTO(err_ret, ret);
                
-        ret = sy_rwlock_rdlock(&vol->lock);
+        ret = pthread_rwlock_rdlock(&vol->lock);
         if(ret)
                 GOTO(err_release, ret);
 
@@ -398,12 +438,12 @@ int redis_conn_close(const redis_handler_t *handler)
         if(ret)
                 GOTO(err_lock, ret);
         
-        sy_rwlock_unlock(&vol->lock);
+        pthread_rwlock_unlock(&vol->lock);
         redis_vol_release(handler->volid);
         
         return 0;
 err_lock:
-        sy_rwlock_unlock(&vol->lock);
+        pthread_rwlock_unlock(&vol->lock);
 err_release:
         redis_vol_release(handler->volid);
 err_ret:
