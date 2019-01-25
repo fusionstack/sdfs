@@ -34,6 +34,13 @@
 #include "proc.h"
 #include "dbg.h"
 
+inline void http_exit_handler(int sig)
+{
+        DWARN("got signal %d, exiting\n", sig);
+
+        srv_running = 0;
+}
+
 #if 0
 
 static void dump_http_request(struct http_request *req)
@@ -452,7 +459,7 @@ int http_srv(int daemon, const char *port)
         int ret;
 
         signal(SIGUSR1, signal_handler);
-        signal(SIGUSR2, exit_handler);
+        signal(SIGUSR2, http_exit_handler);
 
         mime_init();
 
@@ -475,16 +482,6 @@ int http_srv(int daemon, const char *port)
         ret = http_listen(port, YNET_RPC_NONBLOCK);
         if (ret)
                 GOTO(err_ret, ret);
-
-#if PROC_MONITOR_ON
-        ret = proc_init();
-        if (ret)
-                GOTO(err_ret, ret);
-
-        ret = proc_log("yweb");
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
 
         ret = rpc_start(); /*begin serivce*/
         if (ret)

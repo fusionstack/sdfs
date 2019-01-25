@@ -189,10 +189,10 @@ int ynfs_srv(void *args)
         if (ret)
                 GOTO(err_ret, ret);
         
-        ret = core_init(0);
+        ret = core_init(gloconf.polling_core, gloconf.polling_timeout, 0);
         if (ret)
                 GOTO(err_ret, ret);
-        
+
 retry:
         ret = network_connect_master();
         if (ret) {
@@ -211,31 +211,6 @@ retry:
         ret = nfs_remove_init();
         if (ret)
                 GOTO(err_ret, ret);
-
-        UNIMPLEMENTED(__WARN__);
-#if 0
-        DINFO("step 2_1\n");
-        ret = __nfs_conf_register(__conf_modified, __conf_delete, NULL);
-        if(ret)
-                GOTO(err_ret, ret);
-
-#if PROC_MONITOR_ON
-        ret = proc_init();
-        if (ret)
-                GOTO(err_ret, ret);
-
-        ret = proc_log("ynfs");
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
-
-        pthread_t th_cdsstate;
-        pthread_attr_t ta;
-        (void) pthread_attr_init(&ta);
-        (void) pthread_attr_setdetachstate(&ta, PTHREAD_CREATE_DETACHED);
-
-        ret = pthread_create(&th_cdsstate, &ta, handler_ynfsstate, NULL);
-#endif
 
         DINFO("nfs started...\n");
 

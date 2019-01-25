@@ -55,7 +55,7 @@ int rpc_request_prep(buffer_t *buf, const msgid_t *msgid, const void *request,
         net_req->blocks = 0;
         net_req->master_magic = ng.master_magic;
         net_req->priority = (priority == -1) ? schedule_priority(NULL) : priority;
-        net_req->load = jobdock_load();
+        net_req->load = core_latency_get();
         memcpy(net_req->buf, request, reqlen);
 
         

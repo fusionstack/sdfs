@@ -121,9 +121,6 @@ err_ret:
         return -ret;
 }
 
-
-extern int rpc_peek_sd_sync(int sd, char *buf, uint32_t buflen, int timeout);
-extern int rpc_discard_sd_sync(int sd, uint32_t len, int timeout);
 int rpc_accept(int *cli_sd, int srv_sd, int tuning, int nonblock)
 {
         int ret;

@@ -96,41 +96,16 @@ static int __conn_close(const nid_t *nid)
         }
 #endif
 
-#if ENABLE_LOCAL_RPC
         if (net_islocal(nid)) {
                 DWARN("skip close localhost\n");
                 goto out;
         }
-#endif
 
         __faultdomain_last_update__ = 0;
         
         DINFO("close %s\n", netable_rname_nid(nid));
 
-#if __ETCD_READ_MULTI__
-        int ret;
-        char name[MAX_NAME_LEN];
-
-        if (ng.daemon) {
-                ret = network_rname1(nid, name);
-                if (ret == 0) {
-                        etcd_srv_del(name);
-                }
-        }
-#endif
-        
-#if !ENABLE_ETCD_CONN
-#if RECOVERY_IMMEDIATELY_ASYN 
-        if (ng.daemon) {
-                DBUG("force scan\n");
-                recovery_wakeup_all_pool("__conn_close");
-        }
-#endif
-#endif
-
-#if ENABLE_LOCAL_RPC
 out:
-#endif        
 
         //DERROR("__conn_close disabled\n");
         //netable_close_withrpc(NULL, nid, "offline");
@@ -150,12 +125,6 @@ static int __conn_add(const nid_t *nid)
         net_handle_t nh;
         size_t len;
         instat_t instat;
-
-#if !ENABLE_LOCAL_RPC
-        if (net_islocal(nid)) {
-                goto out;
-        }
-#endif
 
         if (netable_connected(nid)) {
                 netable_update(nid);
@@ -192,18 +161,6 @@ static int __conn_add(const nid_t *nid)
                 GOTO(err_ret, ret);
         }
 
-#if __ETCD_READ_MULTI__
-        if (ng.daemon) {
-                etcd_srv_add(info->name);
-        }
-#endif
-        
-#if RECOVERY_IMMEDIATELY_ASYN 
-        if (ng.daemon) {
-                DINFO("force scan\n");
-                recovery_wakeup_all_pool("__conn_add");
-        }
-#endif
 out:
 
         return 0;

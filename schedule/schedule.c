@@ -2174,10 +2174,6 @@ int schedule_init()
 
         __schedule_array__ = schedule;
 
-        ret = cpuset_init();
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
         ret = schedule_thread_init();
         if (unlikely(ret))
                 GOTO(err_ret, ret);

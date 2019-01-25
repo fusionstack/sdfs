@@ -191,8 +191,8 @@ add_library(ynet SHARED
 	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_reply.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_xnect.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_request.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_request_old.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_reply_old.c
+        #${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_request_old.c
+        #${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_reply_old.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_xmit.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_table.c
 )

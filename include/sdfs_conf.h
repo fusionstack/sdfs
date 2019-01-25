@@ -221,7 +221,6 @@ typedef struct {
 #define ETCD_CDS "cds"
 #define ETCD_DISKMAP "diskmap"
 
-#define ENABLE_LOCAL_RPC 1
 #define ENABLE_HEARTBEAT 1
 
 #define ENABLE_NEWMD 1
@@ -230,8 +229,8 @@ typedef struct {
 #define ENABLE_COREAIO 0
 
 #define ENABLE_QUOTA 0
-#define ENABLE_MD_POSIX 0
-#define ENABLE_KLOCK 0
+#define ENABLE_MD_POSIX 1
+#define ENABLE_KLOCK 1
 
 #define SDFS_SYSTEM_VOL "system"
 

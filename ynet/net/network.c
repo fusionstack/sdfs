@@ -149,10 +149,6 @@ static int __network_connect_exec(const nid_t *nid, int force)
         char buf[MAX_BUF_LEN];
         ynet_net_info_t *info;
 
-#if !ENABLE_LOCAL_RPC
-        YASSERT(!net_islocal(nid));
-#endif
-
         ANALYSIS_BEGIN(0);
 
         DBUG("connect to %s\n", netable_rname_nid(nid));
@@ -243,10 +239,6 @@ static int __network_connect_wait_thread(const nid_t *nid, int force, int timeou
         pthread_attr_t ta;
         conn_arg_t *arg;
 
-#if !ENABLE_LOCAL_RPC
-        YASSERT(!net_islocal(nid));
-#endif
-
         ANALYSIS_BEGIN(0);
         
         ret = ymalloc((void **)&arg, sizeof(*arg));
@@ -326,10 +318,6 @@ static int __network_connect_exec_schedule(va_list ap)
 static int __network_connect_wait(const nid_t *nid, int timeout, int force)
 {
         int ret;
-
-#if !ENABLE_LOCAL_RPC
-        YASSERT(net_islocal(nid) == 0);
-#endif
 
         if (!netable_connectable(nid, force)) {
                 ret = EAGAIN;

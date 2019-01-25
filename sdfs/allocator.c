@@ -22,6 +22,7 @@
 #include "allocator.h"
 #include "mond_rpc.h"
 #include "sysutil.h"
+#include "net_table.h"
 #include "ylib.h"
 #include "dbg.h"
 
@@ -284,7 +285,7 @@ static void __allocator_new_disk(allocator_node_t *node, nid_t *nid)
         node->cursor++;
 }
 
-int allocator_new(int repnum, int hardend, int tier, nid_t *disks)
+static int __allocator_new(int repnum, int hardend, int tier, nid_t *disks)
 {
         int ret;
         allocator_t *allocator = __allocator__;
@@ -329,6 +330,29 @@ err_ret:
         return ret;
 }
 
+int allocator_new(int repnum, int hardend, int tier, nid_t *disks)
+{
+        int ret;
+        nid_t array[16];
+
+        YASSERT(repnum + 1 < 16);
+        
+        ret = __allocator_new(repnum + 1, hardend, tier, array);
+        if (ret) {
+                if (ret == ENOSPC) {
+                        return __allocator_new(repnum, hardend, tier, disks);
+                } else {
+                        GOTO(err_ret, ret);
+                }
+        }
+
+        netable_sort(array, repnum + 1);
+        memcpy(disks, array, sizeof(nid_t) * repnum);
+        
+        return 0;
+err_ret:
+        return ret;
+}
 
 #if 0
 int allocator_register()

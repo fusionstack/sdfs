@@ -70,7 +70,7 @@ typedef struct {
         int retval;
 } arg1_t;
 
-#if 0
+#if 1
 typedef struct {
         time_t last_update;
         uint64_t used;
@@ -99,7 +99,8 @@ static int __core_latency_private_init();
 #endif
 
 static core_t *__core_array__[256];
-
+static int __polling_core__ = -1;
+static int __polling_timeout__ = -1;
 
 extern __thread struct list_head private_iser_dev_list;
 
@@ -210,7 +211,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 {
 #if ENABLE_CORENET
         if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
-                int tmo = ng.daemon ? gloconf.polling_timeout : 10;
+                int tmo = core->main_core ? 0 : 10;
                 corenet_tcp_poll(tmo);
         }
 #endif
@@ -261,7 +262,24 @@ static int __core_worker_init(core_t *core)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 #endif
+        
+        if (ng.daemon && __polling_timeout__ == 0) {
+                cpuset_getcpu(&core->main_core, &core->aio_core);
+                if (core->main_core) {
+                        snprintf(name, sizeof(name), "core[%u]", core->hash);
+                        ret = cpuset(name, core->main_core->cpu_id);
+                        if (unlikely(ret)) {
+                                DWARN("set cpu fail\n");
+                        }
 
+                        DINFO("core[%u] cpu set\n", core->hash);
+                } else {
+                        DINFO("core[%u] skip cpu set\n", core->hash);
+                }
+        } else {
+                core->main_core = NULL;
+        }
+        
 #if 0
         ret = variable_newthread();
         if (unlikely(ret))
@@ -286,7 +304,7 @@ static int __core_worker_init(core_t *core)
         snprintf(name, sizeof(name), "core");
 
 #if ENABLE_CORENET
-        int *interrupt = gloconf.polling_timeout ? &core->interrupt_eventfd : NULL;
+        int *interrupt = !core->main_core ? &core->interrupt_eventfd : NULL;
 
         ret = schedule_create(interrupt, name, &core->idx, &core->schedule, NULL);
         if (unlikely(ret)) {
@@ -325,15 +343,7 @@ static int __core_worker_init(core_t *core)
                 GOTO(err_ret, ret);
 
         DINFO("core[%u] timer inited\n", core->hash);
-       
-        snprintf(name, sizeof(name), "core[%u]", core->hash);
-        ret = cpuset(name, core->main_core->cpu_id);
-        if (unlikely(ret)) {
-                DWARN("set cpu fail\n");
-        }
-
-        DINFO("core[%u] cpu inited\n", core->hash);
-
+        
 #if 0
         ret = analysis_private_create(name);
         if (unlikely(ret)) {
@@ -372,7 +382,7 @@ static int __core_worker_init(core_t *core)
         core->maping = maping;
 #endif
 
-#if 0
+#if 1
         ret = __core_latency_private_init();
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -406,15 +416,12 @@ static void * IO_FUNC __core_worker(void *_args)
         int ret;
         core_t *core = _args;
 
-        DINFO("start core[%d] name %s idx %d core id %d, aio core id %d\n",
-              core->hash, core->name, core->idx, core->main_core->cpu_id, core->aio_core);
+        DINFO("start core[%d] name %s idx %d\n",
+              core->hash, core->name, core->idx);
 
         ret = __core_worker_init(core);
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
-
-        DINFO("start core[%d] name %s idx %d core id %d, aio core id %d init finish\n",
-              core->hash, core->name, core->idx, core->main_core->cpu_id, core->aio_core);
 
         while (1) {
                 __core_worker_run(core);
@@ -496,7 +503,7 @@ err_ret:
         return ret;
 }
 
-int __core_create__(core_t **_core, int hash, int flag)
+static int __core_create__(core_t **_core, int hash, int flag)
 {
         int ret;
         core_t *core;
@@ -511,8 +518,6 @@ int __core_create__(core_t **_core, int hash, int flag)
         core->hash = hash;
         core->flag = flag;
         core->keepalive = gettime();
-
-        cpuset_getcpu(&core->main_core, &core->aio_core);
 
         INIT_LIST_HEAD(&core->check_list);
 
@@ -539,82 +544,18 @@ err_ret:
         return ret;
 }
 
-#ifdef SPDK
-int core_spdk_init(int flag)
-{
-        int ret, i;
-        core_t  *_core = NULL;
-        uint64_t mask = 0; /*max CPU number 64*/
-        char cpu_mask_str[16];
-
-#if 0
-        if (__core_spdk_init__ == __CORE_SPDK_INIT__)
-                return 0;
-#endif
-        for(i = 0; i < cpuset_useable(); i++){
-
-                ret = ymalloc((void **)&_core, sizeof(*_core));
-                if (ret){
-                        UNIMPLEMENTED(__DUMP__);
-                }
-
-                cpuset_getcpu(&_core->main_core, &_core->aio_core);
-                if (_core->main_core == NULL)
-                        YASSERT(0);
-
-                INIT_LIST_HEAD(&_core->check_list);
-                INIT_LIST_HEAD(&_core->rdma_dev_list);
-
-                mask |= 1ULL << _core->main_core->cpu_id;
-                DINFO("get cpu id %d, %d\n", _core->main_core->cpu_id, i);
-
-                _core->idx = -1;
-                _core->hash = i;
-                _core->flag = flag;
-                _core->keepalive = gettime();
-
-                ret = sy_spin_init(&_core->keepalive_lock);
-                if (unlikely(ret))
-                        UNIMPLEMENTED(__DUMP__);
-
-                ret = sem_init(&_core->sem, 0, 0);
-                if (unlikely(ret))
-                        UNIMPLEMENTED(__DUMP__);
-
-
-                __core_array__[i] = _core;
-
-        }
-
-        /*
-        ret = sem_init(&spdk_launch_sem, 0, 0);
-        if (ret)
-                UNIMPLEMENTED(__DUMP__);
-        */
-
-        snprintf(cpu_mask_str, 24, "0x%lx", mask);
-        DINFO("polling core number %d and mask is %s\n", cpuset_useable(),cpu_mask_str);
-        ret = spdk_init((void **)__core_array__, cpu_mask_str,  __core_worker);
-        if(ret){
-                UNIMPLEMENTED(__DUMP__);
-        }
-
-        for(i = 0; i < cpuset_useable(); i++){
-                _core = __core_array__[i];
-                sem_wait(&_core->sem);
-        }
-
-        //sem_post(&spdk_launch_sem);
-        __core_spdk_init__ = __CORE_SPDK_INIT__;
-        return 0;
-}
-#endif
-
-int core_init(int flag)
+int core_init(int polling_core, int polling_timeout, int flag)
 {
         int ret, i;
         core_t *core = NULL;
 
+        __polling_timeout__ = polling_timeout;
+        __polling_core__ = polling_core;
+
+        ret = cpuset_init(polling_core);
+        if (unlikely(ret))
+                UNIMPLEMENTED(__DUMP__);
+        
         DINFO("core init begin\n");
         YASSERT(cpuset_useable() > 0 && cpuset_useable() < 64);
 
@@ -626,7 +567,7 @@ int core_init(int flag)
 
         DINFO("core global private mem inited\n");
 
-#if 0
+#if 1
         ret = __core_latency_init();
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
@@ -640,8 +581,8 @@ int core_init(int flag)
 
                 __core_array__[i] = core;
 
-                DINFO("core %d hash %d idx %d main_core %p aio_core %d\n",
-                      i, core->hash, core->idx, core->main_core, core->aio_core);
+                DINFO("core %d hash %d idx %d\n",
+                      i, core->hash, core->idx);
         }
 
         for (i = 0; i < cpuset_useable(); i++) {
@@ -841,7 +782,7 @@ void core_iterator(func1_t func, const void *opaque)
         }
 }
 
-#if 0
+#if 1
 static int __core_latency_private_init()
 {
         int ret;
@@ -858,7 +799,7 @@ err_ret:
         return ret;
 }
 
-const int __core_latency_worker__()
+static int __core_latency_worker__()
 {
         int ret;
         struct list_head list, *pos, *n;

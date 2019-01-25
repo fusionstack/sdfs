@@ -256,7 +256,7 @@ int mond_rpc_diskhb(const nid_t *nid, int tier, const uuid_t *uuid,
 
         char _uuid[MAX_NAME_LEN];
         uuid_unparse(*uuid, _uuid);
-        DINFO("hb disk %s uuid %s\n", network_rname(nid), _uuid);
+        DBUG("hb disk %s uuid %s\n", network_rname(nid), _uuid);
         
         ret = network_connect_master();
         if (unlikely(ret))
