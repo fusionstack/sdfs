@@ -1250,7 +1250,7 @@ void netable_sort(nid_t *nids, int count)
                 sec->nid = nids[i];
 
                 if (net_islocal(&sec->nid)) {
-                        sec->load = jobdock_load();
+                        sec->load = core_latency_get();
                 } else {
                         net = __netable_nidfind(&sec->nid);
                         if (net == NULL || net->status != NETABLE_CONN) {
@@ -1346,7 +1346,7 @@ void IO_FUNC netable_select(const nid_t *nids, int count, nid_t *nid)
                 sec->nid = nids[i];
 
                 if (net_islocal(&sec->nid)) {
-                        sec->load = jobdock_load();
+                        sec->load = core_latency_get();
                 } else {
                         net = __netable_nidfind(&sec->nid);
                         if (net == NULL || net->status != NETABLE_CONN) {

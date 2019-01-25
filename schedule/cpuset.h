@@ -9,6 +9,7 @@ typedef struct {
         int node_id;             ///< NUMA node id
         int physical_package_id; ///< socket
         int used;
+        int lockfd;
 } coreinfo_t;
 
 

@@ -22,7 +22,6 @@
 #include "yftp_conf.h"
 #include "ylog.h"
 #include "ynet_rpc.h"
-#include "ynet_rpc_old.h"
 #include "configure.h"
 #include "io_analysis.h"
 #include "network.h"
@@ -53,6 +52,14 @@ static void signal_handler(int sig)
         netable_iterate();
         analysis_dump();
 }
+
+void ftp_exit_handler(int sig)
+{
+        DWARN("got signal %d, exiting\n", sig);
+
+        ftp_srv_running = 0;
+}
+
 
 void *ftp_handler(void *arg)
 {
@@ -161,16 +168,6 @@ retry:
 
         events = (struct epoll_event *)ptr;
 
-#if PROC_MONITOR_ON
-        ret = proc_init();
-        if (ret)
-                GOTO(err_ret, ret);
-
-        ret = proc_log("yftp");
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
-
         (void) pthread_attr_init(&ta);
         (void) pthread_attr_setdetachstate(&ta, PTHREAD_CREATE_DETACHED);
 
@@ -184,8 +181,8 @@ retry:
 
         ftp_srv_running = 1;
 
-        while (srv_running) {
-                nfds = _epoll_wait(epoll_fd, events, YFTP_EPOLL_SIZE, -1);
+        while (ftp_srv_running) {
+                nfds = _epoll_wait(epoll_fd, events, YFTP_EPOLL_SIZE, 1 * 1000);
                 if (nfds == -1) {
                         ret = errno;
                         if (ret == EINTR) {
@@ -338,7 +335,7 @@ int main(int argc, char *argv[])
 
         signal(SIGIO,  signal_handler);
         signal(SIGUSR1,  signal_handler);
-        signal(SIGUSR2, exit_handler);
+        signal(SIGUSR2, ftp_exit_handler);
 
         ret = ly_run(home, ftp_srv, &yftp_args);
         if (ret)

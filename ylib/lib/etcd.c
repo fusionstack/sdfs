@@ -58,8 +58,8 @@ static int  __etcd_set__(const char *key, const char *value,
         etcd_session sess;
         char *host;
 
-        DINFO("write %s\n", key);
-        
+        DBUG("write %s\n", key);
+
         host = strdup(__ETCD_SRV__);
         ret = __etcd_open_str(host, &sess);
         if (ret) {
@@ -98,7 +98,7 @@ static int __etcd_get__(const char *srv, const char *key, etcd_node_t **result, 
         etcd_node_t *node;
         char *host;
 
-        DINFO("read %s\n", key);
+        DBUG("read %s\n", key);
         
         host = strdup(srv);
         ret = __etcd_open_str(host, &sess);

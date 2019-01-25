@@ -1,5 +1,3 @@
-
-
 #include <limits.h>
 #include <time.h>
 #include <string.h>
@@ -9,6 +7,9 @@
 #include <signal.h>
 #include <sys/eventfd.h>
 #include <errno.h>
+#include <sys/file.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 #define DBG_SUBSYS S_LIBSCHEDULE
 
@@ -30,8 +31,7 @@
 #include "timer.h"
 #include "adt.h"
 #include "dbg.h"
-#include <sys/types.h>
-#include <dirent.h>
+
 
 #define __CPU_PATH__ "/sys/devices/system/cpu"
 #define __CPUSET_INIT__       1
@@ -132,25 +132,6 @@ int cpuset_useable()
         return cpuinfo.polling_core;
 }
 
-static int __cpuset_getconf(const char *conf, int max)
-{
-        char tmp[MAX_NAME_LEN];
-        int pc, count;
-
-        strcpy(tmp, conf);
-        if (tmp[strlen(tmp) - 1] == '%') {
-                tmp[strlen(tmp) - 1] = '\0';
-                pc = atoi(tmp);
-                count = (max + 1) * pc / 100;
-        } else {
-                count = atoi(tmp);
-        }
-
-        count = count < max ? count : max;
-
-        return count;
-}
-
 static int __lookup_ht_core(int cpuid, int coreid)
 {
         int i = -1;
@@ -206,13 +187,48 @@ static int __cpuset_getslave(int cpuid, int coreid)
 int __next_node_id__ = 0;
 int __cpu_node_count__ = 0;
 
+static int __cpu_lock(int cpu_id, int *_fd)
+{
+        int ret, fd;
+        char path[MAX_PATH_LEN];
+
+        snprintf(path, MAX_PATH_LEN, "%s/cpulock/%d", SHM_ROOT, cpu_id);
+
+        ret = _set_value(path, "", 0, O_CREAT | O_EXCL);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        fd = open(path, O_CREAT | O_RDONLY, 0640);
+        if (fd == -1) {
+                ret = errno;
+                GOTO(err_ret, ret);
+        }
+
+        ret = flock(fd, LOCK_EX | LOCK_NB);
+        if (ret == -1) {
+                ret = errno;
+                if (ret == EWOULDBLOCK) {
+                        DINFO("lock %s fail\n", path);
+                        goto err_fd;
+                } else
+                        GOTO(err_fd, ret);
+        }
+
+        *_fd = fd;
+
+        return 0;
+err_fd:
+        close(fd);
+err_ret:
+        return ret;
+}
+
 static void __cpuset_getcpu(coreinfo_t **master, int *slave)
 {
-        int i;
-        coreinfo_t *coreinfo;
+        int ret, i, fd;
+        coreinfo_t *coreinfo = NULL;
 
         *master = NULL;
-        *slave = -1;
         for (i = 0; i <= cpuinfo.threading_max; i++) {
                 // TODO 按cpu_id降序，依次分配core
                 // cpu_id与NUMA Node具有不同的映射关系
@@ -224,17 +240,37 @@ static void __cpuset_getcpu(coreinfo_t **master, int *slave)
                 if (coreinfo->node_id != __next_node_id__)
                         continue;
 
+                ret = __cpu_lock(coreinfo->cpu_id, &fd);
+                if (ret) {
+                        DWARN("cpu[%u] used by other process\n");
+                        coreinfo->used = 1;
+                        continue;
+                }
+
+                coreinfo->lockfd = fd;
                 __next_node_id__ = (__next_node_id__ + 1 ) % __cpu_node_count__;
 
                 coreinfo->used = 1;
                 *master = coreinfo;
-                *slave = __cpuset_getslave(coreinfo->physical_package_id, coreinfo->core_id);
+
+                if (slave) {
+                        *slave = __cpuset_getslave(coreinfo->physical_package_id, coreinfo->core_id);
+                }
 
                 break;
         }
+
+        if (*master) {
+                DINFO("master %u/%u/%u/%u slave %d\n",
+                      coreinfo->cpu_id, coreinfo->node_id,
+                      coreinfo->physical_package_id,
+                      coreinfo->core_id, slave ? *slave : -1);
+        } else {
+                DWARN("get empty cpu fail\n");
+        }
 }
 
-int cpuset_init()
+int cpuset_init(int polling_core)
 {
         int i, ret, max = 0;
         char buf[MAX_BUF_LEN], path[MAX_PATH_LEN];
@@ -283,9 +319,10 @@ int cpuset_init()
 
                 node_list[coreinfo->node_id]++;
 
-                DBUG("thread[%u] coreid %u physical_package_id %u node id %u\n", i,
-                      coreinfo->core_id, coreinfo->physical_package_id, 
-                      coreinfo->node_id);
+                DINFO("cpu[%u] node_id %u physical_package_id %u core_id %u\n",
+                      coreinfo->node_id,
+                      coreinfo->physical_package_id,
+                      coreinfo->core_id);
         }
 
         for (i = 0; i < MAX_NUMA_NODE; i++) {
@@ -295,8 +332,8 @@ int cpuset_init()
                        break;
         }
 
-        cpuinfo.polling_core = __cpuset_getconf(gloconf.polling_core, max + 1);
-        cpuinfo.aio_core = __cpuset_getconf(gloconf.aio_core, max + 1);
+        cpuinfo.polling_core = polling_core;
+        cpuinfo.aio_core = 0;
 
         if (cpuinfo.polling_core < 1) {
                 DINFO("force set polling_core 1\n");
@@ -304,8 +341,6 @@ int cpuset_init()
         }
 
         cpuinfo.threading_max = max;
-
-        DINFO("core max %u polling %u aio %u\n", max, cpuinfo.polling_core, cpuinfo.aio_core);
 
         if (cpuinfo.aio_core) {
                 coreinfo_t *coreinfo[MAX_CPU_COUNT];
@@ -317,7 +352,10 @@ int cpuset_init()
                 }
         }
 
+        DINFO("core max %u polling %u aio %u\n", max, cpuinfo.polling_core, cpuinfo.aio_core);
+
         __cpuset_init__ = __CPUSET_INIT__;
+
         return 0;
 err_ret:
         return ret;
@@ -332,17 +370,22 @@ void cpuset_getcpu(coreinfo_t **master, int *_slave)
 {
         int slave;
 
-        __cpuset_getcpu(master, &slave);
-
         if (cpuinfo.aio_core) {
+                __cpuset_getcpu(master, &slave);
+
                 DINFO("count %u max %u\n", __aio_core_count__, cpuinfo.aio_core * 2);
-                *_slave = __aio_core__[__aio_core_count__ %  (cpuinfo.aio_core * 2)];
+                slave = __aio_core__[__aio_core_count__ %  (cpuinfo.aio_core * 2)];
                 __aio_core_count__ ++;
+
         } else {
-                *_slave = slave;
+                __cpuset_getcpu(master, NULL);
+                slave = -1;
         }
+
+        if (_slave)
+                *_slave = slave;
         
-        DINFO("get cpu %d %d\n", (*master)->cpu_id, *_slave)
+        // DINFO("get cpu %d %d\n", (*master)->cpu_id, *_slave)
 }
 
 int cpuset(const char *name, int cpu)
@@ -376,35 +419,4 @@ int cpuset(const char *name, int cpu)
         return 0;
 err_ret:
         return ret;
-}
-
-
-static void __cpuset_getcpu_by_physical_id(int *master, int *slave, int physical_package_id)
-{
-        int i;
-        coreinfo_t *coreinfo;
-
-        *master = -1;
-        *slave = -1;
-        for (i = 0; i <= cpuinfo.threading_max; i++) {
-                coreinfo = &__coreinfo__[cpuinfo.threading_max - i];
-
-                if (coreinfo->used)
-                        continue;
-
-                if (coreinfo->physical_package_id != physical_package_id) {
-                        continue;
-                }
-
-                coreinfo->used = 1;
-                *master = cpuinfo.threading_max - i;
-                *slave = __cpuset_getslave(coreinfo->physical_package_id, coreinfo->core_id);
-
-                break;
-        }
-}
-
-void cpuset_getcpu_by_physical_id(int *master, int *slave, int physical_package_id)
-{
-        __cpuset_getcpu_by_physical_id(master, slave, physical_package_id);
 }

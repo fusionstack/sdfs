@@ -6,7 +6,6 @@
 #include "ynet_net.h"
 #include "net_table.h"
 #include "job.h"
-#include "ynet_rpc_old.h"
 #include "sdfs_id.h"
 #include "adt.h"
 #include "sdfs_conf.h"
@@ -92,5 +91,8 @@ int rpc_request_prep(buffer_t *buf, const msgid_t *msgid, const void *request,
 
 #endif
 
+int rpc_accept(int *cli_sd, int srv_sd, int tuning, int nonblock);
+extern int rpc_peek_sd_sync(int sd, char *buf, uint32_t buflen, int timeout);
+extern int rpc_discard_sd_sync(int sd, uint32_t len, int timeout);
 
 #endif

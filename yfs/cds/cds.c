@@ -32,6 +32,7 @@
 #include "replica.h"
 #include "schedule.h"
 #include "redis.h"
+#include "core.h"
 #include "net_global.h"
 #include "../../cds/diskio.h"
 #include "bh.h"
@@ -175,10 +176,6 @@ int cds_destroy(int cds_sd, int servicenum)
 
         (void) cds_sd;
         (void) servicenum;
-
-#if PROC_MONITOR_ON
-        proc_destroy();
-#endif
 
         return 0;
 }
@@ -324,12 +321,10 @@ int cds_init(const char *home, int *cds_sd, int servicenum, int diskno, uint64_t
         if (ret)
                 GOTO(err_ret, ret);
 
-#if PROC_MONITOR_ON
-        ret = proc_init();
+        ret = core_init(1, 1, 0);
         if (ret)
                 GOTO(err_ret, ret);
-#endif
-
+        
 retry:
         ret = network_connect_master();
         if (ret) {
@@ -525,14 +520,6 @@ int cds_run(void *args)
         if (ret)
                 GOTO(err_ret, ret);
         
-#if PROC_MONITOR_ON
-        snprintf(path, sizeof(path), "cds_%d", diskno);
-
-        ret = proc_log(path);
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
-
         DBUG("cds (diskno %d) started ...\n", diskno);
 
         ret = rpc_start(); /*begin serivce*/
@@ -570,6 +557,10 @@ int cds_run(void *args)
 
         while (cds_info.running) { //we got nothing to do here
                 sleep(1);
+
+                if (time(NULL) % 10 == 0) {
+                        DINFO("latency %ju\n", core_latency_get());
+                }
         }
 
         ret = ly_update_status("stopping", -1);

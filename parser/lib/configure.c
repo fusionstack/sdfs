@@ -192,9 +192,9 @@ int conf_init(const char *conf_path)
         gloconf.valgrind = 0;
         strcpy(gloconf.master_vip, "\0");
         gloconf.dir_refresh  = 300;
-        strcpy(gloconf.polling_core, "8");
+        gloconf.polling_core = 8;
         gloconf.polling_timeout = 3; //秒
-        strcpy(gloconf.aio_core, "0");
+        gloconf.aio_core = 0;
         gloconf.file_refresh  = 10;
         gloconf.wmem_max = SO_XMITBUF;
         gloconf.rmem_max = SO_XMITBUF;
@@ -638,11 +638,11 @@ int set_value(const char* key, const char* value, int type)
         else if (keyis("file_refresh", key))
                 gloconf.file_refresh = _value;
         else if (keyis("polling_core", key))
-                strncpy(gloconf.polling_core, value, MAXSIZE);
+                gloconf.polling_core = _value;
         else if (keyis("polling_timeout", key))
                 gloconf.polling_timeout = _value * 1000;
         else if (keyis("aio_core", key))
-                strncpy(gloconf.aio_core, value, MAXSIZE);
+                gloconf.aio_core = _value;
         else if (keyis("max_lvm", key))
                 gloconf.max_lvm = _value > 65536 ? 65536 : _value;
 

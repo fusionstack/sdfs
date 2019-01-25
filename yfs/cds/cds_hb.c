@@ -74,7 +74,7 @@ int __hb(const diskid_t *diskid)
 
         YASSERT(diff.ds_bsize == 4096);
 
-        DINFO("try to send heartbeat message diff %lld %lld\n",
+        DBUG("try to send heartbeat message diff %lld %lld\n",
               (long long)diff.ds_bfree, (long long)diff.ds_bavail);
         ret = mond_rpc_diskhb(diskid, cds_info.tier, (const uuid_t *)&ng.nodeid, &diff, info);
         if (ret)

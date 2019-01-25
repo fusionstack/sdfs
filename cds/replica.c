@@ -12,6 +12,7 @@
 #include "nodeid.h"
 #include "md_lib.h"
 #include "diskio.h"
+#include "core.h"
 #include "dbg.h"
 
 static int __seq__ = 0;
@@ -84,7 +85,7 @@ static void __callback(void *_iocb, void *_retval)
         schedule_resume(task, *retval, NULL);
 }
 
-int IO_FUNC replica_write(const io_t *io, const buffer_t *buf)
+int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
 {
         int ret, iov_count;
         int fd;
@@ -93,6 +94,7 @@ int IO_FUNC replica_write(const io_t *io, const buffer_t *buf)
         struct iovec iov[Y_MSG_MAX / PAGE_SIZE + 1];
 
         ANALYSIS_BEGIN(0);
+        CORE_ANALYSIS_BEGIN(1);
         
         YASSERT(schedule_running());
 
@@ -133,6 +135,7 @@ int IO_FUNC replica_write(const io_t *io, const buffer_t *buf)
         __replica_release(fd);
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        CORE_ANALYSIS_UPDATE(1, IO_WARN, "write");       
         
         return 0;
 err_fd:
@@ -141,7 +144,7 @@ err_ret:
         return ret;
 }
 
-int IO_FUNC replica_read(const io_t *io, buffer_t *buf)
+int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
 {
         int ret, iov_count;
         int fd;
@@ -150,6 +153,7 @@ int IO_FUNC replica_read(const io_t *io, buffer_t *buf)
         struct iovec iov[Y_MSG_MAX / PAGE_SIZE + 1];
 
         ANALYSIS_BEGIN(0);
+        CORE_ANALYSIS_BEGIN(1);
         
         YASSERT(schedule_running());
 
@@ -190,11 +194,56 @@ int IO_FUNC replica_read(const io_t *io, buffer_t *buf)
         
         __replica_release(fd);
 
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        ANALYSIS_QUEUE(0, IO_WARN, NULL); 
+        CORE_ANALYSIS_UPDATE(1, IO_WARN, "read");       
         
         return 0;
 err_fd:
         __replica_release(fd);
+err_ret:
+        return ret;
+}
+
+int IO_FUNC __replica_read(va_list ap)
+{
+        const io_t *io = va_arg(ap, const io_t *);
+        buffer_t*buf = va_arg(ap, buffer_t *);
+
+        return __replica_read__(io, buf);
+        
+}
+
+int IO_FUNC replica_read(const io_t *io, buffer_t *buf)
+{
+        int ret;
+
+        ret = core_request(io->id.id, -1, "replica_read", __replica_read, io, buf);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+int IO_FUNC __replica_write(va_list ap)
+{
+        const io_t *io = va_arg(ap, const io_t *);
+        const buffer_t*buf = va_arg(ap, buffer_t *);
+
+        return __replica_write__(io, buf);
+        
+}
+
+int IO_FUNC replica_write(const io_t *io, const buffer_t *buf)
+{
+        int ret;
+
+        ret = core_request(io->id.id, -1, "replica_write", __replica_write, io, buf);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
 err_ret:
         return ret;
 }
@@ -207,5 +256,5 @@ struct sche_thread_ops replica_ops = {
 
 int replica_init()
 {
-        return sche_thread_ops_register(&replica_ops, replica_ops.type, 16);
+        return sche_thread_ops_register(&replica_ops, replica_ops.type, 8);
 }

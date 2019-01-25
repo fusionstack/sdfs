@@ -205,9 +205,9 @@ struct gloconf_t
         int restart;
         char master_vip[MAXSIZE]; //ip1,ip2,vip
         int valgrind;
-        char polling_core[MAXSIZE];
+        int polling_core;
         int polling_timeout;
-        char aio_core[MAXSIZE];
+        int aio_core;
         int direct_port;
 
         int sdevents_threads;

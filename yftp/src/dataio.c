@@ -13,7 +13,6 @@
 #include "session.h"
 #include "ylib.h"
 #include "sdfs_lib.h"
-#include "ynet_rpc_old.h"
 #include "yftp_conf.h"
 #include "ynet_rpc.h"
 #include "configure.h"

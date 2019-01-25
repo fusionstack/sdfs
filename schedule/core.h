@@ -92,7 +92,7 @@ typedef struct __core {
 #define CORE_FLAG_PASSIVE 0x0001
 #define CORE_FLAG_AIO     0x0002
 
-int core_init(int flag);
+int core_init(int polling_core, int polling_timeout, int flag);
 
 int core_spdk_init(int flag);
 int core_init_register(func_t init, void *_ctx, const char *name);
@@ -136,16 +136,6 @@ int core_poller_unregister(core_t *core, void (*poll)());
                 }                                                       \
         }                                                               \
 
-#if 1
-//just for compatible, will be removed
-inline static uint64_t core_latency_get()
-{
-        UNIMPLEMENTED(__WARN__);
-
-        return 0;
-}
-#else
 uint64_t core_latency_get();
-#endif
 
 #endif
