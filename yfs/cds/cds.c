@@ -326,7 +326,7 @@ int cds_init(const char *home, int *cds_sd, int servicenum, int diskno, uint64_t
                 GOTO(err_ret, ret);
         
 retry:
-        ret = network_connect_master();
+        ret = network_connect_mond(1);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {

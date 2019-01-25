@@ -127,8 +127,14 @@ static int __inode_getattr(const fileid_t *fileid, md_proto_t *md)
         
         len = MAX_BUF_LEN;
         ret = hget(fileid, SDFS_MD, buf, &len);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                if (ret == ENOENT) {
+                        memset(md, 0x0, sizeof(*md));
+                        md->fileid = *fileid;
+                        goto out;
+                } else
+                        GOTO(err_ret, ret);
+        }
 
         memcpy(md, buf, len);
         YASSERT(md->md_size == len);
@@ -140,7 +146,8 @@ static int __inode_getattr(const fileid_t *fileid, md_proto_t *md)
 
                 md->at_nlink = count + 2;
         }
-        
+
+out:
         return 0;
 err_ret:
         return ret;

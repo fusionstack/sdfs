@@ -251,7 +251,7 @@ class Instence(object):
         time.sleep(0.1)
 
         if (self.running()):
-            time.sleep(0.1)
+            time.sleep(1.5)
             dwarn("%s, still running, sleep 1" % (self.name), ttyonly)
             time.sleep(1)
             if (self.running()):

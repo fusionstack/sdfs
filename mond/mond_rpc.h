@@ -21,5 +21,6 @@ int mond_rpc_diskjoin(const nid_t *nid, uint32_t tier, const uuid_t *uuid,
                       const diskinfo_stat_t *stat);
 int mond_rpc_newdisk(const nid_t *nid, uint32_t tier, uint32_t repnum,
                      uint32_t hardend, diskid_t *disks);
+int mond_rpc_null(const nid_t *mond);
 
 #endif

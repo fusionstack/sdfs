@@ -204,7 +204,7 @@ int hb_msger(const diskid_t *diskid)
         while (srv_running) {
                 sleep(10);
 
-                ret = network_connect_master();
+                ret = network_connect_mond(0);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -285,7 +285,7 @@ void *cds_hb(void *noop)
 
                         //cds_jnl_close(&ng.mds_nh);
 
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret) {
                                 DERROR("connect fail\n");
                                 sleep(10);

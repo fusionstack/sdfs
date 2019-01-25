@@ -162,7 +162,7 @@ again:
         ret = md_rename(&fparent, fname, &tparent, tname);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 
@@ -289,7 +289,7 @@ again:
         ret = sdfs_lookup_recurive(path, &fileid);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 
@@ -305,7 +305,7 @@ again:
         ret = md_getattr(md, &fileid);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 
@@ -365,7 +365,7 @@ again:
         ret = md_link2node(path, nodeid);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 
@@ -473,7 +473,7 @@ again:
                           sizeof(uint32_t), USS_XATTR_DEFAULT);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 
@@ -501,7 +501,7 @@ again:
         ret = ly_getxattr(path, YFS_XATTR_REPLICA, (void *)&replica, &size);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 
@@ -529,7 +529,7 @@ again:
                           sizeof(uint32_t), USS_XATTR_DEFAULT);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 
@@ -557,7 +557,7 @@ again:
         ret = ly_getxattr(path, YFS_XATTR_CHKLEN, (void *)&chunk, &size);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
-                        ret = network_connect_master();
+                        ret = network_connect_mond(0);
                         if (ret == 0)
                                 goto again;
 

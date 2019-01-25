@@ -35,6 +35,7 @@
 
 extern int mds_scan_init();
 static int mds_exiting  = 0;
+static int __mond_master__ = 0;
 
 extern jobtracker_t *boardcast_jobtracker;
 
@@ -161,6 +162,9 @@ int mds_init(const char *home, int metano)
         if (ret)
                 GOTO(err_ret, ret);
 
+        __mond_master__ = 1;
+        net_setadmin(net_getnid());
+        
         return 0;
 err_ret:
         return ret;
@@ -177,6 +181,7 @@ static int __mon_master(etcd_lock_t *lock, const char *home, int metano)
         while (srv_running) {
                 if (!etcd_lock_health(lock)) {
                         DWARN("lock fail\n");
+                        EXIT(EAGAIN);
                         ret = EAGAIN;
                         GOTO(err_ret, ret);
                 }
@@ -196,13 +201,15 @@ static int __mon_slave(etcd_lock_t *lock)
         nid_t nid, newnid;
         uint32_t magic;
 
+        __mond_master__ = 0;
+        
         ret = etcd_locker(lock, master, &nid, &magic, &idx);
         if (ret) {
                 DWARN("get master fail %u %s\n", ret, strerror(ret));
                 GOTO(err_ret, ret);
         }
                 
-        while (1) {
+        while (srv_running) {
                 ret = etcd_lock_watch(lock, master, &newnid, &magic, &idx);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
@@ -401,4 +408,9 @@ int mds_run(void *args)
         return 0;
 err_ret:
         return ret;
+}
+
+int mond_ismaster()
+{
+        return __mond_master__;
 }

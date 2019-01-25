@@ -276,10 +276,12 @@ STATIC int __rpc_request_wait(const char *name, const net_handle_t *nh, const vo
         const nid_t *nid;
 
         if (nh->type == NET_HANDLE_PERSISTENT) {
+#if 0
                 ret = network_connect(&nh->u.nid, NULL, 1, 0);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
-
+#endif
+                
                 ret = netable_getsock(&nh->u.nid, &sockid);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);

@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
         } else if (verbose)
                 printf("ly_init()'ed\n");
 
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (ret)
                 GOTO(err_ret, ret);
 

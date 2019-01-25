@@ -896,7 +896,7 @@ int ly_init_simple(const char *name)
         ng.live = 0;
         is_daemon = 0;
 
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -923,7 +923,7 @@ int sdfs_init_verbose(const char *name, int workdir, int daemon)
         if (ret)
                 GOTO(err_ret, ret);
 retry:
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {

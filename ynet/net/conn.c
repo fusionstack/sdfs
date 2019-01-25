@@ -303,6 +303,17 @@ static int __conn_scan__()
         char tmp[MAX_NAME_LEN];
         nid_t nid;
 
+retry:
+        ret = network_connect_mond(1);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        sleep(5);
+                        goto retry;
+                } else
+                        GOTO(err_ret, ret);
+        }
+        
         ret = etcd_list(ETCD_CONN, &list);
         if (unlikely(ret)) {
                 if (ret == ENOKEY) {

@@ -142,10 +142,10 @@ class Redisd():
         try:
             #print (self.volume + "/sharding")
             key = "/sdfs/volume/" + self.volume + "/sharding"
-            dmsg("etcd read " + key)
+            #dmsg("etcd read " + key)
             self.sharding = int(self.etcd.read(key).value)
             key = "/sdfs/volume/" +self.volume + "/replica"
-            dmsg("etcd read " + key)
+            #dmsg("etcd read " + key)
             self.replica = int(self.etcd.read(key).value)
 
             #dmsg("%s sharding %d replica %d" % (self.volume, self.sharding, self.replica))
@@ -183,7 +183,7 @@ class Redisd():
         for i in range(NODE_PORT):
             key = prefix + "/port/" + str(i)
             try:
-                dmsg("etcd write " + key)
+                #dmsg("etcd write " + key)
                 self.etcd.write(key, "", prevExist=False)
                 idx = i
                 break;
@@ -204,7 +204,7 @@ class Redisd():
         key = "/sdfs/volume/%s/slot/%d/redis/%d" % (self.volume, slot, replica)
         dmsg("set (%s, %s)" % (key, addr))
         try:
-            dmsg("etcd write " + key)
+            #dmsg("etcd write " + key)
             self.etcd.write(key, addr, prevExist=False)
             #dmsg("key %s succss" % (key))
             return True
@@ -232,17 +232,17 @@ class Redisd():
     
     def __etcd_create(self, key, value):
         key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], key)
-        dmsg("etcd write " + key)
+        #dmsg("etcd write " + key)
         self.etcd.write(key, value, prevExist=False)
 
     def __etcd_set(self, key, value):
         key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], key)
-        dmsg("etcd write " + key)
+        #dmsg("etcd write " + key)
         self.etcd.write(key, value)
         
     def __etcd_get(self, key):
         key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], key)
-        dmsg("etcd read " + key)
+        #dmsg("etcd read " + key)
         res = self.etcd.read(key)
         return res.value
 
@@ -252,13 +252,13 @@ class Redisd():
     
     def __etcd_update_dbversion(self):
         key = "/sdfs/volume/%s/slot/%d/%s" % (self.volume, self.id[0], "dbversion")
-        dmsg("etcd read " + key)
+        #dmsg("etcd read " + key)
         res = self.etcd.read(key)
         idx = res.modifiedIndex
         version = int(res.value)
 
         try:
-            dmsg("etcd write " + key)
+            #dmsg("etcd write " + key)
             res = self.etcd.write(key, version + 1, prevIndex=idx)
         except etcd.EtcdCompareFailed:
             return -1
@@ -358,7 +358,7 @@ class Redisd():
             for j in range(self.replica):
                 key = "/sdfs/volume/%s/wait/%d/redis/%d.wait" % (self.volume, i, j)
                 try:
-                    dmsg("etcd read " + key)
+                    #dmsg("etcd read " + key)
                     value = self.etcd.read(key).value
                     array = value.split(",")
                     if (array[0] == self.hostname and int(array[1]) == self.disk_idx):
@@ -489,10 +489,10 @@ class Redisd():
     def removed(self):
         try:
             key = "/sdfs/volume/" + self.volume + "/sharding"
-            dmsg("etcd read " + key)
+            #dmsg("etcd read " + key)
             sharding = int(self.etcd.read(key).value)
             key = "/sdfs/volume/" + self.volume + "/replica"
-            dmsg("etcd read " + key)
+            #dmsg("etcd read " + key)
             replica = int(self.etcd.read(key).value)
 
         except etcd.EtcdKeyNotFound:
@@ -851,9 +851,9 @@ class RedisDisk(Daemon):
                 index = res.etcd_index + 1
                 continue
             else:
-                dmsg("etcd write " + key)
+                #dmsg("etcd write " + key)
                 self.etcd.write(key, "0")
-                dmsg("etcd read " + key)
+                #dmsg("etcd read " + key)
                 res = self.etcd.read(key)
                 index = res.etcd_index + 1
             #except:
@@ -872,11 +872,11 @@ class RedisDisk(Daemon):
     def __update_instence(self):
         key = "/sdfs/redis/%s/disk/%d/instence" % (self.hostname, self.localid)
 
-        dmsg("etcd write " + key)
+        #dmsg("etcd write " + key)
         self.etcd.write(key, str(len(self.instence)))
 
         key = "/sdfs/redis/%s/disk/%d/trigger" % (self.hostname, self.localid)
-        dmsg("etcd write " + key)
+        #dmsg("etcd write " + key)
         self.etcd.write(key, "0")
         
     def __check_remove(self):
@@ -889,7 +889,7 @@ class RedisDisk(Daemon):
     def __check_volume(self):
         try:
             key = "/sdfs/volume"
-            dmsg("etcd read " + key)
+            #dmsg("etcd read " + key)
             r = self.etcd.read(key)._children
             lst = []
             for i in r:
@@ -907,10 +907,10 @@ class RedisDisk(Daemon):
         #print volume
         try:
             key = "/sdfs/volume/" + volume + "/sharding"
-            dmsg("etcd read " + key)
+            #dmsg("etcd read " + key)
             sharding = int(self.etcd.read(key).value)
             key = "/sdfs/volume/" + volume + "/replica"
-            dmsg("etcd read " + key)
+            #dmsg("etcd read " + key)
             replica = int(self.etcd.read(key).value)
 
             #dmsg("%s sharding %d replica %d" % (volume, sharding, replica))
@@ -921,7 +921,7 @@ class RedisDisk(Daemon):
         for i in range(sharding):
             slot = "/sdfs/volume/%s/slot/%d/redis" % (volume, i)
             try:
-                dmsg("etcd read " + slot)                
+                #dmsg("etcd read " + slot)                
                 r = self.etcd.read(slot)._children
                 for i in r:
                     lst.append(i["key"])

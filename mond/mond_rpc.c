@@ -46,6 +46,8 @@ typedef struct {
         char buf[0];
 } msg_t;
 
+extern int mond_ismaster();
+
 extern disk_stat_t getdiskstat(const diskinfo_stat_t *diskstat);
 
 static __request_handler_func__  __request_handler__[MOND_MAX - MOND_NULL];
@@ -171,7 +173,7 @@ int mond_rpc_getstat(const nid_t *nid, instat_t *instat)
         uint32_t count;
         msg_t *req;
 
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -258,7 +260,7 @@ int mond_rpc_diskhb(const nid_t *nid, int tier, const uuid_t *uuid,
         uuid_unparse(*uuid, _uuid);
         DBUG("hb disk %s uuid %s\n", network_rname(nid), _uuid);
         
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -352,7 +354,7 @@ int mond_rpc_newdisk(const nid_t *nid, uint32_t tier, uint32_t repnum,
 
         ANALYSIS_BEGIN(0);
         
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -444,7 +446,7 @@ int mond_rpc_diskjoin(const nid_t *nid, uint32_t tier, const uuid_t *uuid,
         uint32_t count;
         msg_t *req;
 
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -538,7 +540,7 @@ int mond_rpc_statvfs(const nid_t *nid, const fileid_t *fileid, struct statvfs *s
         uint32_t count;
         msg_t *req;
 
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -570,11 +572,73 @@ err_ret:
         return ret;
 }
 
+static int __mond_srv_null(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+{
+        int ret;
+        msg_t *req;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t buflen;
+
+        req = (void *)buf;
+        mbuffer_get(_buf, req, sizeof(*req));
+        buflen = req->buflen;
+        ret = mbuffer_popmsg(_buf, req, buflen + sizeof(*req));
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        if (!mond_ismaster()) {
+                ret = ENOSYS;
+                GOTO(err_ret, ret);
+        }
+        
+        rpc_reply(sockid, msgid, NULL, 0);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+
+int mond_rpc_null(const nid_t *mond)
+{
+        int ret;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t count;
+        msg_t *req;
+        
+        ANALYSIS_BEGIN(0);
+
+        req = (void *)buf;
+        req->op = MOND_NULL;
+        count = 0;
+        req->buflen = count;
+
+        ret = rpc_request_wait("mond_rpc_null", mond,
+                               req, sizeof(*req) + count, NULL, NULL,
+                               MSG_MOND, 0, _get_timeout());
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+
+
+
 int mond_rpc_init()
 {
         DINFO("mond rpc init\n");
 
         //__request_set_handler(MOND_READ, __mond_srv_read, "mond_srv_read");
+        __request_set_handler(MOND_NULL, __mond_srv_null, "mond_srv_null");
         __request_set_handler(MOND_GETSTAT, __mond_srv_getstat, "mond_srv_getstat");
         __request_set_handler(MOND_DISKHB, __mond_srv_diskhb, "mond_srv_diskhb");
         __request_set_handler(MOND_NEWDISK, __mond_srv_newdisk, "mond_srv_newdisk");

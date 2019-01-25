@@ -194,7 +194,7 @@ int ynfs_srv(void *args)
                 GOTO(err_ret, ret);
 
 retry:
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {

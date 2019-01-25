@@ -13,7 +13,7 @@
 /*network.c*/
 int network_init(void);
 
-int network_connect_master(void);
+int network_connect_mond(int force);
 int network_connect(const nid_t *nid, time_t *_ltime, int _timeout, int force);
 int network_connect_wait(const nid_t *nid, time_t *_ltime, int _timeout, int force);
 

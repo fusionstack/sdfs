@@ -116,8 +116,8 @@ class Node:
             os.system(cmd)
             
     def start(self, role=None, service=None, op="all"):
-        #lfile = "/var/run/uss.start.lock"
-        #lock = lock_file(lfile)
+        lfile = "/var/run/uss.start.lock"
+        lock = lock_file(lfile)
 
         check_sysctl(self.config, fix = True)
 

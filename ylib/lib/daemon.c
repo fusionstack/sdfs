@@ -352,7 +352,7 @@ retry:
         if (ret == -1) {
                 ret = errno;
                 if (ret == EWOULDBLOCK) {
-                        if (retry < 5) {
+                        if (retry < 30) {
                                 DINFO("lock %s fail\n", key);
                                 sleep(1);
                                 retry++;

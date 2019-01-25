@@ -239,8 +239,13 @@ static int __readirplus_entry(entryplus *entryplus, char *name, fileid_t *fileid
         struct stat stbuf;
 
         ret = sdfs_getattr(&node->fileid, &stbuf);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                if (ret == ENOENT) {
+                        memset(&stbuf, 0x0, sizeof(stbuf));
+                        stbuf.st_ino = fileid->id;
+                } else
+                        GOTO(err_ret, ret);
+        }
         
         _strcpy(name, node->name);
         *fileid = node->fileid;

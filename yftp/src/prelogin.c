@@ -77,7 +77,7 @@ retry:
         ret = user_get(username, &user_info);
         if(ret){
                 if (NEED_EAGAIN(ret)) {
-                        network_connect_master();
+                        network_connect_mond(0);
                         SLEEP_RETRY3(err_ret, ret, retry, retry, retry_max);
                 } else {
                         ret = EINVAL;

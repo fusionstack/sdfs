@@ -475,7 +475,7 @@ int http_srv(int daemon, const char *port)
         if (ret)
                 GOTO(err_ret, ret);
         
-        ret = network_connect_master();
+        ret = network_connect_mond(0);
         if (ret)
                 GOTO(err_ret, ret);
 

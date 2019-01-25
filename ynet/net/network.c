@@ -102,14 +102,21 @@ err_ret:
         return ret;
 }
 
-int network_connect_master()
+int network_connect_mond(int force)
 {
         int ret;
         nid_t nid;
 
         ANALYSIS_BEGIN(0);
-        if (net_islocal(net_getadmin()) || netable_connected(net_getadmin())) {
+
+        (void) force;
+        
+        if (net_islocal(net_getadmin())) {
                 DBUG("skiped\n");
+                return 0;
+        }
+
+        if (netable_connected(net_getadmin()) && force == 0) {
                 return 0;
         }
 
@@ -117,12 +124,20 @@ int network_connect_master()
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
+        if (net_islocal(&nid)) {
+                return 0;
+        }
+        
         DBUG("get nid %d\n", nid.id);
         
         ret = __network_connect(&nid);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
+        ret = mond_rpc_null(&nid);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
         DBUG("set admin %u\n", nid.id);
         net_setadmin(&nid);
         
@@ -164,7 +179,7 @@ retry:
                 DINFO("connect to master %s, local %s\n",
                       network_rname(net_getadmin()),
                       network_rname(net_getnid()));
-                ret = network_connect_master();
+                ret = network_connect_mond(0);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }

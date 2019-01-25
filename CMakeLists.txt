@@ -269,6 +269,7 @@ SET_TARGET_PROPERTIES(cds
 #list(REMOVE_ITEM MDS_SRC_LIST ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds_newrep1.c)
 
 add_library(mond SHARED
+    ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds_main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/disk.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/diskpool.c
