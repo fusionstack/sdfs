@@ -96,23 +96,16 @@ static int __conn_close(const nid_t *nid)
         }
 #endif
 
-#if ENABLE_LOCAL_RPC
         if (net_islocal(nid)) {
                 DWARN("skip close localhost\n");
                 goto out;
         }
-#endif
 
         __faultdomain_last_update__ = 0;
         
         DINFO("close %s\n", netable_rname_nid(nid));
 
-#if !ENABLE_ETCD_CONN
-#endif
-
-#if ENABLE_LOCAL_RPC
 out:
-#endif        
 
         //DERROR("__conn_close disabled\n");
         //netable_close_withrpc(NULL, nid, "offline");
@@ -132,12 +125,6 @@ static int __conn_add(const nid_t *nid)
         net_handle_t nh;
         size_t len;
         instat_t instat;
-
-#if !ENABLE_LOCAL_RPC
-        if (net_islocal(nid)) {
-                goto out;
-        }
-#endif
 
         if (netable_connected(nid)) {
                 netable_update(nid);

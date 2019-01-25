@@ -642,10 +642,6 @@ int netable_connect_info(net_handle_t *nh, const ynet_net_info_t *info, int forc
                 maping_drop(HOST2NID, info->name);
         }
 
-#if !ENABLE_LOCAL_RPC
-        YASSERT(!net_islocal(&info->id));
-#endif
-
         main_loop_hold();
 
 retry:
@@ -964,13 +960,6 @@ time_t IO_FUNC netable_conn_time(const nid_t *nid)
 #endif
         
         
-#if !ENABLE_LOCAL_RPC
-        if (net_islocal(nid)) {
-                return LOCAL_LTIME;
-        }
-
-#endif
-
         ent = __netable_nidfind(nid);
         if (unlikely(ent == NULL))
                 return 0;

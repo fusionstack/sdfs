@@ -221,7 +221,6 @@ typedef struct {
 #define ETCD_CDS "cds"
 #define ETCD_DISKMAP "diskmap"
 
-#define ENABLE_LOCAL_RPC 1
 #define ENABLE_HEARTBEAT 1
 
 #define ENABLE_NEWMD 1
