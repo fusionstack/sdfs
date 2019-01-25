@@ -1,5 +1,4 @@
-
-//#include <hircluster.h>
+#include <sys/eventfd.h>
 
 #define DBG_SUBSYS S_YFSLIB
 
@@ -37,7 +36,8 @@ typedef struct {
         int idx;
         sy_spinlock_t lock;
         struct list_head list;
-        sem_t sem;
+        //sem_t sem;
+        int eventfd;
 } redis_worker_t;
 
 
@@ -117,8 +117,14 @@ int hget(const fileid_t *fileid, const char *name, char *value, size_t *size)
 {
         YASSERT(fileid->type);
 
-        return __redis_request(++__seq__, "hget", __hget,
+        ANALYSIS_BEGIN(0);
+        
+        int ret =  __redis_request(++__seq__, "hget", __hget,
                                fileid, name, value, size);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
+        return ret;
 }
 
 
@@ -182,8 +188,14 @@ static int __hset(va_list ap)
 
 int hset(const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
 {
-        return __redis_request(++__seq__, "hset", __hset,
+        ANALYSIS_BEGIN(0);
+        
+        int ret = __redis_request(++__seq__, "hset", __hset,
                                fileid, name, value, size, flag);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
+        return ret;
 }
 
 static int __hlen__(const fileid_t *fileid, uint64_t *count)
@@ -856,26 +868,32 @@ static int __redis_worker_run(redis_worker_t *worker)
         struct list_head list, *pos, *n;
         entry_t *ent;
 
-        INIT_LIST_HEAD(&list);
-        
-        ret = sy_spin_lock(&worker->lock);
-        if(ret)
-                GOTO(err_ret, ret);
+        while (1) {
+                INIT_LIST_HEAD(&list);
 
-        list_splice_init(&worker->list, &list);
+                ret = sy_spin_lock(&worker->lock);
+                if(ret)
+                        GOTO(err_ret, ret);
+
+                list_splice_init(&worker->list, &list);
                 
-        sy_spin_unlock(&worker->lock);
+                sy_spin_unlock(&worker->lock);
 
-        list_for_each_safe(pos, n, &list) {
-                list_del(pos);
-                ent = (void *)pos;
+                list_for_each_safe(pos, n, &list) {
+                        list_del(pos);
+                        ent = (void *)pos;
 
-                ent->retval = ent->exec(ent->ap);
+                        ent->retval = ent->exec(ent->ap);
 
-                if (ent->type == __type_sem__) {
-                        sem_post(&ent->sem);
-                } else {
-                        schedule_resume(&ent->task, ent->retval, NULL);
+                        if (ent->type == __type_sem__) {
+                                sem_post(&ent->sem);
+                        } else {
+                                schedule_resume(&ent->task, ent->retval, NULL);
+                        }
+                }
+
+                if (list_empty(&worker->list)) {
+                        break;
                 }
         }
 
@@ -888,13 +906,16 @@ static void *__redis_worker(void *arg)
 {
         int ret;
         redis_worker_t *worker = arg;
+        uint64_t left;
 
         __workerid__ = worker->idx;
         
         while (1) {
-                ret = sem_wait(&worker->sem);
-                if(ret)
+                ret = read(worker->eventfd, &left, sizeof(left));
+                if(ret < 0) {
+                        ret = errno;
                         UNIMPLEMENTED(__DUMP__);
+                }
 
                 ret = __redis_worker_run(worker);
                 if(ret)
@@ -907,6 +928,7 @@ static void *__redis_worker(void *arg)
 static int __redis_request__(const int hash, entry_t *ent)
 {
         int ret;
+        uint64_t e = 1;
         redis_worker_t *worker = &__redis_worker__[hash % __worker_count__];
 
         ret = sy_spin_lock(&worker->lock);
@@ -917,7 +939,11 @@ static int __redis_request__(const int hash, entry_t *ent)
 
         sy_spin_unlock(&worker->lock);
 
-        sem_post(&worker->sem);
+        ret = write(worker->eventfd, &e, sizeof(e));
+        if (ret < 0) {
+                ret = errno;
+                YASSERT(0);
+        }
 
         return 0;
 err_ret:
@@ -993,10 +1019,14 @@ int redis_init()
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
 
-                ret = sem_init(&worker->sem, 0, 0);
-                if (unlikely(ret))
+                ret = eventfd(0, EFD_CLOEXEC);
+                if (unlikely(ret < 0)) {
+                        ret = errno;
                         GOTO(err_ret, ret);
+                }
 
+                worker->eventfd = ret;
+                
                 INIT_LIST_HEAD(&worker->list);
 
                 ret = sy_thread_create2(__redis_worker, worker, "redis_worker");

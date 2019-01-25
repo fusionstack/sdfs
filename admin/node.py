@@ -147,6 +147,8 @@ class Node:
         if op == "all":
             self._start_service()
 
+        os.system("rm " + lfile)
+
     def stop(self, role=None, service=None):
         lfile = "/var/run/uss.stop.lock"
         lock = lock_file(lfile)
@@ -177,6 +179,8 @@ class Node:
         """
         self._stop_redis()
 
+        os.system("rm " + lfile)
+        
     def _construct_dict(self, i):
         disk_total = i.get_total()
         disk_used = i.get_used()

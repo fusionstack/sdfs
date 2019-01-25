@@ -316,7 +316,7 @@ int cds_init(const char *home, int *cds_sd, int servicenum, int diskno, uint64_t
         ret = disk_init(home, max_object);
         if (ret)
                 GOTO(err_ret, ret);
-        
+
         ret = cds_volume_init();
         if (ret)
                 GOTO(err_ret, ret);

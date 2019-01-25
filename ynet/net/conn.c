@@ -450,7 +450,7 @@ static int __conn_init_info(nid_t *_nid)
         snprintf(key, MAX_NAME_LEN, "%u.info", nid.id);
 
 retry:
-        DINFO("register %s value %s\n", key, tmp);
+        DBUG("register %s value %s\n", key, tmp);
         ret = etcd_create_text(ETCD_CONN, key, tmp, 0);
         if (unlikely(ret)) {
                 ret = etcd_update_text(ETCD_CONN, key, tmp, NULL, 0);

@@ -189,19 +189,32 @@ int __cpu_node_count__ = 0;
 
 static int __cpu_lock(int cpu_id, int *_fd)
 {
-        int ret, fd;
+        int ret, fd, flags;
         char path[MAX_PATH_LEN];
 
-        snprintf(path, MAX_PATH_LEN, "%s/cpulock/%d", SHM_ROOT, cpu_id);
+        snprintf(path, MAX_PATH_LEN, "%s/cpulock/%d", gloconf.workdir, cpu_id);
 
-        ret = _set_value(path, "", 0, O_CREAT | O_EXCL);
-        if (unlikely(ret))
+        DBUG("try lock cpu %s\n", path);
+        ret = path_validate(path, YLIB_NOTDIR, YLIB_DIRCREATE);
+        if (ret)
                 GOTO(err_ret, ret);
 
         fd = open(path, O_CREAT | O_RDONLY, 0640);
         if (fd == -1) {
                 ret = errno;
                 GOTO(err_ret, ret);
+        }
+
+        flags = fcntl(fd, F_GETFL, 0);
+        if (flags < 0 ) {
+                ret = errno;
+                GOTO(err_fd, ret);
+        }
+
+        ret = fcntl(fd, F_SETFL, flags | FD_CLOEXEC);
+        if (ret < 0) {
+                ret = errno;
+                GOTO(err_fd, ret);
         }
 
         ret = flock(fd, LOCK_EX | LOCK_NB);
@@ -214,6 +227,8 @@ static int __cpu_lock(int cpu_id, int *_fd)
                         GOTO(err_fd, ret);
         }
 
+        DINFO("lock cpu[%u] success\n", cpu_id);
+        
         *_fd = fd;
 
         return 0;
@@ -233,6 +248,8 @@ static void __cpuset_getcpu(coreinfo_t **master, int *slave)
                 // TODO 按cpu_id降序，依次分配core
                 // cpu_id与NUMA Node具有不同的映射关系
                 coreinfo = &__coreinfo__[cpuinfo.threading_max - i];
+                DBUG("cpu[%u] used %u node_id %u -> %u\n", i,
+                      coreinfo->used, coreinfo->node_id, __next_node_id__);
 
                 if (coreinfo->used)
                         continue;
@@ -320,6 +337,7 @@ int cpuset_init(int polling_core)
                 node_list[coreinfo->node_id]++;
 
                 DINFO("cpu[%u] node_id %u physical_package_id %u core_id %u\n",
+                      i,
                       coreinfo->node_id,
                       coreinfo->physical_package_id,
                       coreinfo->core_id);

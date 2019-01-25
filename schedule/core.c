@@ -613,7 +613,8 @@ int core_init(int polling_core, int polling_timeout, int flag)
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
-        DINFO("flag %d cpuset_useable %d\n", flag, cpuset_useable());
+        //DINFO("flag %d cpuset_useable %d\n", flag, cpuset_useable());
+
         return 0;
 }
 

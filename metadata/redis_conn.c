@@ -62,7 +62,7 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
                 GOTO(err_ret, ret);
         }
 
-        DINFO("get volume %s sharding[%d] master @ %s:%s\n", volume, sharding, list[0], list[1]);
+        DBUG("get volume %s sharding[%d] master @ %s:%s\n", volume, sharding, list[0], list[1]);
 
         int port = atoi(list[1]);
         ret = redis_connect(&conn->conn, list[0], &port);
