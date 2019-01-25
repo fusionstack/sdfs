@@ -626,7 +626,7 @@ int nodepool_get_node_num_hdd(uint32_t *node_num)
         if (ret)
                 return ret;
 
-        if (gloconf.testing) {
+        if (gloconf.solomode) {
                 //for python test/test.py
                 *node_num = np->disk_total.value;
         } else {

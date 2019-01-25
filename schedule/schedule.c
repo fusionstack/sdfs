@@ -1337,7 +1337,7 @@ static int __schedule_create(int *eventfd, const char *name, int idx, schedule_t
 
         DINFO("create schedule[%d] name %s\n", idx, name);
 
-        if (gloconf.testing) {
+        if (gloconf.solomode) {
                 (void)private_mem;
                 ret = __schedule_create__(&schedule, name, idx, NULL, eventfd);
         } else {

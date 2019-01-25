@@ -99,7 +99,7 @@ static int __uss_check_diskid(const objid_t *id, const diskid_t *src, const disk
         for (i = 0; i < (int)chkinfo->repnum; i++) {
                 diskid = &chkinfo->diskid[i];
 
-                if (gloconf.testing) {
+                if (gloconf.solomode) {
                         if (ynet_nid_cmp(dist, diskid) == 0) {
                                 ret = EPERM;
                                 GOTO(err_ret, ret);

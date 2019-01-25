@@ -1367,7 +1367,7 @@ int _disk_dfree_link(const char *path, uint64_t *disk_size)
         }
 
         if (S_ISREG(stbuf.st_mode)) {
-                if (!gloconf.testing) {
+                if (!gloconf.solomode) {
                         ret = EIO;
                         GOTO(err_ret, ret);
                 } else {

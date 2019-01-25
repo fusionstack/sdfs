@@ -132,7 +132,7 @@ err_ret:
         return ret;
 }
 
-int udp_sock_boardcast(int sd, uint32_t net, uint32_t mask, uint32_t port, const void *buf, int buflen)
+int udp_sock_broadcast(int sd, uint32_t net, uint32_t mask, uint32_t port, const void *buf, int buflen)
 {
         int ret, on;
         struct sockaddr_in addr;
@@ -140,7 +140,7 @@ int udp_sock_boardcast(int sd, uint32_t net, uint32_t mask, uint32_t port, const
         memset(&addr, 0x0, sizeof(struct sockaddr_in));
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
-        if (gloconf.testing)
+        if (gloconf.solomode)
                 addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
         else
                 addr.sin_addr.s_addr = net | ~mask;

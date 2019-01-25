@@ -372,7 +372,7 @@ static int __maping_getmaster__(nid_t *nid)
         ret = etcd_locker(&lock, host, nid, &magic, NULL);
         if (unlikely(ret)) {
                 if (ret == ENOKEY) {
-                        if (ng.daemon || gloconf.testing)
+                        if (ng.daemon || gloconf.solomode)
                                 ret = EAGAIN;
                         else
                                 ret = EHOSTDOWN;
