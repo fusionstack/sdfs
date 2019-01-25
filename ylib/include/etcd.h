@@ -77,11 +77,6 @@ int etcd_lock_health(etcd_lock_t *lock);
 
 int etcd_set_with_ttl(const char *prefix, const char *key, const char *val, int ttl);
 
-#if __ETCD_READ_MULTI__
-int etcd_srv_add(const char *name);
-int etcd_srv_del(const char *name);
-#endif
-
 int etcd_init();
 
 int etcd_cluster_node_count(int *node_count);

@@ -51,196 +51,6 @@
 static int __etcd_open_str(char *server, etcd_session *_sess);
 static int __etcd_get__(const char *srv, const char *key, etcd_node_t **result, int consistent);
 
-#if __ETCD_READ_MULTI__
-#define MAX_NODE 32
-
-typedef struct {
-        sy_spinlock_t lock;
-        int count;
-        struct list_head list;
-} srvlist_t;
-
-typedef struct {
-        struct list_head hook;
-        char name[0];
-} srv_t;
-
-static srvlist_t *srvlist = NULL;
-
-static int __etcd_getsrv(int consistent, char list[][MAX_NAME_LEN], int *count)
-{
-        int ret, i;
-        struct list_head *pos;
-        srv_t *srv;
-
-        if (srvlist == NULL || consistent == 0) {
-                strcpy(list[0], __ETCD_SRV__);
-                DBUG("srv[0] %s\n", list[0]);
-                *count = 1;
-        } else {
-                ret = sy_spin_lock(&srvlist->lock);
-                if (ret)
-                        GOTO(err_ret, ret);
- 
-                if (!list_empty(&srvlist->list)) {
-                        i = 0;
-                        list_for_each(pos, &srvlist->list) {
-                                srv = (void *)pos;
-                                snprintf(list[i], MAX_NAME_LEN, "%s:2379", srv->name);
-                                DBUG("srv[%u] %s\n", i, list[i]);
-
-                                i++;
-
-                                if (i > MAX_NODE)
-                                        break;
-                        }
-
-                        *count = i;
-                } else {
-                        strcpy(list[0], __ETCD_SRV__);
-                        DBUG("srv[0] %s\n", list[0]);
-                        *count = 1;
-                }
-        
-                sy_spin_unlock(&srvlist->lock);
-        }
-
-        return 0;
-err_ret:
-        return ret;
-}
-
-int etcd_srv_add(const char *name)
-{
-        int ret, found = 0;
-        struct list_head *pos;
-        srv_t *srv;
-
-        YASSERT(srvlist);
-
-        ret = sy_spin_lock(&srvlist->lock);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        list_for_each(pos, &srvlist->list) {
-                srv = (void *)pos;
-                if (strcmp(name, srv->name) == 0) {
-                        DBUG("%s exist\n", name);
-                        found = 1;
-                        break;
-                }
-        }
-
-        if (found == 0) {
-                ret = ymalloc((void**)&srv, sizeof(*srv) + strlen(name) + 1);
-                if (ret)
-                        GOTO(err_lock, ret);
-
-                strcpy(srv->name, name);
-                DBUG("%s add\n", name);
-               
-                list_add_tail(&srv->hook, &srvlist->list);
-        }
-        
-        sy_spin_unlock(&srvlist->lock);
-
-        return 0;
-err_lock:
-        sy_spin_unlock(&srvlist->lock);
-err_ret:
-        return ret;
-}
-
-int etcd_srv_del(const char *name)
-{
-        int ret;
-        struct list_head *pos, *n;
-        srv_t *srv;
-
-        YASSERT(srvlist);
-        
-        ret = sy_spin_lock(&srvlist->lock);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        list_for_each_safe(pos, n, &srvlist->list) {
-                srv = (void *)pos;
-                if (strcmp(name, srv->name) == 0) {
-                        DBUG("%s del\n", name);
-                        list_del(&srv->hook);
-                        break;
-                }
-        }
-
-        sy_spin_unlock(&srvlist->lock);
-
-        return 0;
-err_ret:
-        return ret;
-}
-
-static int  __etcd_get_multi(const char *key, etcd_node_t **ppnode, int consistent)
-{
-        int ret, i, count, maxidx = -1, cur, enokey = 0, eagain = 0;
-        char srv[MAX_NODE][MAX_NAME_LEN];
-        etcd_node_t *array[MAX_NODE], *node;
-
-        ret = __etcd_getsrv(consistent, srv, &count);
-        if (ret)
-                UNIMPLEMENTED(__DUMP__);
-
-        for (i = 0; i < count; i++) {
-                array[i] = NULL;
-
-                ret = __etcd_get__(srv[i], key, &node, consistent);
-                if (ret) {
-                        if (ret == ENOKEY) {
-                                enokey++;
-                        } else {
-                                eagain++;
-                        }
-
-                        continue;
-                }
-
-                array[i] = node;
-                if (maxidx < node->modifiedIndex) {
-                        maxidx = node->modifiedIndex;
-                        cur = i;
-                }
-
-                if (maxidx != node->modifiedIndex && maxidx != -1) {
-                        DERROR("get key %s node %s idx %u %d\n", key, srv[i], node->modifiedIndex, maxidx);
-                } else {
-                        DBUG("get key %s node %s idx %u %d\n", key, srv[i], node->modifiedIndex, maxidx);
-                }                        
-        }
-
-        if (maxidx == -1) {
-                if (enokey) {
-                        ret = ENOKEY;
-                } else {
-                        ret = EAGAIN;
-                }
-
-                GOTO(err_ret, ret);
-        }
-
-        for (i = 0; i < count; i++) {
-                if (i == cur) {
-                        *ppnode = array[i];
-                } else {
-                        free_etcd_node(array[i]);
-                }                        
-        }
-        
-        return 0;
-err_ret:
-        return ret;
-}
-
-#endif
-
 static int  __etcd_set__(const char *key, const char *value,
                            const etcd_prevcond_t *precond, etcd_set_flag flag, unsigned int ttl)
 {
@@ -391,17 +201,10 @@ static int __etcd_get_request(va_list ap)
          * ETCD_NOENT, no such key
          * ETCD_PREVCONT, key exist, but previous condition error, can be exist, or other*/
          
-#if __ETCD_READ_MULTI__
-        ret = __etcd_get_multi(key, &node, consistent);
-        if (ret) {
-                GOTO(err_ret, ret);
-        }
-#else
         ret = __etcd_get__(__ETCD_SRV__, key, &node, consistent);
         if (ret) {
                 GOTO(err_ret, ret);
         }
-#endif
 
         *result = node;
 
@@ -428,17 +231,10 @@ static int __etcd_get(const char *key, etcd_node_t **result, int consistent)
                 if (unlikely(schedule_self()))
                         DERROR("etcd request in core but no task!!!");
 
-#if __ETCD_READ_MULTI__
-                ret = __etcd_get_multi(key, &node, consistent);
-                if(ret){
-                        GOTO(err_ret, ret);
-                }
-#else
                 ret = __etcd_get__(__ETCD_SRV__, key, &node, consistent);
                 if (ret) {
                         GOTO(err_ret, ret);
                 }
-#endif                
 
                 *result = node;
         }

@@ -107,25 +107,7 @@ static int __conn_close(const nid_t *nid)
         
         DINFO("close %s\n", netable_rname_nid(nid));
 
-#if __ETCD_READ_MULTI__
-        int ret;
-        char name[MAX_NAME_LEN];
-
-        if (ng.daemon) {
-                ret = network_rname1(nid, name);
-                if (ret == 0) {
-                        etcd_srv_del(name);
-                }
-        }
-#endif
-        
 #if !ENABLE_ETCD_CONN
-#if RECOVERY_IMMEDIATELY_ASYN 
-        if (ng.daemon) {
-                DBUG("force scan\n");
-                recovery_wakeup_all_pool("__conn_close");
-        }
-#endif
 #endif
 
 #if ENABLE_LOCAL_RPC
@@ -192,18 +174,6 @@ static int __conn_add(const nid_t *nid)
                 GOTO(err_ret, ret);
         }
 
-#if __ETCD_READ_MULTI__
-        if (ng.daemon) {
-                etcd_srv_add(info->name);
-        }
-#endif
-        
-#if RECOVERY_IMMEDIATELY_ASYN 
-        if (ng.daemon) {
-                DINFO("force scan\n");
-                recovery_wakeup_all_pool("__conn_add");
-        }
-#endif
 out:
 
         return 0;
