@@ -27,7 +27,7 @@ from signal import SIGTERM
 
 from daemon import Daemon
 from config import Config
-from utils import dmsg, derror, dwarn, _check_config, set_value, get_value, exec_shell, _str2dict
+from utils import dmsg, derror, dwarn, _check_config, set_value, get_value, exec_shell, _str2dict, Exp
 
 DISK_INSTENCE = 32
 NODE_PORT = 100
@@ -540,7 +540,6 @@ class Redisd():
         while (self.running):
             try:
                 res = exec_shell(cmd, need_return=True)
-                break;
             except:
                 if (retry > 10):
                     self.running = False
@@ -548,17 +547,33 @@ class Redisd():
                 time.sleep(1)
                 retry += 1;
                 continue;
-                
-        r = res[0][:-1]
-        if (len(r) == 0):
-            return 0
-        else:
+
+            r = res[0][:-1]
+            if (len(r) == 0):
+                return 0
+            
+            try:
+                version = int(r)
+            except ValueError:
+                derror(r)
+                time.sleep(1)
+                continue;
+
             return int(r)
 
     def __get_replica_info(self):
         cmd = "redis-cli -h %s -p %s info replication" % (self.hostname, self.port)
 
-        res = exec_shell(cmd, p=False, need_return=True)
+        while (1):
+            try:
+                res = exec_shell(cmd, p=False, need_return=True)
+            except Exp as e:
+                derror(str(Exp))
+                time.sleep(1)
+                continue;
+
+            break;
+            
         d = _str2dict(res[0])
         return d
 
