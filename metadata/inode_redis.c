@@ -496,7 +496,7 @@ static int __inode_symlink(const fileid_t *fileid, const char *link_target)
         strcpy(md->name, link_target);
         md->md_size += (strlen(link_target) + 1);
 
-        DINFO(CHKID_FORMAT" link %s\n", CHKID_ARG(fileid), md->name);
+        DBUG(CHKID_FORMAT" link %s\n", CHKID_ARG(fileid), md->name);
         
         ret = __md_set((void *)md, 0);
         if (ret)

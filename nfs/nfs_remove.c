@@ -233,12 +233,17 @@ int nfs_remove(const fileid_t *parent, const char *name)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_mkdir(&volid, NFS_REMOVED, NULL, &removed, 0, 0, 0);
+retry:
+        ret = sdfs_lookup(&volid, NFS_REMOVED, &removed);
         if (ret) {
-                if (ret == EEXIST) {
-                        ret = sdfs_lookup(&volid, NFS_REMOVED, &removed);
-                        if (ret)
-                                GOTO(err_ret, ret);
+                if (ret == ENOENT) {
+                        ret = sdfs_mkdir(&volid, NFS_REMOVED, NULL, &removed, 0, 0, 0);
+                        if (ret) {
+                                if (ret == EEXIST) {
+                                        goto retry;
+                                } else
+                                        GOTO(err_ret, ret);
+                        }
                 } else
                         GOTO(err_ret, ret);
         }
@@ -246,25 +251,44 @@ int nfs_remove(const fileid_t *parent, const char *name)
         now = time(NULL);
         snprintf(tname, MAX_NAME_LEN, "%d", ((int)now / 3600) * 3600);
 
-        ret = sdfs_mkdir(&removed, tname, NULL, &workdir, 0, 0, 0);
+        ret = sdfs_lookup(&removed, tname, &workdir);
         if (ret) {
-                if (ret == EEXIST) {
-                        ret = sdfs_lookup(&removed, tname, &workdir);
-                        if (ret)
-                                GOTO(err_ret, ret);
-                } else
+                if (ret == ENOENT) {
+                        ret = sdfs_mkdir(&removed, tname, NULL, &workdir, 0, 0, 0);
+                        if (ret) {
+                                if (ret == EEXIST) {
+                                        goto retry;
+                                } else
+                                        GOTO(err_ret, ret);
+                        }
+                } else 
                         GOTO(err_ret, ret);
         }
 
         uuid_generate(uuid);
         uuid_unparse(uuid, _uuid);
 
+#if ENABLE_MD_POSIX
+        fileid_t fileid;
+        ret = sdfs_lookup(parent, name, &fileid);
+        if (ret)
+                GOTO(err_ret, ret);
+#endif
+        
+        
         DBUG("rename to %s\n", _uuid);
         ret = sdfs_rename(parent, name, &workdir, _uuid);
         if (ret) {
                 GOTO(err_ret, ret);
         }
 
+#if ENABLE_MD_POSIX
+        struct timespec t;
+        clock_gettime(CLOCK_REALTIME, &t);
+        sdfs_utime(parent, NULL, &t, &t);
+        sdfs_utime(&fileid, NULL, NULL, &t);
+#endif
+        
         return 0;
 err_ret:
         return ret;

@@ -50,6 +50,8 @@ static int __md_create(const fileid_t *parent, const char *name,
         int ret;
         fileid_t fileid;
 
+        DBUG("create %s @ "CHKID_FORMAT"\n", name, CHKID_ARG(parent));
+        
         if (strncmp(name, SDFS_MD_SYSTEM, strlen(SDFS_MD_SYSTEM)) == 0) {
                 ret = EPERM;
                 GOTO(err_ret, ret);
@@ -285,6 +287,8 @@ int md_lookup(fileid_t *fileid, const fileid_t *parent, const char *name)
         md_proto_t *md;
         char buf[MAX_BUF_LEN];
 
+        DBUG("lookup %s @ "CHKID_FORMAT"\n", name, CHKID_ARG(parent));
+        
         if (strcmp(name, ".") == 0) {
                 *fileid = *parent;
                 return 0;
