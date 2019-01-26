@@ -681,11 +681,16 @@ int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
               lock1->start, lock2->start,
               lock1->length, lock2->length);
         
-        if (lock1->sid == lock2->sid &&
-            lock1->owner == lock2->owner &&
-            lock1->start == lock2->start &&
-            lock1->length == lock2->length) {
-                return 1;
+        if (lock1->sid == lock2->sid) {
+                if (lock1->opaquelen == 0 && lock2->opaquelen == 0)
+                        return 1;
+
+                if (lock1->opaquelen == lock2->opaquelen
+                    && memcmp(lock1->opaque, lock2->opaque, lock1->opaquelen) == 0) {
+                        return 1;
+                }
+
+                return 0;
         } else {
                 return 0;
         }

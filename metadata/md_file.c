@@ -116,6 +116,14 @@ static int __md_lock_collision__(const sdfs_lock_t *lock1, const sdfs_lock_t *lo
                 return 0;
         }
 
+        
+        DINFO("type %d,%d, sid %d,%d, owner 0x%u,0x%u, start %ju,%ju, end %ju,%ju\n",
+              lock1->type, lock2->type,
+              lock1->sid, lock2->sid,
+              lock1->owner, lock2->owner,
+              lock1->start, lock2->start,
+              lock1->length, lock2->length);
+        
         return 1;
 }
 
@@ -127,7 +135,7 @@ static int __md_lock_collision(const sdfs_lock_t *lock, const char *buf, size_t 
         left = size;
         pos = (void *)buf;
         while (left) {
-                YASSERT(left == SDFS_LOCK_SIZE(pos));
+                YASSERT(left >= SDFS_LOCK_SIZE(pos));
 
                 if (__md_lock_collision__(lock, pos)) {
                         return 1;
@@ -197,7 +205,7 @@ static sdfs_lock_t *__md_lock_find(const sdfs_lock_t *lock, char *buf, size_t si
         left = size;
         pos = (void *)buf;
         while (left) {
-                YASSERT(left == SDFS_LOCK_SIZE(pos));
+                YASSERT(left >= SDFS_LOCK_SIZE(pos));
 
                 if (sdfs_lock_equal(NULL, lock, NULL, pos)) {
                         return pos;
@@ -233,7 +241,7 @@ static int __md_unlock(const fileid_t *fileid, const sdfs_lock_t *lock)
         }
         
         DINFO("lock found\n");
-        YASSERT(lock->len == pos->len);
+        YASSERT(lock->opaquelen == pos->opaquelen);
 
         //ARRAY_POP(*pos, SDFS_LOCK_SIZE(pos), size - (pos - buf));
         memmove(pos, (void *)pos + SDFS_LOCK_SIZE(pos),

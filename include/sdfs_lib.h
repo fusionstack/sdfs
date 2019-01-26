@@ -299,11 +299,11 @@ typedef struct {
         uint64_t owner; // who requests/holds the lock
         uint64_t start; // initial location to lock
         uint64_t length; // num bytes to lock from start
-        int16_t len;
+        int16_t opaquelen;
         char opaque[0];
 } sdfs_lock_t;
 
-#define SDFS_LOCK_SIZE(__lock__) (sizeof(*__lock__) + __lock__->len)
+#define SDFS_LOCK_SIZE(__lock__) (sizeof(*__lock__) + __lock__->opaquelen)
 
 int sdfs_init(const char *name);
 

@@ -259,8 +259,8 @@ retry:
         DINFO("begin running\n");
         
         while (nfs_srv_running) { //we got nothing to do here
-                ret = register_nlm_service();
-                sleep(10);
+                //ret = register_nlm_service();
+                sleep(1);
         }
 
         ret = ly_update_status("stopping", -1);

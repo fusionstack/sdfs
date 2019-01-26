@@ -298,7 +298,7 @@ static int __allocator_new(int repnum, int hardend, int tier, nid_t *disks)
         (void) tier;
         
 #if 1
-        if (__allocator__ == NULL) {
+        if (__allocator__ == NULL || gloconf.solomode) {
                 return mond_rpc_newdisk(net_getnid(), tier, repnum, hardend, disks);
         }
 #endif
