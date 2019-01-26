@@ -77,7 +77,7 @@ int nlm4_async_cancel(const fileid_t *fileid, const sdfs_lock_t *lock)
                 }
         }
         
-        sy_spin_lock(&nlm4_async->lock);
+        sy_spin_unlock(&nlm4_async->lock);
 
         return 0;
 err_ret:
@@ -106,7 +106,7 @@ int nlm4_async_reg(const fileid_t *fileid, const sdfs_lock_t *lock, int *cancel)
 
         list_add_tail(&ent->hook, &nlm4_async->list);
 
-        sy_spin_lock(&nlm4_async->lock);
+        sy_spin_unlock(&nlm4_async->lock);
         
         return 0;
 err_ret:
@@ -137,7 +137,7 @@ int nlm4_async_unreg(const fileid_t *fileid, const sdfs_lock_t *lock, int *cance
                 }
         }
         
-        sy_spin_lock(&nlm4_async->lock);
+        sy_spin_unlock(&nlm4_async->lock);
 
         YASSERT(found == 1);
         
@@ -170,5 +170,3 @@ int nlm4_async_init()
 err_ret:
         return ret;
 }
-
-

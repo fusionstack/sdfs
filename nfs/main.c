@@ -218,10 +218,6 @@ retry:
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sunrpc_init();
-        if (ret)
-                GOTO(err_ret, ret);
-
         ret = sunrpc_tcp_passive(service);
         if (ret)
                 GOTO(err_ret, ret);
@@ -238,7 +234,7 @@ retry:
                 GOTO(err_ret, ret);
         }
 
-#if 0
+#if 1
         ret = sunrpc_tcp_passive(NLM_SERVICE_DEF);
         if (ret)
                 GOTO(err_ret, ret);
@@ -263,6 +259,7 @@ retry:
         DINFO("begin running\n");
         
         while (nfs_srv_running) { //we got nothing to do here
+                ret = register_nlm_service();
                 sleep(10);
         }
 

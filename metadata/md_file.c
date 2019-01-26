@@ -236,7 +236,8 @@ static int __md_unlock(const fileid_t *fileid, const sdfs_lock_t *lock)
         YASSERT(lock->len == pos->len);
 
         //ARRAY_POP(*pos, SDFS_LOCK_SIZE(pos), size - (pos - buf));
-        memmove(pos, (void *)pos + SDFS_LOCK_SIZE(pos), size - ((void *)pos - (void *)buf) - SDFS_LOCK_SIZE(pos));
+        memmove(pos, (void *)pos + SDFS_LOCK_SIZE(pos),
+                size - ((void *)pos - (void *)buf) - SDFS_LOCK_SIZE(pos));
 
         ret = inodeop->setlock(fileid, buf, size - SDFS_LOCK_SIZE(lock), 0);
         if (ret)

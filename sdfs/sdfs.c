@@ -664,3 +664,29 @@ int sdfs_getlock(const fileid_t *fileid, sdfs_lock_t *lock)
 {
         return md_getlock(fileid, lock);
 }
+
+int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
+                                  const fileid_t *file2, const sdfs_lock_t *lock2)
+{
+        if (file1 && file2 && chkid_cmp(file1, file2)) {
+                DINFO("fileid "CHKID_FORMAT","CHKID_FORMAT"\n",
+                      CHKID_ARG(file1), CHKID_ARG(file2));
+                return 0;
+        }
+
+        DINFO("type %d,%d, sid %d,%d, owner 0x%u,0x%u, start %ju,%ju, end %ju,%ju\n",
+              lock1->type, lock2->type,
+              lock1->sid, lock2->sid,
+              lock1->owner, lock2->owner,
+              lock1->start, lock2->start,
+              lock1->length, lock2->length);
+        
+        if (lock1->sid == lock2->sid &&
+            lock1->owner == lock2->owner &&
+            lock1->start == lock2->start &&
+            lock1->length == lock2->length) {
+                return 1;
+        } else {
+                return 0;
+        }
+}

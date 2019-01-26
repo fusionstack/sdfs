@@ -305,23 +305,6 @@ typedef struct {
 
 #define SDFS_LOCK_SIZE(__lock__) (sizeof(*__lock__) + __lock__->len)
 
-static inline int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
-                                  const fileid_t *file2, const sdfs_lock_t *lock2)
-{
-        if (file1 && file2 && chkid_cmp(file1, file2))
-                return 0;
-
-        if (lock1->type == lock2->type &&
-            lock1->sid == lock2->sid &&
-            lock1->owner == lock2->owner &&
-            lock1->start == lock2->start &&
-            lock1->length == lock2->length)
-                return 1;
-        else
-                return 0;
-}
-
-
 int sdfs_init(const char *name);
 
 //dir
@@ -367,6 +350,8 @@ int sdfs_link2node(const fileid_t *old, const fileid_t *, const char *);
 int sdfs_unlink(const fileid_t *parent, const char *name);
 int sdfs_setlock(const fileid_t *fileid, const sdfs_lock_t *lock);
 int sdfs_getlock(const fileid_t *fileid, sdfs_lock_t *lock);
+int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
+                    const fileid_t *file2, const sdfs_lock_t *lock2);
 
 
 //node

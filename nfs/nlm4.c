@@ -201,6 +201,9 @@ out:
         return 0;
 err_rep:
         res.test_stat.status = NLM4_DENIED;
+        res.cookies.len = args->cookies.len;
+        res.cookies.data = (void *)cookie;
+        memcpy(res.cookies.data, args->cookies.data, args->cookies.len);
         sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                            &res, (xdr_ret_t)xdr_nlm_testres);
 err_ret:
@@ -310,7 +313,13 @@ static int __nlm4_lock_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                 ret = sdfs_setlock(fileid, lock);
                 if (ret) {
                         if (ret == EWOULDBLOCK) {
+                                DWARN("NLM_LOCK_SVC blocked fileid"FID_FORMAT"offset %llu len %llu exclusive %u svid %u\n",
+                                      FID_ARG(fileid), (LLU)args->alock.l_offset, (LLU)args->alock.l_len,
+                                      args->exclusive, args->alock.svid);
                                 res.stat = NLM4_BLOCKED;
+                                res.cookies.len = args->cookies.len;
+                                res.cookies.data = (void *)cookie;
+                                memcpy(res.cookies.data, args->cookies.data, args->cookies.len);
                                 ret = sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                                                    &res, (xdr_ret_t)xdr_nlm_res);
                                 if (ret)
@@ -342,6 +351,9 @@ static int __nlm4_lock_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 
         return 0;
 err_rep:
+        res.cookies.len = args->cookies.len;
+        res.cookies.data = (void *)cookie;
+        memcpy(res.cookies.data, args->cookies.data, args->cookies.len);
         sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                            &res, (xdr_ret_t)xdr_nlm_res);
 err_ret:
@@ -394,6 +406,9 @@ static int __nlm4_unlock_svc(const sockid_t *sockid, const sunrpc_request_t *req
         return 0;
 err_rep:
         res.stat = NLM4_DENIED;
+        res.cookies.len = args->cookies.len;
+        res.cookies.data = (void *)cookie;
+        memcpy(res.cookies.data, args->cookies.data, args->cookies.len);
         sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                            &res, (xdr_ret_t)xdr_nlm_res);
 err_ret:
@@ -410,6 +425,7 @@ static int __nlm4_cancel_svc(const sockid_t *sockid, const sunrpc_request_t *req
         fileid_t *fileid;
         sdfs_lock_t *lock;
         char _lock[MAX_LOCK_LEN];
+        char cookie[MAX_BUF_LEN];
 
         (void) gid;
         (void) uid;
@@ -430,6 +446,7 @@ static int __nlm4_cancel_svc(const sockid_t *sockid, const sunrpc_request_t *req
 
         //cookies
         res.cookies.len = args->cookies.len;
+        res.cookies.data = (void *)cookie;
         memcpy(res.cookies.data, args->cookies.data, args->cookies.len);
 
         ret = sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
@@ -442,6 +459,9 @@ static int __nlm4_cancel_svc(const sockid_t *sockid, const sunrpc_request_t *req
         return 0;
 err_rep:
         res.stat = NLM4_GRANTED;
+        res.cookies.len = args->cookies.len;
+        res.cookies.data = (void *)cookie;
+        memcpy(res.cookies.data, args->cookies.data, args->cookies.len);
         sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                      &res, (xdr_ret_t)xdr_nlm_res);
 err_ret:
