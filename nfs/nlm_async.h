@@ -22,9 +22,19 @@
 #include "ylib.h"
 #include "sdfs_lib.h"
 
+typedef struct {
+        int uppid;
+        int ownerlen;
+        int callerlen;
+        char buf[0];
+} nlm_ext_t;
+
+#define MAX_LOCK_LEN (sizeof(sdfs_lock_t) + sizeof(nlm_ext_t) + 2048)
+
 int nlm4_async_init();
-int nlm4_async_unreg(const fileid_t *fileid, const sdfs_lock_t *lock, int *cancel);
-int nlm4_async_reg(const fileid_t *fileid, const sdfs_lock_t *lock, int *cancel);
+int nlm4_async_unreg(const fileid_t *fileid, const sdfs_lock_t *lock);
+int nlm4_async_reg(const fileid_t *fileid, const sdfs_lock_t *lock);
+int nlm4_async_canceled(const fileid_t *fileid, const sdfs_lock_t *lock);
 int nlm4_async_cancel(const fileid_t *fileid, const sdfs_lock_t *lock);
 
 #endif

@@ -40,6 +40,7 @@ uint64_t hash_test(nlm_testargs *args);
 uint64_t hash_lock(nlm_lockargs *args);
 uint64_t hash_unlock(nlm_unlockargs *args);
 uint64_t hash_notify(nlm_notifyargs *args);
+uint64_t hash_cancel(nlm_cancargs *args);
 #endif
 #endif
 

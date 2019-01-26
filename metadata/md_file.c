@@ -240,7 +240,6 @@ static int __md_unlock(const fileid_t *fileid, const sdfs_lock_t *lock)
                 GOTO(err_lock, ret);
         }
         
-        DINFO("lock found\n");
         YASSERT(lock->opaquelen == pos->opaquelen);
 
         //ARRAY_POP(*pos, SDFS_LOCK_SIZE(pos), size - (pos - buf));

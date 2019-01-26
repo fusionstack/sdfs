@@ -542,7 +542,7 @@ int init_stage1()
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = timer_init(0);
+        ret = timer_init(0, 0);
         if (ret)
                 GOTO(err_ret, ret);
 

@@ -45,8 +45,16 @@ inline uint64_t hash_unlock(nlm_unlockargs *args)
 {
 	fileid_t *fileid;
 	fileid = (fileid_t*)args->alock.fh.val;
-	 return fileid->id * (fileid->volid >> 16) << fileid->id;
+        return fileid->id * (fileid->volid >> 16) << fileid->id;
 }
+
+inline uint64_t hash_cancel(nlm_cancargs *args)
+{
+	fileid_t *fileid;
+	fileid = (fileid_t*)args->alock.fh.val;
+        return fileid->id * (fileid->volid >> 16) << fileid->id;
+}
+
 inline uint64_t hash_notify(nlm_notifyargs *args)
 {
 	return hash_mem(args->cookies.data, args->cookies.len);

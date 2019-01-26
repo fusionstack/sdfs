@@ -9,7 +9,7 @@ typedef int (*resume_func)(void *ctx, int retval);
 
 typedef int (*timer_exec_t)(void *);
 
-int timer_init(int private);
+int timer_init(int private, int polling);
 int timer_insert(const char *name, void *ctx, func_t func, suseconds_t usec);
 void timer_expire();
 

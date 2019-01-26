@@ -674,12 +674,14 @@ int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
                 return 0;
         }
 
-        DINFO("type %d,%d, sid %d,%d, owner 0x%u,0x%u, start %ju,%ju, end %ju,%ju\n",
-              lock1->type, lock2->type,
-              lock1->sid, lock2->sid,
-              lock1->owner, lock2->owner,
-              lock1->start, lock2->start,
-              lock1->length, lock2->length);
+        YASSERT(lock1->type == SDFS_RDLOCK || lock1->type == SDFS_WRLOCK || lock1->type == SDFS_UNLOCK);
+        YASSERT(lock2->type == SDFS_RDLOCK || lock2->type == SDFS_WRLOCK || lock2->type == SDFS_UNLOCK);
+        DBUG("type %d,%d, sid %d,%d, owner 0x%u,0x%u, start %ju,%ju, end %ju,%ju\n",
+             lock1->type, lock2->type,
+             lock1->sid, lock2->sid,
+             lock1->owner, lock2->owner,
+             lock1->start, lock2->start,
+             lock1->length, lock2->length);
         
         if (lock1->sid == lock2->sid) {
                 if (lock1->opaquelen == 0 && lock2->opaquelen == 0)

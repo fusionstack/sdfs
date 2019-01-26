@@ -38,6 +38,7 @@ typedef struct {
         int maxlevel;
         int chunksize;
         int private;
+        int polling;
         group_t group;
 } ytimer_t;
 
@@ -177,7 +178,7 @@ static void *__timer_expire(void *_args)
 }
 
 
-int timer_init(int private)
+int timer_init(int private, int polling)
 {
         int ret, len;
         void *ptr;
@@ -199,6 +200,7 @@ int timer_init(int private)
         _timer->maxlevel = SKIPLIST_MAX_LEVEL;
         _timer->chunksize = SKIPLIST_CHKSIZE_DEF;
         _timer->private = private;
+        _timer->polling = polling;
 
         group = &_timer->group;
         ret = skiplist_create(__timer_cmp, _timer->maxlevel, _timer->chunksize,
@@ -214,9 +216,11 @@ int timer_init(int private)
                 variable_set(VARIABLE_TIMER, _timer);
         } else {
                 YASSERT(__timer__ == NULL);
-                
                 _timer->thread = -1;
+                __timer__ = _timer;
+        }                
 
+        if (!polling) {
                 ret = sy_spin_init(&group->lock);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
@@ -232,8 +236,6 @@ int timer_init(int private)
                 ret = pthread_create(&th, &ta, __timer_expire, (void *)group);
                 if (unlikely(ret))
                         GOTO(err_ret, ret); 
-
-                __timer__ = _timer;
         }
 
         return 0;
@@ -310,9 +312,12 @@ int timer_insert(const char *name, void *ctx, func_t func, suseconds_t usec)
 
         if (unlikely(!timer->private)) {
                 sy_spin_unlock(&group->lock);
+        }
+
+        if (unlikely(!timer->polling)) {
                 sem_post(&group->sem);
         }
-        
+                
         return 0;
 err_lock:
         if (unlikely(!timer->private)) {
@@ -327,6 +332,9 @@ void timer_expire()
         ytimer_t *timer;
         timer = variable_get(VARIABLE_TIMER);
         YASSERT(timer);
+
+        if (unlikely(!timer->polling))
+                return;
 
         __timer_expire__(&timer->group);
 }

@@ -121,7 +121,7 @@ static void __nfs_exec(void *ctx)
                 nfs_acl(&rpc_request->sockid, &rpc_request->req,
                         rpc_request->uid, rpc_request->gid, &rpc_request->buf);
         } else if (req->program == NLM_PROGRAM) {
-                DINFO("NLM REQUEST\n");
+                DBUG("NLM REQUEST\n");
                 nfs_nlm4(&rpc_request->sockid, &rpc_request->req,
                          rpc_request->uid, rpc_request->gid, &rpc_request->buf);
         }else{

@@ -288,7 +288,7 @@ typedef struct {
 } dirhandler_t;
 
 typedef enum {
-        SDFS_RDLOCK,
+        SDFS_RDLOCK = 10,
         SDFS_WRLOCK,
         SDFS_UNLOCK,
 } sdfs_lock_type_t;

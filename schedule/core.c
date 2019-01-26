@@ -338,7 +338,7 @@ static int __core_worker_init(core_t *core)
 
         DINFO("core[%u] schedule inited\n", core->hash);
 
-        ret = timer_init(1);
+        ret = timer_init(1, core->main_core ? 1 : 0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
