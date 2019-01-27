@@ -19,7 +19,7 @@
 #include "dbg.h"
 #include "cJSON.h"
 #include "xattr.h"
-#include "share.h"
+#include "sdfs_share.h"
 #include "md_lib.h"
 
 int emit_greeting(struct yftp_session *ys)

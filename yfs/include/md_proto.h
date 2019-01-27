@@ -13,7 +13,7 @@
 #include "yfs_md.h"
 #include "sdfs_lib.h"
 #include "dbg.h"
-#include "share.h"
+#include "sdfs_share.h"
 #include "user.h"
 #include "group.h"
 #include "flock.h"

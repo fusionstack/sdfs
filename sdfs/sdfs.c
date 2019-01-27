@@ -725,3 +725,42 @@ int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
                 return 0;
         }
 }
+
+int sdfs_share_list(int prot, shareinfo_t **shareinfo, int *count)
+{
+        int ret;
+
+        ret = md_share_list_byprotocal(prot, shareinfo, count);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+int sdfs_share_get(const char *key, shareinfo_t *shareinfo)
+{
+        int ret;
+
+        ret = md_share_get(key, shareinfo);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+int sdfs_share_set(const char *key, const shareinfo_t *shareinfo)
+{
+        int ret;
+
+        ret = md_share_set(key, shareinfo);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
+err_ret:
+        return ret;
+}

@@ -212,7 +212,8 @@ static void _share_args2info(IN const fileid_t *dirid,
 
 static void _print_cifs_share_info(IN const share_cifs_t *share_cifs)
 {
-        printf("protocol   : cifs\n"
+        printf("share_name : %s\n"
+               "protocol   : cifs\n"
                "directory  : %s\n"
                "dirid      : "ID_VID_FORMAT"\n"
                "user_name    : %s\n"
@@ -220,6 +221,7 @@ static void _print_cifs_share_info(IN const share_cifs_t *share_cifs)
                "host_name    : %s\n"
                "share_name : %s\n"
                "mode       : %s\n",
+               share_cifs->share_name,
                share_cifs->path,
                ID_VID_ARG(&share_cifs->dirid),
                (char *)share_cifs->uname,
@@ -232,13 +234,15 @@ static void _print_cifs_share_info(IN const share_cifs_t *share_cifs)
 static void _print_ftp_share_info(IN const share_ftp_t *share_ftp)
 {
 
-        printf("protocol  : ftp\n"
+        printf("share_name: %s\n"
+               "protocol  : ftp\n"
                "directory : %s\n"
                "dirid     : "ID_VID_FORMAT"\n"
                "user_name   : %s\n"
                "group_name   : %s\n"
                "host_name   : %s\n"
                "mode      : %s\n",
+               share_ftp->share_name,
                share_ftp->path,
                ID_VID_ARG(&share_ftp->dirid),
                (char *)share_ftp->uname,
@@ -249,13 +253,15 @@ static void _print_ftp_share_info(IN const share_ftp_t *share_ftp)
 
 static void _print_nfs_share_info(IN const share_nfs_t *share_nfs)
 {
-        printf("protocol  : nfs\n"
+        printf("share_name: %s\n"
+               "protocol  : nfs\n"
                "directory : %s\n"
                "dirid     : "ID_VID_FORMAT"\n"
                "user_name   : %s\n"
                "group_name   : %s\n"
                "host_name   : %s\n"
                "mode      : %s\n",
+               share_nfs->share_name,
                share_nfs->path,
                ID_VID_ARG(&share_nfs->dirid),
                (char *)share_nfs->uname,
@@ -334,6 +340,8 @@ static int _share_list(share_protocol_t prot)
                 GOTO(err_ret, ret);
 
         _list_share_info(prot, shareinfo, count);
+
+        yfree((void **)&shareinfo);
 
         return 0;
 err_ret:

@@ -16,6 +16,7 @@
 #include "sdfs_ec.h"
 #include "sdfs_quota.h"
 #include "sdfs_conf.h"
+#include "sdfs_share.h"
 #include "sdfs_worm.h"
 
 #ifndef USS_SETATTR_MODE
@@ -184,14 +185,6 @@ extern int raw_set_quotaid(const fileid_t *fileid, uint64_t quotaid);
                           // int *);
 extern int raw_remove_quota(const fileid_t *quotaid, const quota_t *quota);
 extern int raw_modify_quota(const fileid_t *quotaid, quota_t *quota, uint32_t modify_mask);
-
-#if 0
-extern int raw_flock_op(const fileid_t *fileid,
-                        uss_flock_op_t flock_op,
-                        struct flock *flock,
-                        const uint64_t owne);
-#endif
-
 
 typedef enum {
         __NOT_SET_SIZE = 0,
@@ -377,5 +370,9 @@ int sdfs_symlink(const fileid_t *parent, const char *link_name,
 int sdfs_readlink(const fileid_t *from, char *, uint32_t *buflen);
 char *sdfs_realpath(const char *path, char *resolved_path);
 
+
+int sdfs_share_list(int prot, shareinfo_t **shareinfo, int *count);
+int sdfs_share_get(const char *key, shareinfo_t *shareinfo);
+int sdfs_share_set(const char *key, const shareinfo_t *shareinfo);
 
 #endif

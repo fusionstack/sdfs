@@ -130,7 +130,7 @@ static int __mount_mnt_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 {
         int ret = 0;
         static mount_ret res;
-        char dpath[MAX_PATH_LEN];
+        char dpath[MAX_PATH_LEN], basename[MAX_PATH_LEN];
         char remoteip[MAX_NAME_LEN];
         fileid_t fileid;
         static int auth = AUTH_UNIX;
@@ -242,12 +242,12 @@ err_ret:
 static int __mount_dump_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                            uid_t uid, gid_t gid, nfsarg_t *_args, buffer_t *buf)
 {
-        int ret, i, len;
+        int ret, i, len, count;
         static struct mountbody *dump_list = 0, *resnode;
         void *ptr;
-        struct nfsconf_export_t *export;
+        shareinfo_t *shareinfo, *array;
+        const char *addr = "0.0.0.0";
 
-        UNIMPLEMENTED(__WARN__);//do we need free dump_list?
         DINFO("dump\n");
         
         (void) _args;
@@ -255,44 +255,60 @@ static int __mount_dump_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         (void) gid;
         (void) buf;
 
-        if (dump_list == 0) {
-                ret = ymalloc(&ptr, sizeof(struct mountbody) * nfsconf.export_size);
+        ret = sdfs_share_list(SHARE_NFS, &array, &count);
+        if (ret)
+                GOTO(err_rep, ret);
+
+        if (count == 0) {
+                dump_list = NULL;
+                goto out;
+        }
+        
+        ret = ymalloc(&ptr, sizeof(struct mountbody) * count);
+        if (ret)
+                GOTO(err_rep, ret);
+
+        dump_list = ptr;
+
+        for (i = 0; i < count; i++) {
+                shareinfo = &array[i];
+                resnode = &dump_list[i];
+
+                len = sizeof(shareinfo->share_name);
+                YASSERT(len < MAX_PATH_LEN);
+                ret = ymalloc(&ptr, len + 1);
                 if (ret)
-                        GOTO(err_rep, ret);
+                        UNIMPLEMENTED(__DUMP__);
 
-                dump_list = ptr;
+                _strncpy(ptr, shareinfo->share_name, len);
 
-                for (i = 0; i < nfsconf.export_size; i++) {
-                        export = &nfsconf.nfs_export[i];
-                        resnode = &dump_list[i];
+                resnode->ml_directory = ptr;
 
-                        len = sizeof(export->path);
-                        YASSERT(len < MAX_PATH_LEN);
-                        ret = ymalloc(&ptr, len + 1);
-                        if (ret)
-                                UNIMPLEMENTED(__DUMP__);
-
-                        _strncpy(ptr, export->path, len);
-
-                        resnode->ml_directory = ptr;
-
-                        len = sizeof(export->ip);
-                        YASSERT(len < MAX_PATH_LEN);
-                        ret = ymalloc(&ptr, len);
-                        if (ret)
-                                UNIMPLEMENTED(__DUMP__);
-
-                        _strncpy(ptr, export->ip, len);
-
-                        resnode->ml_hostname = ptr;
-
-                        if (i < nfsconf.export_size - 1)
-                                resnode->ml_next = &dump_list[i + 1];
-                        else
-                                resnode->ml_next = NULL;
+                DINFO("share name : %s path : %s hostname : %s\n", shareinfo->share_name,
+                      shareinfo->path, shareinfo->hname);
+                
+                if (strlen(shareinfo->hname)) {
+                        addr = shareinfo->hname;
                 }
+                        
+                len = sizeof(addr);
+                YASSERT(len < MAX_PATH_LEN);
+
+                ret = ymalloc(&ptr, len);
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+
+                _strncpy(ptr, addr, len);
+                resnode->ml_hostname = ptr;
+
+                if (i < count - 1)
+                        resnode->ml_next = &dump_list[i + 1];
+                else
+                        resnode->ml_next = NULL;
         }
 
+        yfree((void **)&shareinfo);
+out:
         ret = sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                            &dump_list, (xdr_ret_t)xdr_dump);
         if (ret)
@@ -312,10 +328,11 @@ err_ret:
 static int __mount_export_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                            uid_t uid, gid_t gid, nfsarg_t *_args, buffer_t *buf)
 {
-        int ret, i, len;
+        int ret, i, len, count;
         static struct exportnode *export_list = 0, *resnode;
         void *ptr;
-        struct nfsconf_export_t *export;
+        shareinfo_t *shareinfo, *array;
+        const char *addr = "0.0.0.0";
 
         (void) _args;
         (void) uid;
@@ -323,53 +340,63 @@ static int __mount_export_svc(const sockid_t *sockid, const sunrpc_request_t *re
         (void) buf;
 
         DINFO("export\n");
+
+        ret = sdfs_share_list(SHARE_NFS, &array, &count);
+        if (ret)
+                GOTO(err_rep, ret);
+
+        if (count == 0) {
+                goto out;
+        }
         
-        if (export_list == 0) {
-                ret = ymalloc(&ptr, sizeof(exportnode) * nfsconf.export_size);
+        ret = ymalloc(&ptr, sizeof(exportnode) * count);
+        if (ret)
+                GOTO(err_rep, ret);
+
+        export_list = ptr;
+
+        for (i = 0; i < count; i++) {
+                shareinfo = &array[i];
+                resnode = &export_list[i];
+
+                len = sizeof(shareinfo->share_name);
+                YASSERT(len < MAX_PATH_LEN);
+                ret = ymalloc(&ptr, len + 1);
                 if (ret)
-                        GOTO(err_rep, ret);
+                        UNIMPLEMENTED(__DUMP__);
 
-                export_list = ptr;
+                _strncpy(ptr, shareinfo->share_name, len);
 
-                for (i = 0; i < nfsconf.export_size; i++) {
-                        export = &nfsconf.nfs_export[i];
-                        resnode = &export_list[i];
+                resnode->ex_dir = ptr;
 
-                        len = sizeof(export->path);
-                        YASSERT(len < MAX_PATH_LEN);
-                        ret = ymalloc(&ptr, len + 1);
-                        if (ret)
-                                UNIMPLEMENTED(__DUMP__);
+                ret = ymalloc(&ptr, sizeof(groupnode));
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
 
-                        _strncpy(ptr, export->path, len);
+                resnode->ex_groups = ptr;
 
-                        resnode->ex_dir = ptr;
-
-                        ret = ymalloc(&ptr, sizeof(groupnode));
-                        if (ret)
-                                UNIMPLEMENTED(__DUMP__);
-
-                        resnode->ex_groups = ptr;
-
-                        len = sizeof(export->ip);
-                        YASSERT(len < MAX_PATH_LEN);
-                        ret = ymalloc(&ptr, len);
-                        if (ret)
-                                UNIMPLEMENTED(__DUMP__);
-
-                        _strncpy(ptr, export->ip, len);
-
-                        resnode->ex_groups->gr_name = ptr;
-                        resnode->ex_groups->gr_next = NULL;
-
-                        if (i < nfsconf.export_size - 1)
-                                resnode->ex_next = &export_list[i + 1];
-                        else
-                                resnode->ex_next = NULL;
+                if (strlen(shareinfo->hname)) {
+                        addr = shareinfo->hname;
                 }
+                
+                len = sizeof(addr);
+                YASSERT(len < MAX_PATH_LEN);
+                ret = ymalloc(&ptr, len);
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+
+                _strncpy(ptr, addr, len);
+
+                resnode->ex_groups->gr_name = ptr;
+                resnode->ex_groups->gr_next = NULL;
+
+                if (i < count - 1)
+                        resnode->ex_next = &export_list[i + 1];
+                else
+                        resnode->ex_next = NULL;
         }
 
-
+out:        
         ret = sunrpc_reply(sockid, req, ACCEPT_STATE_OK,
                            &export_list, (xdr_ret_t)xdr_exports);
         if (ret)
