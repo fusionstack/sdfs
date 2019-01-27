@@ -125,12 +125,51 @@ err_ret:
         return ret;
 }
 
+static int __mount_dir_get(const char *_path, dirid_t *dirid)
+{
+        int ret;
+        char volname[MAX_NAME_LEN], path[MAX_PATH_LEN], *pos;
+        shareinfo_t shareinfo;
+
+        ret = sscanf(_path, "/%[^/]", volname);
+        if (ret != 1) {
+                ret = EINVAL;
+                GOTO(err_ret, ret);
+        }
+
+        ret = sdfs_share_get(volname, &shareinfo);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        pos = strstr(_path, volname);
+        pos += strlen(volname);
+
+        DINFO("split as (%s,%s)\n", volname, pos);
+
+        if (strlen(pos) == 0) {
+                *dirid = shareinfo.dirid;
+                goto out;
+        } 
+
+        snprintf(path, MAX_PATH_LEN, "%s/%s", shareinfo.path, pos);
+        DINFO("real path %s\n", path);
+
+        ret = sdfs_lookup_recurive(path, dirid);
+        if (ret)
+                GOTO(err_ret, ret);
+        
+out:
+        return 0;
+err_ret:
+        return ret;
+}
+
 static int __mount_mnt_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                            uid_t uid, gid_t gid, nfsarg_t *_args, buffer_t *buf)
 {
         int ret = 0;
         static mount_ret res;
-        char dpath[MAX_PATH_LEN], basename[MAX_PATH_LEN];
+        char dpath[MAX_PATH_LEN];
         char remoteip[MAX_NAME_LEN];
         fileid_t fileid;
         static int auth = AUTH_UNIX;
@@ -158,26 +197,26 @@ static int __mount_mnt_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         if(ret)
                 GOTO(err_rep, ret);
 
-        ret = sdfs_lookup_recurive(dpath, &fileid);
+        ret = __mount_dir_get(dpath, &fileid);
         if (ret) {
                 DERROR("%s attempted to mount path (%s) - %s\n",
                                 remoteip, dpath, strerror(ret));
                 res.fhs_status = MNT_EACCES;
                 goto err_rep;
-        } else {
-                ret = sdfs_getattr(&fileid, &stbuf);
-                if (ret) {
-                        res.fhs_status = MNT_EACCES;
-                        GOTO(err_rep, ret);
-                }
+        }
 
-                mode = stbuf.st_mode;
-                if (!S_ISDIR(mode)) {
-                        DERROR("%s attempted to mount path (%s) - not a directory, mode %o\n",
-                                        remoteip, dpath, mode);
-                        res.fhs_status = MNT_EACCES;
-                        GOTO(err_rep, ret);
-                }
+        ret = sdfs_getattr(&fileid, &stbuf);
+        if (ret) {
+                res.fhs_status = MNT_EACCES;
+                GOTO(err_rep, ret);
+        }
+
+        mode = stbuf.st_mode;
+        if (!S_ISDIR(mode)) {
+                DERROR("%s attempted to mount path (%s) - not a directory, mode %o\n",
+                       remoteip, dpath, mode);
+                res.fhs_status = MNT_EACCES;
+                GOTO(err_rep, ret);
         }
 
         DBUG("mount ok, res %p\n", &res);
