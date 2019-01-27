@@ -40,6 +40,7 @@ def usage():
            "    write\n"
            "admin ops:\n"
            "    user\n"
+           "    group\n"
            "    worm\n"
            "    share\n"
            "    health\n"
@@ -49,7 +50,7 @@ def usage():
 def is_c_type(cmd):
     lst = ['mkdir', 'ls', 'touch', 'stat', 'attr', 'cat', 'chmod',
            'chown', 'ln', 'mv', 'rmdir', 'truncate', 'write'
-           'user', 'worm', 'share', 'health']
+           'user', 'group', 'worm', 'share', 'health']
     if cmd in lst:
         return True
     else:

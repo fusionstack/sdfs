@@ -37,7 +37,7 @@ def modify_file(filename, data):
 def get_content_as_list():
     delimeter = "-------------------------------------------------------------\n"
     list_record = []
-    _exec = "/opt/sdfs/app/bin/uss.share -l -p nfs"
+    _exec = "/opt/sdfs/app/bin/sdfs.share -l -p nfs"
     try:
         result, err = exec_shell(_exec, p=True, need_return=True, timeout=60)
     except Exception as e:

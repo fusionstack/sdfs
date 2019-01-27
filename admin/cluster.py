@@ -156,6 +156,7 @@ class Cluster(object):
                 _exec_reload = "systemctl daemon-reload"
                 _exec_all_cmd = _exec_all_cmd + _exec_reload + ' && '
 
+                """
                 # to load dbus config file
                 #start message-bus
                 _exec_dbus = "systemctl restart messagebus"
@@ -164,6 +165,7 @@ class Cluster(object):
                 # restart systemd-logind
                 _exec_login = "systemctl restart systemd-logind"
                 _exec_all_cmd = _exec_all_cmd + _exec_login + ' && '
+                """
 
             _exec_rmdir = "rm -rf %s/*" % (nfs_temp)
             _exec_all_cmd = _exec_all_cmd + _exec_rmdir
