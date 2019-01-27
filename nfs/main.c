@@ -29,6 +29,7 @@
 #include "proc.h"
 #include "sdfs_quota.h"
 #include "core.h"
+#include "nfs_conf.h"
 #include "nlm_async.h"
 #include "io_analysis.h"
 #include "allocator.h"
@@ -85,7 +86,7 @@ int register_nfs_service()
                 pmap_unset(NFS3_PROGRAM, NFS_V3);
 
         if (! pmap_set (NFS3_PROGRAM, NFS_V3, opt_portmapper ? IPPROTO_TCP : 0,
-                        2049)) {
+                        nfsconf.nfs_port)) {
                 ret = EAGAIN;
                 GOTO(err_ret, ret);
         }
@@ -93,6 +94,12 @@ int register_nfs_service()
         return 0;
 err_ret:
         return ret;
+}
+
+void unregister_nfs_service()
+{
+        if (opt_portmapper)
+                pmap_unset(NFS3_PROGRAM, NFS_V3);
 }
 
 int register_mount_service()
@@ -104,14 +111,21 @@ int register_mount_service()
         }
 
         if (! pmap_set (MOUNTPROG, MOUNTVERS3, opt_portmapper ? IPPROTO_TCP : 0,
-                        2049)) {
+                        nfsconf.nfs_port)) {
                 ret = EAGAIN;
                 GOTO(err_ret, ret);
         }
 
         return 0;
 err_ret:
-        return 0;
+        return ret;
+}
+
+void unregister_mount_service()
+{
+        if (opt_portmapper) {
+                pmap_unset(MOUNTPROG, MOUNTVERS3);
+        }
 }
 
 int register_nlm_service()
@@ -122,13 +136,20 @@ int register_nlm_service()
                 pmap_unset(NLM_PROGRAM, NLM_VERSION);
 
         if (! pmap_set (NLM_PROGRAM, NLM_VERSION, opt_portmapper ? IPPROTO_TCP : 0,
-                        3001)) {
+                        nfsconf.nlm_port)) {
                 ret = EAGAIN;
                 GOTO(err_ret, ret);
         }
         return 0;
 err_ret:
         return ret;
+}
+
+
+void unregister_nlm_service()
+{
+        if (opt_portmapper)
+                pmap_unset(NLM_PROGRAM, NLM_VERSION);
 }
 
 int ynfs_reset_handler(net_handle_t *nh, uuid_t *nodeid)
@@ -151,7 +172,7 @@ int ynfs_srv(void *args)
         int ret, daemon;
         net_proto_t net_op;
         ynfs_args_t *ynfs_args;
-        const char *service = NFS_SERVICE_DEF;
+        char service[MAX_NAME_LEN];
         char path[MAX_PATH_LEN];
 
         ynfs_args = args;
@@ -172,10 +193,11 @@ int ynfs_srv(void *args)
         memset(&net_op, 0x0, sizeof(net_proto_t));
 
         //net_op.reset_handler = ynfs_reset_handler;
-
+#if 0
         ret = sy_spin_init(&nfs_conf_lock);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
+#endif
 
         ret = ly_init(daemon, "nfs/0", -1);
         if (ret)
@@ -218,6 +240,7 @@ retry:
         if (ret)
                 GOTO(err_ret, ret);
 
+        snprintf(service, MAX_NAME_LEN, "%d", nfsconf.nfs_port);
         ret = sunrpc_tcp_passive(service);
         if (ret)
                 GOTO(err_ret, ret);
@@ -235,7 +258,8 @@ retry:
         }
 
 #if 1
-        ret = sunrpc_tcp_passive(NLM_SERVICE_DEF);
+        snprintf(service, MAX_NAME_LEN, "%d", nfsconf.nlm_port);
+        ret = sunrpc_tcp_passive(service);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -263,6 +287,10 @@ retry:
                 sleep(1);
         }
 
+        unregister_nlm_service();
+        unregister_nfs_service();
+        unregister_mount_service();
+        
         ret = ly_update_status("stopping", -1);
         if (ret)
                 GOTO(err_ret, ret);

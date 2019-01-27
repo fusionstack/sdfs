@@ -31,7 +31,6 @@
 
 #define UNIX_PATH_MAX 108
 
-#define NLM_SERVICE_DEF "3001"
 #define NFS_TCPDATA_MAX 1048576
 #define NFS_RTMULT 2
 #define NFS_NAMLEN_MAX 255

@@ -497,17 +497,6 @@ class Node:
                 dwarn("need run with master!")
                 break
 
-    def objck(self, check_flag=None):
-        lfile = "/var/run/uss.objck.lock"
-        lock = lock_file(lfile)
-
-        if self.config.use_redis():
-            self._objck_redis(check_flag)
-        elif self.config.use_leveldb():
-            self._objck_leveldb(check_flag)
-        else:
-            raise Exp(1, "unsupport")
-
     def ln_old(self, force=True):
         if not os.path.exists("/opt/fusionnas"):
             os.system("ln -sf /opt/sdfs /opt/fusionnas")

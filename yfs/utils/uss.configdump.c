@@ -47,7 +47,6 @@ int main(int argc, char *argv[])
                "globals.valgrind:%d\n"
                "globals.check_mountpoint:%d\n"
                "globals.solomode:%d\n"
-               "mdsconf.redis_total:%d\n"
                "mdsconf.db:%s\n"
                "mdsconf.redis_baseport:%d\n"
                "mdsconf.redis_sharding:%d\n"
@@ -65,7 +64,6 @@ int main(int argc, char *argv[])
                gloconf.valgrind,
                gloconf.check_mountpoint,
                gloconf.solomode,
-               mdsconf.redis_total,
                mdsconf.db,
                mdsconf.redis_baseport,
                mdsconf.redis_sharding,

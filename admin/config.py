@@ -138,8 +138,6 @@ class Config:
         self.testing = int(d['globals.testing'])
         self.valgrind = int(d['globals.valgrind'])
         self.solomode = int(d['globals.solomode'])
-        self.redis_total = int(d['mdsconf.redis_total'])
-        self.db = d['mdsconf.db']
         self.redis_dir = os.path.join(self.workdir, "redis")
 
     def __parse_line__(self, line, srv):
@@ -191,12 +189,6 @@ class Config:
             exit(1)
         
         #print cluster
-
-    def use_redis(self):
-        return self.db == "redis"
-
-    def use_leveldb(self):
-        False
 
     def dump_cluster(self, cluster=None, dumpto=None):
         #print (cluster, self.cluster)

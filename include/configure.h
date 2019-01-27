@@ -80,9 +80,10 @@ struct nfsconf_t
 {
         int use_export;
         int export_size;
+        int nfs_port;
+        int nlm_port;
         int rsize;
         int wsize;
-        int job_qos;
         struct nfsconf_export_t nfs_export[1024];
 };
 
@@ -107,8 +108,11 @@ struct mdsconf_t
         int chknew_hardend;
         char db[MAX_NAME_LEN];
         uint64_t disk_keep;
+
+#if 0
         int redis_wait;
         int redis_thread;
+
         int redis_total;
         char leveldb[MAX_PATH_LEN];
         int leveldb_physical_package_id;
@@ -118,11 +122,12 @@ struct mdsconf_t
         int leveldb_queue; //线程池的个数
         int leveldb_queue_pb; //线程池中处理Pb任务的个数
         int leveldb_queue_worker; //每个线程池中，线程个数
+#endif
 
         int main_loop_threads;
+        int redis_baseport;
         int redis_sharding;
         int redis_replica;
-        int redis_baseport;
 };
 
 /* cds configure */
@@ -195,7 +200,6 @@ struct gloconf_t
         int write_back;
         uint64_t cache_size;
         int net_crc;
-        int io_mode;
         int dir_refresh;
         int file_refresh;
         int wmem_max;
@@ -260,5 +264,8 @@ extern struct yftp_conf_t yftp_conf;
 #define SOCKID_CORENET 20
 
 #define REDIS_BASEPORT 6490
+
+#define NLM_SERVICE_DEF 3001
+#define NFS_SERVICE_DEF 3049
 
 #endif

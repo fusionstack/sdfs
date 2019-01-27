@@ -9,6 +9,8 @@ import logging, pprint
 import argparse
 import errno
 
+from utils import _check_config
+
 #logging.basicConfig(level=logging.DEBUG)
 
 SERVICE = 'org.ganesha.nfsd'
@@ -58,8 +60,8 @@ def get_export(list_record):
         if len(record) == 0:
             continue
         export_path = record.split('\n')[1].split(':')[1].strip(' ')
-        clients = record.split('\n')[3].split(':')[1].strip(' ')
-        access_type = record.split('\n')[4].split(':')[1].strip(' ')
+        clients = record.split('\n')[5].split(':')[1].strip(' ')
+        access_type = record.split('\n')[6].split(':')[1].strip(' ')
         client_pair["Clients"] = clients
         access_pair["Access_Type"] = access_type
         client_list.update(client_pair)
@@ -310,6 +312,11 @@ def delete_client_by_host(content, export_id, host):
         sys.exit(e.error)
     modify_file(CONF_PATH, new)
 
+
+def disable_nfs3():
+    _check_config("/etc/ganesha/ganesha.conf", "NFS_Core_Param", " ", '{NFS_Protocols = "4";}', 1)
+    
+    
 #  通过是否可以导出目录，
 #  判断nfs是否正常启动
 def nfs_running():
@@ -348,7 +355,8 @@ if __name__ == "__main__":
 
         set_conf(CONF_PATH, export_list)
         del_conf(CONF_PATH, export_list)
-        enable_export()
+        disable_nfs3()
+        #enable_export()
     parser_load = subparsers.add_parser('load', help='load config')
     parser_load.set_defaults(func=_load)
 

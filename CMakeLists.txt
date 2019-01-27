@@ -314,7 +314,7 @@ set (YNFS_SRC_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/nfs_mount.c
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/nfs_remove.c
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/xdr_nfs.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/nfs/nfs_proc.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/nfs/nfs_proc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/main.c
 )
 
@@ -325,7 +325,6 @@ set (YNLM_SRC_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/nlm_lkcache.c
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/nlm_nsm.c
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/hostcache.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/nfs/mini_nlm.c
 )
 
 set (YISCSI_SRC_LIST

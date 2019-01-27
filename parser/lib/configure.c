@@ -132,7 +132,8 @@ int conf_init(const char *conf_path)
         mdsconf.disk_keep = (100 * 1024 * 1024 * 1024LL); /*100G*/
         nfsconf.rsize = 1048576;
         nfsconf.wsize = 1048576;
-        nfsconf.job_qos = 4096;
+        nfsconf.nfs_port = NFS_SERVICE_DEF;
+        nfsconf.nlm_port = NLM_SERVICE_DEF;
         memset(sanconf.iqn, 0x0, MAXSIZE);
         sanconf.lun_blk_shift = 9;
         gloconf.write_back = 1;
@@ -168,20 +169,9 @@ int conf_init(const char *conf_path)
         memset(gloconf.cluster_name, 0x0, MAXSIZE);
         strcpy(gloconf.cluster_name, "uss");
         mdsconf.chknew_hardend = 1;
-        mdsconf.redis_wait = 2000;
-        mdsconf.redis_thread = 20;
-        mdsconf.redis_total = 512;
-        strcpy(mdsconf.db, "redis");
-        strcpy(mdsconf.leveldb, "/var/lib/leveldb");
-        mdsconf.leveldb_physical_package_id = -1; //默认不设置
-        mdsconf.schedule_physical_package_id = -1;
-        mdsconf.leveldb_queue = 6;
-        mdsconf.leveldb_queue_pb = 1;
-        mdsconf.leveldb_queue_worker = 1;
         mdsconf.main_loop_threads = 6;
 
         gloconf.performance_analysis = 0;
-        gloconf.io_mode = 1; /*0 is sequence, 1 is random*/
         gloconf.cache_size = (128 * 1024 * 1024LL);
         gloconf.net_crc = 0;
         gloconf.check_mountpoint = 1;
@@ -507,8 +497,10 @@ int set_value(const char* key, const char* value, int type)
                 nfsconf.rsize = _value;
         else if (keyis("wsize", key))
                 nfsconf.wsize = _value;
-        else if (keyis("job_qos", key))
-                nfsconf.job_qos = _value;
+        else if (keyis("nlm_port", key))
+                nfsconf.nlm_port = _value;
+        else if (keyis("nfs_port", key))
+                nfsconf.nfs_port = _value;
 
         /**
          * yiscsi configure
@@ -543,14 +535,6 @@ int set_value(const char* key, const char* value, int type)
                 mdsconf.redis_sharding = _value;
         else if (keyis("redis_replica", key))
                 mdsconf.redis_replica = _value;
-        else if (keyis("redis_wait", key))
-                mdsconf.redis_wait = _value;
-        else if (keyis("redis_thread", key))
-                mdsconf.redis_thread = _value;
-        else if (keyis("redis_total", key))
-                mdsconf.redis_total = _value;
-        else if (keyis("schedule_physical_package_id", key))
-                mdsconf.schedule_physical_package_id = _value;
         else if (keyis("main_loop_threads ", key)) {
                 mdsconf.main_loop_threads = _value;
         }
@@ -581,17 +565,6 @@ int set_value(const char* key, const char* value, int type)
                 gloconf.write_back = _value;
         else if (keyis("performance_analysis", key))
                 gloconf.performance_analysis = _value;
-        else if (keyis("io_mode", key)) {
-                if (strcmp(value, "sequence")  == 0)
-                        gloconf.io_mode = 0;
-                else if (strcmp(value, "random")  == 0)
-                        gloconf.io_mode = 0;
-                else {
-                        printf("only 'random' or 'sequence' is accepted\n");
-                        exit(EINVAL);
-                }
-        }
-
         else if (keyis("rpc_timeout", key)) {
                 gloconf.rpc_timeout = _value;
         } else if (keyis("backtrace", key)) {
