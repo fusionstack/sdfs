@@ -657,12 +657,40 @@ err_ret:
 
 int sdfs_setlock(const fileid_t *fileid, const sdfs_lock_t *lock)
 {
-        return md_setlock(fileid, lock);
+        int ret, retry = 0;
+
+retry:
+        ret = md_setlock(fileid, lock);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
 }
 
 int sdfs_getlock(const fileid_t *fileid, sdfs_lock_t *lock)
 {
-        return md_getlock(fileid, lock);
+        int ret, retry = 0;
+
+retry:
+        ret = md_getlock(fileid, lock);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
 }
 
 int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
