@@ -50,6 +50,7 @@ class Node:
                     derror("bad path %s/%s" % (role_dir, i))
                     raise Exp(errno.EIO, '%s' % (i))
                     continue
+
                 instences.append(Instence(role, i, self.config))
 
         #instences.append(Instence("uss_nfs", -1, self.config))
