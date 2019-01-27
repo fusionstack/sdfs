@@ -28,22 +28,6 @@
 #define MAX_SUBMIT  MAX_IO
 #endif
 
-typedef struct {
-        chkid_t id;
-        job_t *job;
-        //struct iovec buf[Y_MSG_MAX / PAGE_SIZE + 1]];
-        struct iovec *buf;
-        uint64_t version;
-        uint32_t status;
-        int ref;
-        int count;
-        int op;
-        int offset;
-        int size;
-        int idx;
-        int free;
-} diskio_t;
-
 int disk_join(const diskid_t *diskid, struct statvfs *fsbuf);
 int disk_init(const char *home, uint64_t _max_object);
 int disk_statvfs(struct statvfs *_stbuf);

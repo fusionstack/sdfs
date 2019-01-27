@@ -43,18 +43,6 @@
 /*#define USE_AIO*/
 
 typedef struct {
-        chkid_t id;
-        int level;
-} entry_t;
-
-typedef struct {
-        struct iocb iocb;
-        diskio_t *diskio;
-        cache_entry_t *cent;
-        int fd;
-} iocb_t;
-
-typedef struct {
         int level;
         int count;
         int idx;
