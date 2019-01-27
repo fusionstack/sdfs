@@ -165,8 +165,6 @@ void cds_signal_handler(int sig)
 
         jobdock_iterator();
 
-        disk_dumpref();
-
         analysis_dump();
 }
 
