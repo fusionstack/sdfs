@@ -131,6 +131,7 @@ class Config:
         self.redis_sharding = int(d['mdsconf.redis_sharding'])
         self.redis_replica = int(d['mdsconf.redis_replica'])
         self.redis_baseport = int(d['mdsconf.redis_baseport'])
+        self.nfs_srv = d['globals.nfs_srv']
         self.wmem_max = int(d['globals.wmem_max'])
         self.rmem_max = int(d['globals.rmem_max'])
         self.master_vip = d['globals.master_vip']

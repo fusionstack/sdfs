@@ -182,7 +182,7 @@ struct gloconf_t
         int lease_timeout;
         int hb_timeout;
         int hb_retry;
-        char nfs[MAXSIZE];
+        char nfs_srv[MAXSIZE];
 
         int solomode;
         

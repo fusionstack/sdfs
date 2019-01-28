@@ -143,7 +143,7 @@ int conf_init(const char *conf_path)
         gloconf.rpc_timeout = 10;
         gloconf.hb_timeout = 5;
         gloconf.hb_retry = 3;
-        strcpy(gloconf.nfs, "native");
+        strcpy(gloconf.nfs_srv, "native");
         gloconf.lease_timeout = 20;
         mdsconf.redis_sharding = 3;
         mdsconf.redis_replica = 2;
@@ -602,8 +602,8 @@ int set_value(const char* key, const char* value, int type)
                 gloconf.mask = ntohl(inet_addr(value));
         else if (keyis("cluster_name", key))
                 strncpy(gloconf.cluster_name, value, MAXSIZE);
-        else if (keyis("nfs", key))
-                strncpy(gloconf.nfs, value, MAXSIZE);
+        else if (keyis("nfs_srv", key))
+                strncpy(gloconf.nfs_srv, value, MAXSIZE);
         else if (keyis("net_crc", key))
                 gloconf.net_crc  = _value;
         else if (keyis("dir_refresh", key))
