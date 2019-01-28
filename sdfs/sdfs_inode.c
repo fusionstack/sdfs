@@ -24,12 +24,13 @@
 #include "sdfs_chunk.h"
 #include "network.h"
 #include "yfs_limit.h"
-#include "dbg.h"
+#include "io_analysis.h"
 #include "worm_cli_lib.h"
 #include "main_loop.h"
 #include "posix_acl.h"
 #include "flock.h"
 #include "xattr.h"
+#include "dbg.h"
 
 
 int sdfs_getattr(const fileid_t *fileid, struct stat *stbuf)
@@ -40,6 +41,7 @@ int sdfs_getattr(const fileid_t *fileid, struct stat *stbuf)
 
         md = (void *)buf;
 
+        io_analysis(ANALYSIS_OP_READ, 0);
         DBUG("getattr "FID_FORMAT"\n", FID_ARG(fileid));
 
         if (fileid->type == ftype_root || fileid->type == ftype_null) {

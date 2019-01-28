@@ -12,6 +12,7 @@
 #include "nodeid.h"
 #include "md_lib.h"
 #include "diskio.h"
+#include "io_analysis.h"
 #include "core.h"
 #include "dbg.h"
 
@@ -93,6 +94,10 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / PAGE_SIZE + 1];
 
+        ret = io_analysis(ANALYSIS_IO_WRITE, io->size);
+        if (ret)
+                GOTO(err_ret, ret);
+        
         ANALYSIS_BEGIN(0);
         CORE_ANALYSIS_BEGIN(1);
         
@@ -152,6 +157,10 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / PAGE_SIZE + 1];
 
+        ret = io_analysis(ANALYSIS_IO_READ, io->size);
+        if (ret)
+                GOTO(err_ret, ret);
+        
         ANALYSIS_BEGIN(0);
         CORE_ANALYSIS_BEGIN(1);
         

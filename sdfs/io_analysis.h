@@ -4,8 +4,10 @@
 #include <stdint.h>
 
 typedef enum {
-        ANALYSIS_READ = 1,
-        ANALYSIS_WRITE,
+        ANALYSIS_OP_READ = 1,
+        ANALYSIS_OP_WRITE,
+        ANALYSIS_IO_READ,
+        ANALYSIS_IO_WRITE,
 } analysis_op_t;
 
 int io_analysis_init(const char *name, int seq);

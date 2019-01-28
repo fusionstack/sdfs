@@ -155,7 +155,7 @@ retry:
 out:
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
-        ret = io_analysis(ANALYSIS_READ, size);
+        ret = io_analysis(ANALYSIS_IO_READ, size);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -390,7 +390,7 @@ retry1:
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
-        ret = io_analysis(ANALYSIS_WRITE, size);
+        ret = io_analysis(ANALYSIS_IO_WRITE, size);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -521,16 +521,19 @@ err_ret:
 
 int sdfs_getxattr(const fileid_t *fileid, const char *name, void *value, size_t *size)
 {
+        io_analysis(ANALYSIS_OP_READ, 0);
         return md_getxattr(fileid, name, value, size);
 }
 
 int sdfs_removexattr(const fileid_t *fileid, const char *name)
 {
+        io_analysis(ANALYSIS_OP_WRITE, 0);
         return md_removexattr(fileid, name);
 }
 
 int sdfs_listxattr(const fileid_t *fileid, char *list, size_t *size)
 {
+        io_analysis(ANALYSIS_OP_READ, 0);
         return md_listxattr(fileid, list, size);
 }
 
@@ -583,6 +586,7 @@ int sdfs_setxattr(const fileid_t *fileid, const char *name, const void *value,
         md_proto_t *md;
         char buf[MAX_BUF_LEN];
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
         md = (void *)buf;
 
         ret = md_getattr(md, fileid);
@@ -659,6 +663,7 @@ int sdfs_setlock(const fileid_t *fileid, const sdfs_lock_t *lock)
 {
         int ret, retry = 0;
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
 retry:
         ret = md_setlock(fileid, lock);
         if (ret) {
@@ -678,6 +683,8 @@ int sdfs_getlock(const fileid_t *fileid, sdfs_lock_t *lock)
 {
         int ret, retry = 0;
 
+        io_analysis(ANALYSIS_OP_READ, 0);
+        
 retry:
         ret = md_getlock(fileid, lock);
         if (ret) {

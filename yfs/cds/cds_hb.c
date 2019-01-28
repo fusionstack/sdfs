@@ -31,7 +31,6 @@ extern net_global_t ng;
 int overload = 0;
 #define OVERLOAD_FLAG "overload"
 //XXX
-extern jobtracker_t *jobtracker;
 
 #if 1
 

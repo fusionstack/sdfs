@@ -216,9 +216,6 @@ struct gloconf_t
 
         int sdevents_threads;
         int jobdock_size;
-        int yfs_jobtracker;
-        int nfs_jobtracker;
-        int objs_jobtracker;
 
         uint64_t chunk_entry_max;
 
@@ -227,10 +224,6 @@ struct gloconf_t
         int disk_mt_ssd;
 
         int disk_worker;
-
-        int lookup_cache;
-
-        int preload_chk;
 
         int hb;
 

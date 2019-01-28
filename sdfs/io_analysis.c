@@ -12,6 +12,7 @@
 #include "configure.h"
 #include "schedule.h"
 #include "io_analysis.h"
+#include "core.h"
 #include "dbg.h"
 
 #define ANALY_AVG_UPDATE_COUNT (3)  //secend
@@ -60,24 +61,25 @@ static int __io_analysis_dump()
         __io_analysis_get(&readps, &writeps, &readbwps, &writebwps);
 
         if (now - __io_analysis__->last_output > 2) {
-                snprintf(buf, MAX_INFO_LEN, "read: %llu\n"
-                                "read_bytes: %llu\n"
-                                "write: %llu\n"
-                                "write_bytes: %llu\n"
-                                "read_ps:%u\n"
-                                "read_bytes_ps:%u\n"
-                                "write_ps:%u\n"
-                                "write_bytes_ps:%u\n"
-                                "time:%u\n",
-                                (LLU)__io_analysis__->read_count,
-                                (LLU)__io_analysis__->read_bytes,
-                                (LLU)__io_analysis__->write_count,
-                                (LLU)__io_analysis__->write_bytes,
-                                readps,
-                                readbwps,
-                                writeps,
-                                writebwps,
-                                (int)now);
+                snprintf(buf, MAX_INFO_LEN,
+                         "read: %llu\n"
+                         "read_bytes: %llu\n"
+                         "write: %llu\n"
+                         "write_bytes: %llu\n"
+                         "read_ps:%u\n"
+                         "read_bytes_ps:%u\n"
+                         "write_ps:%u\n"
+                         "write_bytes_ps:%u\n"
+                         "latency:%ju\n",
+                         (LLU)__io_analysis__->read_count,
+                         (LLU)__io_analysis__->read_bytes,
+                         (LLU)__io_analysis__->write_count,
+                         (LLU)__io_analysis__->write_bytes,
+                         readps,
+                         readbwps,
+                         writeps,
+                         writebwps,
+                         core_latency_get());
                 __io_analysis__->last_output = now;
         }
 
@@ -113,22 +115,26 @@ int io_analysis(analysis_op_t op, int count)
         if (ret)
                 GOTO(err_ret, ret);
 
-        if (op == ANALYSIS_READ) {
+        if (op == ANALYSIS_IO_READ) {
                 __io_analysis__->read_count++;
                 __io_analysis__->read_bytes += count;
-        } else if (op == ANALYSIS_WRITE) {
+        } else if (op == ANALYSIS_IO_WRITE) {
                 __io_analysis__->write_count++;
                 __io_analysis__->write_bytes += count;
+        } else if (op == ANALYSIS_OP_READ) {
+                __io_analysis__->write_count++;
+        } else if (op == ANALYSIS_OP_WRITE) {
+                __io_analysis__->read_count++;
         } else {
                 YASSERT(0);
         }
 
         if (__io_analysis__->last == 0) {
                 __io_analysis__->cur = 0;
-                if (op == ANALYSIS_READ) {
+                if (op == ANALYSIS_IO_READ || op == ANALYSIS_OP_READ ) {
                         __io_analysis__->readps[0] = 1;
                         __io_analysis__->readbwps[0] = count;
-                } else {
+                } else if (op == ANALYSIS_IO_WRITE || op == ANALYSIS_OP_WRITE) {
                         __io_analysis__->writeps[0] = 1;
                         __io_analysis__->writebwps[0] = count;
                 }
@@ -145,19 +151,19 @@ int io_analysis(analysis_op_t op, int count)
 
                 YASSERT(next >= 0 && next < ANALY_AVG_UPDATE_COUNT);
                 __io_analysis__->cur = next;
-                if (op == ANALYSIS_READ) {
+                if (op == ANALYSIS_IO_READ || op == ANALYSIS_OP_READ ) {
                         __io_analysis__->readps[next] = 1;
                         __io_analysis__->readbwps[next] = count;
-                } else {
+                } else if (op == ANALYSIS_IO_WRITE || op == ANALYSIS_OP_WRITE) {
                         __io_analysis__->writeps[next] = 1;
                         __io_analysis__->writebwps[next] = count;
                 }
                 __io_analysis__->last = now;
         } else {
-                if (op == ANALYSIS_READ) {
+                if (op == ANALYSIS_IO_READ || op == ANALYSIS_OP_READ ) {
                         __io_analysis__->readps[__io_analysis__->cur] += 1;
                         __io_analysis__->readbwps[__io_analysis__->cur] += count;
-                } else {
+                } else if (op == ANALYSIS_IO_WRITE || op == ANALYSIS_OP_WRITE) {
                         __io_analysis__->writeps[__io_analysis__->cur] += 1;
                         __io_analysis__->writebwps[__io_analysis__->cur] += count;
                 }

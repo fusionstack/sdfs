@@ -28,8 +28,6 @@ typedef struct {
 
 #pragma pack()
 
-extern jobtracker_t *jobtracker;
-
 int sunrpc1_reply_prep(job_t *job, xdr_ret_t xdr_ret, void *buf, int state)
 {
         int ret;

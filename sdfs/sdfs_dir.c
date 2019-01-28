@@ -33,6 +33,7 @@
 #include "xattr.h"
 #include "mond_rpc.h"
 #include "schedule.h"
+#include "io_analysis.h"
 #include "dbg.h"
 
 int sdfs_mkdir(const fileid_t *parent, const char *name, const ec_t *ec,
@@ -41,6 +42,8 @@ int sdfs_mkdir(const fileid_t *parent, const char *name, const ec_t *ec,
         int ret, retry = 0;
         setattr_t setattr;
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
+        
         setattr_init(&setattr, mode, -1, ec, uid, gid, -1);
 #if 1
         setattr_update_time(&setattr,
@@ -126,6 +129,8 @@ int sdfs_mkvol(const char *name, const ec_t *ec, mode_t mode, fileid_t *_fileid)
         setattr_t setattr;
         fileid_t fileid;
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
+        
         setattr_init(&setattr, mode, -1, ec, geteuid(), getgid(), -1);
 #if 1
         setattr_update_time(&setattr,
@@ -155,6 +160,8 @@ err_ret:
 int sdfs_lookupvol(const char *name, fileid_t *fileid)
 {
         int ret;
+
+        io_analysis(ANALYSIS_OP_READ, 0);
 
         ret = md_lookupvol(name, fileid);
         if (ret)
@@ -421,6 +428,8 @@ int sdfs_rmdir(const fileid_t *parent, const char *name)
 {
         int ret, retry = 0;
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
+        
         if (parent->type == ftype_root) {
                 return md_rmvol(name);
         }
@@ -486,6 +495,8 @@ int sdfs_lookup(const fileid_t *parent, const char *name, fileid_t *fileid)
 {
         int ret, retry = 0;
 
+        io_analysis(ANALYSIS_OP_READ, 0);
+        
 retry:
         if (parent->type == ftype_root) {
                 ret = md_lookupvol(name, fileid);
@@ -509,6 +520,7 @@ int sdfs_statvfs(const fileid_t *fileid, struct statvfs *vfs)
 {
         int ret, retry = 0;
 
+        io_analysis(ANALYSIS_OP_READ, 0);
 retry:
         ret = mond_rpc_statvfs(net_getnid(), fileid, vfs);
         if (ret) {
@@ -529,6 +541,7 @@ int sdfs_symlink(const fileid_t *parent, const char *link_name,
 {
         int ret, retry = 0;
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
 retry:
         ret = md_symlink(parent, link_name, link_target, mode, uid, gid);
         if (ret) {
@@ -548,6 +561,7 @@ int sdfs_link2node(const fileid_t *old, const fileid_t *parent, const char *name
 {
         int ret, retry = 0;
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
 retry:
         ret = md_link2node(old, parent, name);
         if (ret) {
@@ -568,6 +582,8 @@ int sdfs_readlink(const fileid_t *fileid, char *buf, uint32_t *buflen)
         int ret, len, retry = 0;
         char link_target[MAX_BUF_LEN];
 
+        io_analysis(ANALYSIS_OP_READ, 0);
+        
 retry:
         ret = md_readlink(fileid, link_target);
         if (ret) {
@@ -595,6 +611,7 @@ int sdfs_unlink(const fileid_t *parent, const char *name)
         fileinfo_t *md;
         char buf[MAX_BUF_LEN];
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
 #if ENABLE_WORM
         fileid_t fileid;
         worm_status_t worm_status;
@@ -644,6 +661,7 @@ int sdfs_create(const fileid_t *parent, const char *name,
         int ret, retry = 0;
         setattr_t setattr;
 
+        io_analysis(ANALYSIS_OP_WRITE, 0);
         setattr_init(&setattr, mode, -1, NULL, uid, gid, -1);
 #if 1
         setattr_update_time(&setattr,
@@ -746,7 +764,7 @@ int sdfs_opendir(const dirid_t *dirid, dirhandler_t **_dirhandler)
         int ret;
         struct stat stbuf;
         dirhandler_t *dirhandler;
-
+        
         if (dirid->type != ftype_root) {
                 ret = sdfs_getattr(dirid, &stbuf);
                 if (ret)
@@ -877,6 +895,8 @@ long sdfs_telldir(dirhandler_t *dirhandler)
         long off;
         static_assert(sizeof(diroff_t) == sizeof(off), "diroff");
 
+        io_analysis(ANALYSIS_OP_READ, 0);
+        
         DINFO("telldir "CHKID_FORMAT"\n", CHKID_ARG(&dirhandler->dirid));
         
         memcpy(&off, &dirhandler->diroff, sizeof(dirhandler->diroff));
@@ -888,6 +908,8 @@ void sdfs_rewinddir(dirhandler_t *dirhandler)
 {
 
         DINFO("rewinddir "CHKID_FORMAT"\n", CHKID_ARG(&dirhandler->dirid));
+
+        io_analysis(ANALYSIS_OP_READ, 0);
         
         if (dirhandler->dirlist) {
                 yfree((void **)&dirhandler->dirlist);
@@ -901,6 +923,8 @@ void sdfs_rewinddir(dirhandler_t *dirhandler)
 void sdfs_seekdir(dirhandler_t *dirhandler, long loc)
 {
         DINFO("seekdir "CHKID_FORMAT"\n", CHKID_ARG(&dirhandler->dirid));
+
+        io_analysis(ANALYSIS_OP_READ, 0);
         
         if (dirhandler->dirlist) {
                 yfree((void **)&dirhandler->dirlist);

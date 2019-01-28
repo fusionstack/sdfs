@@ -497,7 +497,6 @@ err_ret:
 #if 0
 
 /* write verifier */
-extern jobtracker_t *jobtracker;
 extern int grace_period;
 
 int nlm_job2ip(job_t *job, char *host)

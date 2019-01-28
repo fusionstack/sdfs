@@ -33,6 +33,7 @@
 #include "schedule.h"
 #include "redis.h"
 #include "core.h"
+#include "io_analysis.h"
 #include "net_global.h"
 #include "../../cds/diskio.h"
 #include "bh.h"
@@ -84,9 +85,6 @@ io_analy_t io_analysis;
 #define CDS_LEVELDB_THREAD_NUM 4
 
 extern int __is_cds_cache;
-
-jobtracker_t *replica_jobtracker;
-extern jobtracker_t *objs_jobtracker;
 
 #if 0
 /* handler for cds state. */
@@ -487,13 +485,9 @@ int cds_run(void *args)
 
         DINFO("cds %s avail %lluGB total %lluGB, max object %llu, tier %u\n", home,
               ((LLU)fsbuf.f_bavail * fsbuf.f_bsize) / (1024 * 1024 * 1024LL),
-              ((LLU)fsbuf.f_blocks * fsbuf.f_bsize) / (1024 * 1024 * 1024LL), (LLU)max_object, cds_info.tier);
+              ((LLU)fsbuf.f_blocks * fsbuf.f_bsize) / (1024 * 1024 * 1024LL),
+              (LLU)max_object, cds_info.tier);
 
-
-        ret = jobtracker_create(&replica_jobtracker, 5, "replica");
-        if (ret)
-                GOTO(err_ret, ret);
-        
         ret = path_validate(home, 1, 1);
         if (ret)
                 GOTO(err_ret, ret);
@@ -505,9 +499,12 @@ int cds_run(void *args)
         }
 
         cds_info.running = 1;
-
         __fence_test_need__ = 1;
 
+        ret = io_analysis_init("cds", diskno);
+        if (ret)
+                GOTO(err_ret, ret);
+        
         ret = cds_init(home, NULL, servicenum, diskno, max_object);
         if (ret)
                 GOTO(err_ret, ret);
