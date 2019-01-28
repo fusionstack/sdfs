@@ -248,7 +248,7 @@ int chunk_cleanup(void *arg)
 
         (void) arg;
 
-        DINFO("get cleanup msg\n");
+        DBUG("get cleanup msg\n");
 
         while (1) {
                 count = 100;

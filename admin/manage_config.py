@@ -125,7 +125,7 @@ def get_max_export_id(content):
 
 def build_common_param(export_path):
     keys_list = ['Path', 'Pseudo',  'Access_Type', 'Squash', 'Disable_Acl', 'Protocols']
-    values_list = [export_path, export_path, 'RO', 'No_Root_Squash', 'True', '3']
+    values_list = [export_path, export_path, 'RO', 'No_Root_Squash', 'True', '4']
 
     pairs = zip(keys_list, values_list)
 
@@ -142,8 +142,10 @@ def build_fsal_block(export_id):
     return export_block
 
 def build_fsal_param():
-    keys_list = ['Name', 'volpath']
-    values_list = ['USS', '/home']
+    #keys_list = ['Name', 'volpath']
+    #values_list = ['USS', '/home']
+    keys_list = ['Name']
+    values_list = ['USS']
 
     fsal_pairs = zip(keys_list, values_list)
 
