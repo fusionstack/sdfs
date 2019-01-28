@@ -461,7 +461,6 @@ class Redisd():
         self.lock = etcd.Lock(self.etcd, name)
         self.lock.acquire(blocking=False, lock_ttl=10)
         self.running = True
-
  
         def __lock__(args):
             ctx = args
@@ -469,15 +468,17 @@ class Redisd():
                 try:
                     ret = ctx.lock.acquire(blocking=False,  lock_ttl=10)
                     if (ret):
-                        dmsg("%s run as master %s" % (self.workdir, name))
+                        #dmsg("%s run as master %s" % (self.workdir, name))
+                        pass
                     else:
-                        dmsg("%s run as slave %s" % (self.workdir, name))
+                        #dmsg("%s run as slave %s" % (self.workdir, name))
+                        pass
 
                 except etcd.EtcdException:
                     derror(self.workdir + " etcd error fail, acquire:" + str(self.lock.is_acquired))
                     #print(str(etcd.EtcdException))
                     
-                time.sleep(3)
+                time.sleep(10)
 
             ctx.lock.release()
 

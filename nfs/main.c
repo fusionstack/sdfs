@@ -386,8 +386,8 @@ int main(int argc, char *argv[])
         if (ret)
                 GOTO(err_ret, ret);
 
-        if (strcmp(gloconf.nfs, "native")) {
-                DWARN("native nfs disabled, use %s replace\n", gloconf.nfs);
+        if (strcmp(gloconf.nfs_srv, "native")) {
+                DWARN("native nfs disabled, use %s replace\n", gloconf.nfs_srv);
                 exit(1);
         }
         

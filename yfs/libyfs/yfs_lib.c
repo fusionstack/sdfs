@@ -560,7 +560,7 @@ int init_stage1()
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = jobtracker_create(&jobtracker, gloconf.yfs_jobtracker, "default");
+        ret = jobtracker_create(&jobtracker, 1, "default");
         if (ret)
                 GOTO(err_ret, ret);
 

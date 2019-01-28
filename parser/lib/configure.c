@@ -143,7 +143,7 @@ int conf_init(const char *conf_path)
         gloconf.rpc_timeout = 10;
         gloconf.hb_timeout = 5;
         gloconf.hb_retry = 3;
-        strcpy(gloconf.nfs, "native");
+        strcpy(gloconf.nfs_srv, "native");
         gloconf.lease_timeout = 20;
         mdsconf.redis_sharding = 3;
         mdsconf.redis_replica = 2;
@@ -160,7 +160,6 @@ int conf_init(const char *conf_path)
         cdsconf.ec_lock = 0;
         cdsconf.io_sync = 1;
         cdsconf.lvm_qos_refresh = 1;
-        cdsconf.ha_mode = 0;
         cdsconf.queue_depth = 127;
         gloconf.network = 0;
         gloconf.solomode = 0;
@@ -191,19 +190,12 @@ int conf_init(const char *conf_path)
         netconf.count = 0;
         gloconf.sdevents_threads = 4;
         gloconf.jobdock_size = 8192;
-        gloconf.yfs_jobtracker = 8;
-        gloconf.nfs_jobtracker = 2;
-        gloconf.objs_jobtracker = 2;
 
         gloconf.chunk_entry_max = 1024*102; //默认40M
 
         gloconf.disk_mt = 0; //默认 不开启
         gloconf.disk_mt_ssd = 128; //mt 线程数
         gloconf.disk_mt_hdd = 2;
-
-        gloconf.preload_chk = 1; //默认 开启
-
-        gloconf.lookup_cache = 0; //默认 关闭
 
         gloconf.disk_worker = 1;
 
@@ -544,8 +536,6 @@ int set_value(const char* key, const char* value, int type)
          */
         else if (keyis("unlink_async", key))
                 cdsconf.unlink_async = _value;
-        else if (keyis("ha_mode", key))
-                cdsconf.ha_mode = _value;
         else if (keyis("queue_depth", key))
                 cdsconf.queue_depth = _value;
         else if (keyis("cache_size", key))
@@ -602,8 +592,8 @@ int set_value(const char* key, const char* value, int type)
                 gloconf.mask = ntohl(inet_addr(value));
         else if (keyis("cluster_name", key))
                 strncpy(gloconf.cluster_name, value, MAXSIZE);
-        else if (keyis("nfs", key))
-                strncpy(gloconf.nfs, value, MAXSIZE);
+        else if (keyis("nfs_srv", key))
+                strncpy(gloconf.nfs_srv, value, MAXSIZE);
         else if (keyis("net_crc", key))
                 gloconf.net_crc  = _value;
         else if (keyis("dir_refresh", key))
@@ -668,12 +658,6 @@ int set_value(const char* key, const char* value, int type)
                 gloconf.sdevents_threads = (_value > SDEVENTS_THREADS_MAX ? SDEVENTS_THREADS_MAX : _value);
         else if (keyis("jobdock_size", key))
                 gloconf.jobdock_size = _value;
-        else if (keyis("yfs_jobtracker", key))
-                gloconf.yfs_jobtracker = _value;
-        else if (keyis("nfs_jobtracker", key))
-                gloconf.nfs_jobtracker = _value;
-        else if (keyis("objs_jobtracker", key))
-                gloconf.objs_jobtracker = _value;
         else if (keyis("chunk_entry_max", key))
                 gloconf.chunk_entry_max = _value;
         else if (keyis("disk_mt", key))
@@ -682,10 +666,6 @@ int set_value(const char* key, const char* value, int type)
                 gloconf.disk_mt_hdd = _value;
         else if (keyis("disk_mt_ssd", key))
                 gloconf.disk_mt_ssd = _value;
-        else if (keyis("preload_chk", key))
-                gloconf.preload_chk = _value;
-        else if (keyis("lookup_cache", key))
-                gloconf.lookup_cache = _value;
         else if (keyis("disk_worker", key))
                 gloconf.disk_worker = (_value > DISK_WORKER_MAX? DISK_WORKER_MAX: _value);
         else if (keyis("hb", key))

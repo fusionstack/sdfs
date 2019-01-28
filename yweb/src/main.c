@@ -471,7 +471,7 @@ int http_srv(int daemon, const char *port)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = io_analysis_init("ftp", 0);
+        ret = io_analysis_init("http", 0);
         if (ret)
                 GOTO(err_ret, ret);
         
