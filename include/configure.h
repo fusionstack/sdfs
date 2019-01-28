@@ -135,7 +135,6 @@ struct cdsconf_t
 {
         int disk_timeout;
         int unlink_async;
-        int ha_mode;
         int queue_depth;
         int prealloc_max;
         int ec_lock;

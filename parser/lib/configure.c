@@ -160,7 +160,6 @@ int conf_init(const char *conf_path)
         cdsconf.ec_lock = 0;
         cdsconf.io_sync = 1;
         cdsconf.lvm_qos_refresh = 1;
-        cdsconf.ha_mode = 0;
         cdsconf.queue_depth = 127;
         gloconf.network = 0;
         gloconf.solomode = 0;
@@ -537,8 +536,6 @@ int set_value(const char* key, const char* value, int type)
          */
         else if (keyis("unlink_async", key))
                 cdsconf.unlink_async = _value;
-        else if (keyis("ha_mode", key))
-                cdsconf.ha_mode = _value;
         else if (keyis("queue_depth", key))
                 cdsconf.queue_depth = _value;
         else if (keyis("cache_size", key))
