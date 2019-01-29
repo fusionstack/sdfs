@@ -85,6 +85,8 @@ class Config:
         self.uss_vip = _join(self.home, "app/admin/vip.py")
         self.uss_redisd = _join(self.home, "app/admin/redisd.py")
 
+        self.sdfs_mon = _join(self.home, "app/bin/sdfs.mon")
+        
         self.max_num = MAX_NUM
         self.cluster_conf = os.path.join(self.home, 'etc/cluster.conf')
         self.uss_conf = os.path.join(self.home, 'etc/sdfs.conf')

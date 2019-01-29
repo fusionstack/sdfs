@@ -188,9 +188,9 @@ class IOTopUI(object):
             poll.register(sys.stdin.fileno(), select.POLLIN | select.POLLPRI)
         while self.options.iterations is None or \
               iterations < self.options.iterations:
-            total, current = self.process_list.refresh_processes()
-            self.refresh_display(iterations == 0, total, current,
-                                 self.process_list.duration)
+            self.process_list.refresh_processes()
+                        
+            self.refresh_display(iterations == 0, self.process_list.duration)
             if self.options.iterations is not None:
                 iterations += 1
                 if iterations >= self.options.iterations:
@@ -421,7 +421,10 @@ class IOTopUI(object):
         action = key_bindings.get(key, lambda: None)
         action()
 
-    def get_data(self):
+    def get_data(self, t, sort):
+        return self.process_list.get_data(t, sort)
+        
+        """
         def format(p):
             stats = format_stats(self.options, p, self.process_list.duration)
             io_delay, swapin_delay, read_bytes, write_bytes = stats
@@ -459,14 +462,18 @@ class IOTopUI(object):
         processes.sort(key=lambda p: key(p, stats_lambda(p)),
                        reverse=self.sorting_reverse)
         return list(map(format, processes))
+        """
 
-    def refresh_display(self, first_time, total, current, duration):
+    def refresh_display(self, first_time, duration):
+        rb, rc, wb, wc, ltc =self.process_list.update_total_io()
+
         summary = [
-            'read bw:%s\t|write bw:%s\t|read op:%s\t|write op:%s' % (
-                format_bandwidth(self.options, total[0], duration).rjust(14),
-                format_bandwidth(self.options, total[1], duration).rjust(14),
-                format_bandwidth(self.options, current[0], duration).rjust(14),
-                format_bandwidth(self.options, current[1], duration).rjust(14))
+            'read bw:%s\t|write bw:%s\t|read op:%s\t|write op:%s\t|latency max:%sms' % (
+                format_bandwidth(self.options, str(rb), duration).rjust(14),
+                format_bandwidth(self.options, str(wb), duration).rjust(14),
+                format_bandwidth(self.options, str(rc), duration).rjust(14),
+                format_bandwidth(self.options, str(wc), duration).rjust(14),
+                str(ltc))
         ]
 
         """
@@ -487,7 +494,7 @@ class IOTopUI(object):
             pid += 'TID'
         titles = [pid, '  PRIO', '  USER', '     DISK READ', '  DISK WRITE',
                   '  SWAPIN', '      IO', '    COMMAND']
-        lines = self.get_data()
+        lines = self.get_data(['cds'], 'latency')
         if self.options.time:
             titles = ['    TIME'] + titles
             current_time = time.strftime('%H:%M:%S ')

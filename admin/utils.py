@@ -73,20 +73,20 @@ class Exp(Exception):
             exp_info += ' stdout:' + self.out
         return repr(exp_info)
 
-def _str2dict(s):
+def _str2dict(s, row='\n', col=':'):
     if len(s) == 0:
         return {}
 
-    if (s[-1] == '\n'):
+    if (s[-1] == row):
         s = s[:-1]
 
-    a = s.split('\n')
+    a = s.split(row)
     d = {}
     for i in a:
-        if ':' not in i:
+        if col not in i:
             continue
 
-        p = i.split(':')
+        p = i.split(col)
         if (d.get(p[0])):
             raise Exp(errno.EEXIST, "dup key exist")
         try:
