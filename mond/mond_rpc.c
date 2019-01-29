@@ -36,6 +36,8 @@ typedef enum {
         MOND_NEWDISK,
         MOND_DISKJOIN,
         MOND_STATVFS,
+        MOND_SET,
+        MOND_GET,
         MOND_MAX,
 } mond_op_t;
 
@@ -644,6 +646,9 @@ int mond_rpc_init()
         __request_set_handler(MOND_NEWDISK, __mond_srv_newdisk, "mond_srv_newdisk");
         __request_set_handler(MOND_DISKJOIN, __mond_srv_diskjoin, "mond_srv_diskjoin");
         __request_set_handler(MOND_STATVFS, __mond_srv_statvfs, "mond_srv_statvfs");
+        //__request_set_handler(MOND_GET, __mond_srv_get, "mond_srv_get");
+        //__request_set_handler(MOND_SET, __mond_srv_set, "mond_srv_set");
+        
         
         if (ng.daemon) {
                 rpc_request_register(MSG_MOND, __request_handler, NULL);
