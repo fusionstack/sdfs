@@ -465,15 +465,16 @@ class IOTopUI(object):
         """
 
     def refresh_display(self, first_time, duration):
-        rb, rc, wb, wc, ltc =self.process_list.update_total_io()
+        t = self.process_list.io_fs
+        print (t)
 
         summary = [
             'read bw:%s\t|write bw:%s\t|read op:%s\t|write op:%s\t|latency max:%sms' % (
-                format_bandwidth(self.options, str(rb), duration).rjust(14),
-                format_bandwidth(self.options, str(wb), duration).rjust(14),
-                format_bandwidth(self.options, str(rc), duration).rjust(14),
-                format_bandwidth(self.options, str(wc), duration).rjust(14),
-                str(ltc))
+                format_bandwidth(self.options, str(t[0]), duration).rjust(14),
+                format_bandwidth(self.options, str(t[1]), duration).rjust(14),
+                format_bandwidth(self.options, str(t[2]), duration).rjust(14),
+                format_bandwidth(self.options, str(t[3]), duration).rjust(14),
+                str(t[4]))
         ]
 
         """

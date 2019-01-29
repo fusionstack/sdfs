@@ -394,16 +394,28 @@ class ProcessList(DumpableObject):
         # {pid: ProcessInfo}
         self.processes = {}
         self.instence = {}
+        self.rawdata = {}
         self.config = Config()
         self.taskstats_connection = taskstats_connection
         self.options = options
         self.timestamp = time.monotonic()
+
+        self.total_fs = [0, 0, 0, 0, 0]
+        self.total_cds = [0, 0, 0, 0, 0]
         #self.vmstat = vmstat.VmStat()
 
         # A first time as we are interested in the delta
         #self.update_process_counts()
 
+        
     def get_process(self, t):
+        def get_diff(new, old):
+            diff = {}
+            for k, v in new.items():
+                diff[k] = v - old
+
+            return diff
+        
         cmd = "%s --type %s" % (self.config.sdfs_mon, t)
         try:
             out, err = exec_shell(cmd, p=False, need_return=True)
@@ -413,14 +425,32 @@ class ProcessList(DumpableObject):
         d = _str2dict(out, col=' ')
         #print (d)
 
-        d1 = {}
+        newdata = {}
+        diff = {}
         for k, v in d.items():
             #print (k, v)
-            d1[k] = _str2dict(v, row=';', col=':')
+            
+            tmp = _str2dict(v, row=';', col=':')
+            for k1, v1 in tmp.items():
+                tmp[k1] = int(v1)
+        
+            newdata[k] = tmp
 
-        #print(d1)
+            try:
+                olddata = self.rawdata[t][k]
+                diff[k] = get_diff(tmp, olddata)
+                print ("got old--------------")
+            except:#not exists
+                diff[k] = tmp
+                print ("no old---------------%s %s---" % (t, k))
+                print (self.rawdata)
+                print ("no old---------------%s %s---" % (t, k))
 
-        self.instence[t] = d1
+
+        self.rawdata[t] = newdata
+        self.instence[t] = diff
+        print (t, newdata)
+        print (t, diff)
 
     def list_tgids(self):
         if self.options.pids:
@@ -455,44 +485,43 @@ class ProcessList(DumpableObject):
 
         return tids
 
-    def __update_total_io(self, d, rb, wb, rc, wc, ltc):
+    def __update_total_io(self, d, t):
         for k, v in d.items():
-            rb += int(v['read_bytes'])
-            wb += int(v['write_bytes'])
-            rc += int(v['read_count'])
-            wc += int(v['write_bytes'])
-            ltc1 = int(v['latency'])
-            if (ltc1 > ltc):
-                ltc = ltc1
+            t[0] += int(v['read_bytes'])
+            t[1] += int(v['write_bytes'])
+            t[2] += int(v['read_count'])
+            t[3] += int(v['write_count'])
+            ltc = int(v['latency'])
+            if (ltc > t[4]):
+                t[4] = ltc
 
-        return rb, wb, rc, wc, ltc
-            
+        return t
     
-    def update_total_io(self):
-        lst = ['nfs', 'ganesha', 'cifs']
-
-        rb = 0
-        rc = 0
-        wb = 0
-        wc = 0
-        ltc = 0
+    def update_total_io(self, lst):
+        t = [0, 0, 0, 0, 0]
         for k in lst:
             try:
                 d = self.instence[k]
-                self.__update_total_io(d, rb, rc, wb, wc, ltc)
+                t = self.__update_total_io(d, t)
             except:
                 pass
 
-        return rb, wb, rc, wc, ltc
+        return t
+        """
+        return ([t[0] - last[0],
+                 t[1] - last[1],
+                 t[2] - last[2],
+                 t[3] - last[3],
+                 t[4] - last[4]], t)
+        """
     
-    def update_process_counts(self):
+    def refresh_data(self, lst):
         new_timestamp = time.monotonic()
         self.duration = new_timestamp - self.timestamp
         self.timestamp = new_timestamp
 
         total_read = total_write = 0
 
-        lst = ['cds', 'nfs', 'ganesha', 'cifs']
         for k in lst:
             self.get_process(k)
 
@@ -519,6 +548,8 @@ class ProcessList(DumpableObject):
         """
 
     def get_data(self, t, sort):
+        return []
+        
         lst = []
 
         d = {}
@@ -542,7 +573,12 @@ class ProcessList(DumpableObject):
                 thread.mark = True
         """
 
-        self.update_process_counts()
+        #self.refresh_data(['cds', 'nfs', 'ganesha', 'cifs'])
+        self.refresh_data(['nfs', 'ganesha', 'cifs'])
+        #self.io_cds, self.total_cds = self.update_total_io(self.total_cds, ["cds"])
+        #self.io_fs, self.total_fs = self.update_total_io(self.total_fs, ["nfs", "ganesha", "samba"])
+        #self.io_cds = self.update_total_io(["cds"])
+        self.io_fs = self.update_total_io(["nfs", "ganesha", "samba"])
 
     """
         return {"123456": "391.1309", "1929333" : "398977"}
