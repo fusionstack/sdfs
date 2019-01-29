@@ -422,54 +422,23 @@ class IOTopUI(object):
         action()
 
     def get_data(self, t, sort):
-        return self.process_list.get_data(t, sort)
-        
-        """
+        slist = self.process_list.get_data(t, sort)
+
         def format(p):
-            stats = format_stats(self.options, p, self.process_list.duration)
-            io_delay, swapin_delay, read_bytes, write_bytes = stats
-            if Stats.has_blkio_delay_total:
-                delay_stats = '%7s %7s ' % (swapin_delay, io_delay)
-            else:
-                delay_stats = ' ?unavailable?  '
-            pid_format = '%%%dd' % MAX_PID_WIDTH
-            line = (pid_format + ' %4s %-8s %11s %11s %s') % (
-                p.pid, p.get_ioprio(), p.get_user()[:8], read_bytes,
-                write_bytes, delay_stats)
-            cmdline = p.get_cmdline()
-            if not self.options.batch:
-                remaining_length = self.width - len(line)
-                if 2 < remaining_length < len(cmdline):
-                    len1 = (remaining_length - 1) // 2
-                    offset2 = -(remaining_length - len1 - 1)
-                    cmdline = cmdline[:len1] + '~' + cmdline[offset2:]
-            line += cmdline
-            if not self.options.batch:
-                line = line[:self.width]
+            line = "%10s\t%10s\t%10s\t%5s\t%5s\t%-30s" % (p[1],
+                                                          human_size(int(p[2])),
+                                                          human_size(int(p[3])),
+                                                          p[4], p[5], p[0])
             return line
 
-        def should_format(p):
-            return not self.options.only or \
-                   p.did_some_io(self.options.accumulated)
-
-        processes = list(filter(should_format,
-                                self.process_list.processes.values()))
-        key = IOTopUI.sorting_keys[self.sorting_key][0]
-        if self.options.accumulated:
-            stats_lambda = lambda p: p.stats_accum
-        else:
-            stats_lambda = lambda p: p.stats_delta
-        processes.sort(key=lambda p: key(p, stats_lambda(p)),
-                       reverse=self.sorting_reverse)
-        return list(map(format, processes))
-        """
-
+        return list(map(format, slist))
+        
     def refresh_display(self, first_time, duration):
         t = self.process_list.io_fs
-        print (t)
+        #print (t)
 
         summary = [
-            'read bw:%s\t|write bw:%s\t|read op:%s\t|write op:%s\t|latency max:%sms' % (
+            'READ BW:%s\t| WRITE BW:%s\t| READ OP:%s\t| WRITE OP:%s\t| LATENCY MAX:%sms' % (
                 format_bandwidth(self.options, str(t[0]), duration).rjust(14),
                 format_bandwidth(self.options, str(t[1]), duration).rjust(14),
                 format_bandwidth(self.options, str(t[2]), duration).rjust(14),
@@ -488,6 +457,7 @@ class IOTopUI(object):
         ]
         """
 
+        """
         pid = max(0, (MAX_PID_WIDTH - 3)) * ' '
         if self.options.processes:
             pid += 'PID'
@@ -495,12 +465,17 @@ class IOTopUI(object):
             pid += 'TID'
         titles = [pid, '  PRIO', '  USER', '     DISK READ', '  DISK WRITE',
                   '  SWAPIN', '      IO', '    COMMAND']
+        """
+        titles = ['   LATENCY', '         READ WB', '        WRITE WB', '    READ OP', ' WRITE OP', '   INSTENCE', '  xxxx', '  xxxx']
+
         lines = self.get_data(['cds'], 'latency')
+        """
         if self.options.time:
             titles = ['    TIME'] + titles
             current_time = time.strftime('%H:%M:%S ')
             lines = [current_time + l for l in lines]
             summary = [current_time + s for s in summary]
+        """
         if self.options.batch:
             if self.options.quiet <= 2:
                 for s in summary:
@@ -513,11 +488,13 @@ class IOTopUI(object):
         else:
             self.win.erase()
 
+            status_msg = None
+            """
             if Stats.has_blkio_delay_total:
-                status_msg = None
             else:
                 status_msg = ('CONFIG_TASK_DELAY_ACCT not enabled in kernel, '
                               'cannot determine SWAPIN and IO %')
+            """
 
             help_lines = []
             help_attrs = []

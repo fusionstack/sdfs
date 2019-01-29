@@ -125,9 +125,9 @@ int io_analysis(analysis_op_t op, int count)
                 __io_analysis__->write_count++;
                 __io_analysis__->write_bytes += count;
         } else if (op == ANALYSIS_OP_READ) {
-                __io_analysis__->write_count++;
-        } else if (op == ANALYSIS_OP_WRITE) {
                 __io_analysis__->read_count++;
+        } else if (op == ANALYSIS_OP_WRITE) {
+                __io_analysis__->write_count++;
         } else {
                 YASSERT(0);
         }

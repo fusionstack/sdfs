@@ -412,8 +412,10 @@ class ProcessList(DumpableObject):
         def get_diff(new, old):
             diff = {}
             for k, v in new.items():
-                diff[k] = v - old
+                diff[k] = v - old[k]
 
+            diff['latency'] = new['latency']
+                
             return diff
         
         cmd = "%s --type %s" % (self.config.sdfs_mon, t)
@@ -439,18 +441,18 @@ class ProcessList(DumpableObject):
             try:
                 olddata = self.rawdata[t][k]
                 diff[k] = get_diff(tmp, olddata)
-                print ("got old--------------")
+                #print ("got old--------------")
             except:#not exists
                 diff[k] = tmp
-                print ("no old---------------%s %s---" % (t, k))
-                print (self.rawdata)
-                print ("no old---------------%s %s---" % (t, k))
+                #print ("no old---------------%s %s---" % (t, k))
+                #print (self.rawdata)
+                #print ("no old---------------%s %s---" % (t, k))
 
 
         self.rawdata[t] = newdata
         self.instence[t] = diff
-        print (t, newdata)
-        print (t, diff)
+        #print (t, newdata)
+        #print (t, diff)
 
     def list_tgids(self):
         if self.options.pids:
@@ -548,23 +550,32 @@ class ProcessList(DumpableObject):
         """
 
     def get_data(self, t, sort):
-        return []
+        #return []
         
+        from operator import itemgetter, attrgetter
         lst = []
 
-        d = {}
         for i in t:
             try:
+                #{'latency': 0, 'write_bytes': 0, 'read_count': 0, 'read_bytes': 0, 'write_count': 0}
+                #print (i, self.instence[i])
                 for k, v in self.instence[i].items():
-                    d[k] = v
+                    #print (k, v['latency'], v['read_bytes'], v['write_bytes'], v['read_count'], v['write_count'])
+                    lst.append([k, v['latency'], v['read_bytes'], v['write_bytes'], v['read_count'], v['write_count']])
             except:
                 pass
 
-        for k, v in d.items():
-            lst.append(k + ' ' + str(v))
-
-        return lst
+        #print(lst)
+        newlist = []
+        slist = sorted(lst, key=itemgetter(1), reverse=True)
+        return slist
         
+        for i in slist:
+            newlist.append(str(i))
+
+        #print(newlist)
+        return newlist
+            
     def refresh_processes(self):
 
         """
@@ -573,11 +584,11 @@ class ProcessList(DumpableObject):
                 thread.mark = True
         """
 
-        #self.refresh_data(['cds', 'nfs', 'ganesha', 'cifs'])
-        self.refresh_data(['nfs', 'ganesha', 'cifs'])
+        self.refresh_data(['cds', 'nfs', 'ganesha', 'cifs'])
+        #self.refresh_data(['nfs', 'ganesha', 'cifs'])
         #self.io_cds, self.total_cds = self.update_total_io(self.total_cds, ["cds"])
         #self.io_fs, self.total_fs = self.update_total_io(self.total_fs, ["nfs", "ganesha", "samba"])
-        #self.io_cds = self.update_total_io(["cds"])
+        self.io_cds = self.update_total_io(["cds"])
         self.io_fs = self.update_total_io(["nfs", "ganesha", "samba"])
 
     """
