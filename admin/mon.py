@@ -462,6 +462,15 @@ class IOTopUI(object):
 
     def refresh_display(self, first_time, total, current, duration):
         summary = [
+            'read bw:%s\t|write bw:%s\t|read op:%s\t|write op:%s' % (
+                format_bandwidth(self.options, total[0], duration).rjust(14),
+                format_bandwidth(self.options, total[1], duration).rjust(14),
+                format_bandwidth(self.options, current[0], duration).rjust(14),
+                format_bandwidth(self.options, current[1], duration).rjust(14))
+        ]
+
+        """
+        summary = [
                 'Total DISK READ:   %s | Total DISK WRITE:   %s' % (
                 format_bandwidth(self.options, total[0], duration).rjust(14),
                 format_bandwidth(self.options, total[1], duration).rjust(14)),
@@ -469,6 +478,7 @@ class IOTopUI(object):
                 format_bandwidth(self.options, current[0], duration).rjust(14),
                 format_bandwidth(self.options, current[1], duration).rjust(14))
         ]
+        """
 
         pid = max(0, (MAX_PID_WIDTH - 3)) * ' '
         if self.options.processes:

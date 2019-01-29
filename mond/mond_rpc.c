@@ -23,6 +23,7 @@
 #include "network.h"
 #include "diskpool.h"
 #include "nodepool.h"
+#include "mond_kv.h"
 #include "mem_cache.h"
 #include "schedule.h"
 #include "dbg.h"
@@ -633,12 +634,184 @@ err_ret:
         return ret;
 }
 
+static int __mond_srv_set(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+{
+        int ret;
+        msg_t *req;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t buflen;
+        const nid_t *nid;
+        const char *path;
+        const char *value;
+        uint32_t valuelen;
+
+        req = (void *)buf;
+        mbuffer_get(_buf, req, sizeof(*req));
+        buflen = req->buflen;
+        ret = mbuffer_popmsg(_buf, req, buflen + sizeof(*req));
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        _opaque_decode(req->buf, buflen,
+                       &nid, NULL,
+                       &path, NULL,
+                       &value, &valuelen,
+                       NULL);
+
+        DINFO("set %s, valuelen %u\n", path, valuelen);
+
+        ret = mond_kv_set(path, value, valuelen);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        rpc_reply(sockid, msgid, NULL, 0);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+
+int mond_rpc_set(const nid_t *nid, const char *path, const char *value, uint32_t valuelen)
+{
+        int ret;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t count;
+        msg_t *req;
+
+        ret = network_connect_mond(0);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        ANALYSIS_BEGIN(0);
+
+        req = (void *)buf;
+        req->op = MOND_SET;
+        _opaque_encode(&req->buf, &count,
+                       nid, sizeof(*nid),
+                       path, strlen(path) + 1,
+                       value, valuelen,
+                       NULL);
+
+        req->buflen = count;
+
+        ret = rpc_request_wait("mond_rpc_set", net_getadmin(),
+                               req, sizeof(*req) + count, NULL, NULL,
+                               MSG_MOND, 0, _get_timeout());
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+
+#if 1
+static int __mond_srv_get(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+{
+        int ret;
+        msg_t *req;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t buflen;
+        const nid_t *nid;
+        const char *path;
+        const uint64_t *offset;
+        char *value;
+        uint32_t valuelen;
+
+        req = (void *)buf;
+        mbuffer_get(_buf, req, sizeof(*req));
+        buflen = req->buflen;
+        ret = mbuffer_popmsg(_buf, req, buflen + sizeof(*req));
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        _opaque_decode(req->buf, buflen,
+                       &nid, NULL,
+                       &path, NULL,
+                       &offset, NULL,
+                       NULL);
+
+        DINFO("get %s\n", path);
+
+        ret = ymalloc((void **)&value, MON_ENTRY_MAX);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        ret = mond_kv_get(path, *offset, value, &valuelen);
+        if (unlikely(ret))
+                GOTO(err_free, ret);
+        
+        rpc_reply(sockid, msgid, value, valuelen);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_free:
+        yfree((void **)&value);
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+
+int mond_rpc_get(const nid_t *nid, const char *path, uint64_t offset, void *value, int *valuelen)
+{
+        int ret;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t count;
+        msg_t *req;
+
+        ret = network_connect_mond(0);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        ANALYSIS_BEGIN(0);
+
+        req = (void *)buf;
+        req->op = MOND_GET;
+        _opaque_encode(&req->buf, &count,
+                       nid, sizeof(*nid),
+                       path, strlen(path) + 1,
+                       &offset, sizeof(offset),
+                       NULL);
+
+        req->buflen = count;
+
+        ret = rpc_request_wait("mond_rpc_get", net_getadmin(),
+                               req, sizeof(*req) + count, value, valuelen,
+                               MSG_MOND, 0, _get_timeout());
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+#endif
 
 
 int mond_rpc_init()
 {
+        int ret;
+        
         DINFO("mond rpc init\n");
 
+        ret = mond_kv_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
         //__request_set_handler(MOND_READ, __mond_srv_read, "mond_srv_read");
         __request_set_handler(MOND_NULL, __mond_srv_null, "mond_srv_null");
         __request_set_handler(MOND_GETSTAT, __mond_srv_getstat, "mond_srv_getstat");
@@ -646,9 +819,8 @@ int mond_rpc_init()
         __request_set_handler(MOND_NEWDISK, __mond_srv_newdisk, "mond_srv_newdisk");
         __request_set_handler(MOND_DISKJOIN, __mond_srv_diskjoin, "mond_srv_diskjoin");
         __request_set_handler(MOND_STATVFS, __mond_srv_statvfs, "mond_srv_statvfs");
-        //__request_set_handler(MOND_GET, __mond_srv_get, "mond_srv_get");
-        //__request_set_handler(MOND_SET, __mond_srv_set, "mond_srv_set");
-        
+        __request_set_handler(MOND_GET, __mond_srv_get, "mond_srv_get");
+        __request_set_handler(MOND_SET, __mond_srv_set, "mond_srv_set");
         
         if (ng.daemon) {
                 rpc_request_register(MSG_MOND, __request_handler, NULL);
@@ -657,6 +829,8 @@ int mond_rpc_init()
                 corerpc_register(MSG_MOND, __request_handler, NULL);
 #endif
         }
-
+        
         return 0;
+err_ret:
+        return ret;
 }
