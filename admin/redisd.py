@@ -478,7 +478,7 @@ class Redisd():
                     derror(self.workdir + " etcd error fail, acquire:" + str(self.lock.is_acquired))
                     #print(str(etcd.EtcdException))
                     
-                time.sleep(10)
+                time.sleep(3)
 
             ctx.lock.release()
 
@@ -665,7 +665,8 @@ class Redisd():
         self.health_thread.start()
             
     def __run_master(self):
-        dmsg("run as master")
+        #dwarn("%s master %s fail\n" % (self.workdir, master))
+        dmsg("%s %s %s run as master" % (self.workdir, self.hostname, self.port))
         cmd = "redis-cli -h %s -p %s SLAVEOF NO ONE" % (self.hostname, self.port)
         os.system(cmd)
         self.last_check = time.time()
@@ -839,14 +840,14 @@ class RedisDisk(Daemon):
 
             try:
                 dmsg("etcd watch " + key)
-                res = self.etcd.watch(key, index)
+                res = self.etcd.watch(key, index, timeout=1000)
             except etcd.EtcdWatchTimedOut:
-                derror("watch timeout");
+                #dmsg("watch timeout");
                 continue
             except etcd.EtcdEventIndexCleared:
                 derror("watch outdated");
                 res = self.etcd.read(key)
-
+                
             dmsg("watch %s return, value %s, idx %u:%u" % (key, res.value, res.etcd_index, index))
             if (res.value == "0"):
                 index = res.etcd_index + 1
@@ -864,7 +865,7 @@ class RedisDisk(Daemon):
             if not self.running:
                 break
 
-            time.sleep(3)
+            #time.sleep(3)
             self.__check_volume()
             self.__check_remove()
 

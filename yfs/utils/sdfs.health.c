@@ -569,7 +569,7 @@ static int __redis_scan(const char *volume, int sharding, rept_t *rept)
         }
 
         int port = atoi(list[1]);
-        ret = redis_connect(&conn, list[0], &port);
+        ret = redis_connect(&conn, list[0], &port, key);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -600,7 +600,7 @@ int __health_redis_online(const char *_addr)
         }
 
         int port = atoi(list[1]);
-        ret = redis_connect(&conn, list[0], &port);
+        ret = redis_connect(&conn, list[0], &port, "");
         if (ret)
                 return 0;
         else {
