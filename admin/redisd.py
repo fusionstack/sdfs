@@ -21,7 +21,7 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from SocketServer import ThreadingMixIn
 #import BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
-from signal import SIGTERM 
+from signal import SIGTERM
 
 #sys.path.insert(0, os.path.split(os.path.realpath(__file__))[0] + "/../")
 
@@ -94,6 +94,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 class Redisd():
     def __init__(self, workdir, diskid, disk_idx):
         self.config = Config()
+        self.uuid = str(uuid.uuid1())
         self.workdir = workdir
         self.diskid = diskid
         self.localid = int(self.workdir.split('/')[-1])
@@ -101,6 +102,7 @@ class Redisd():
         self.hostname = socket.gethostname()
         self.etcd = etcd.Client(host='127.0.0.1', port=2379)
         self.id = None
+        self.lock = False
         self.volume = None
         self.running = True
         self.replica_info = None
@@ -261,6 +263,7 @@ class Redisd():
             #dmsg("etcd write " + key)
             res = self.etcd.write(key, version + 1, prevIndex=idx)
         except etcd.EtcdCompareFailed:
+            derror("%s update %s fail" % (self.workdir, key))
             return -1
 
         return version + 1
@@ -380,7 +383,7 @@ class Redisd():
         
         res = self.__register_get()
         if (res == None):
-            dwarn("get register fail")
+            #dwarn("get register fail")
             return False
 
         dmsg("register %s to volume %s slot(%u, %u)" % (self.workdir, self.volume,
@@ -421,9 +424,10 @@ class Redisd():
     def __redis_ismaster(self):
         #return self.lock.is_acquired
 
+        #dmsg("%s lock %d, 1" % (self.workdir, self.lock.is_acquired))
         #dmsg("%s redis master check" % (self.workdir))
         if not self.lock.is_acquired:
-            #dmsg("%s not locked" % (self.workdir))
+            dwarn("%s not locked" % (self.workdir))
             return False
 
         cmd = "redis-cli -h %s -p %s info replication | grep role | awk -F ':' '{print $2}'" % (self.hostname, self.port)
@@ -434,6 +438,7 @@ class Redisd():
                 res = exec_shell(cmd, need_return=True, p=False)
                 break;
             except Exp, e:
+                dwarn("cmd %s fail\n" % (cmd))
                 time.sleep(1)
                 retry += 1;
                 continue;
@@ -453,13 +458,24 @@ class Redisd():
         
 
     def __lock(self, background = True):
-        path = self.workdir
-        #dmsg(str(self.id))
-        #print "xxx:" + self.volume
         name = "volume(%s,%d)" % (self.volume, self.id[0])
-        #print name
-        self.lock = etcd.Lock(self.etcd, name)
-        self.lock.acquire(blocking=False, lock_ttl=10)
+
+        if (self.lock):
+            dmsg("%s lock %s %d already locked, uuid %s" % (self.workdir, name, self.lock.is_acquired, self.uuid))
+        else:
+            path = self.workdir
+            #print name
+            self.lock = etcd.Lock(self.etcd, name)
+
+        ret = self.lock.acquire(blocking=False, lock_ttl=10)
+        if (ret):
+            dmsg("%s lock %s %d success, uuid %s" % (self.workdir, name, self.lock.is_acquired, self.uuid))
+            pass
+        else:
+            derror("%s lock %s %d ,fail, uuid %s" % (self.workdir, name, self.lock.is_acquired, self.uuid))
+            #pass
+            #return self.lock.is_acquired
+            
         self.running = True
  
         def __lock__(args):
@@ -610,7 +626,7 @@ class Redisd():
     def __update_dbversion(self):
         dbversion = self.__etcd_update_dbversion()
         if (dbversion == -1):
-            dwarn("master fail\n")
+            dwarn("%s master fail, update dbversion\n" % (self.workdir))
             return
 
         dmsg("update dbversion to %d" % (dbversion))
@@ -666,6 +682,7 @@ class Redisd():
             
     def __run_master(self):
         #dwarn("%s master %s fail\n" % (self.workdir, master))
+        #dmsg("%s lock %d, 4" % (self.workdir, self.lock.is_acquired))
         dmsg("%s %s %s run as master" % (self.workdir, self.hostname, self.port))
         cmd = "redis-cli -h %s -p %s SLAVEOF NO ONE" % (self.hostname, self.port)
         os.system(cmd)
@@ -676,14 +693,14 @@ class Redisd():
 
         while (self.running):
             if (not self.__redis_ismaster()):
-                dwarn("master fail\n")
+                dwarn("%s master fail\n" % (self.workdir))
                 break;
             else:
                 if (self.__replica_changed()):
                     self.__update_dbversion()
 
                 self.__heath_check()
-            time.sleep(0.1)
+            time.sleep(0.5)
                 
     def __set_slave__(self):
         retry = 0
@@ -742,6 +759,7 @@ class Redisd():
 
         self.__lock()
 
+        #dmsg("%s lock %d, 0" % (self.workdir, self.lock.is_acquired))
         while (self.running):
             if (self.lock.is_acquired):
                 self.__run_master()
@@ -957,14 +975,13 @@ class RedisDisk(Daemon):
         if not workdir:
             return False
 
-        dmsg("workdir: " + workdir)
-
         redis = Redisd(workdir, self.diskid, self.localid)
         if not redis.init(volume):
-            dwarn("register %s to %s fail\n" % (workdir, volume))
+            #dwarn("register %s to %s fail\n" % (workdir, volume))
             return False
         
-        redis = Redisd(workdir, self.diskid, self.localid)
+        #redis = Redisd(workdir, self.diskid, self.localid)
+        #dmsg("register %s to volume %s slot(%u, %u)" % (workdir, volume)
         redis.start_loop()
         self.instence.append(redis)
 

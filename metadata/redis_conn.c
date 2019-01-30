@@ -52,8 +52,10 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
 
         snprintf(key, MAX_NAME_LEN, "%s/slot/%d/master", volume, sharding);
         ret = etcd_get_text(ETCD_VOLUME, key, addr, NULL);
-        if(ret)
+        if(ret) {
+                DWARN("%s not found\n", key);
                 GOTO(err_ret, ret);
+        }
 
         count = 2;
         _str_split(addr, ' ', list, &count);
