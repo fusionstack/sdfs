@@ -57,6 +57,7 @@ static int __io_analysis_dump()
         time_t now;
         char path[MAX_PATH_LEN], buf[MAX_INFO_LEN];
         uint32_t readps, writeps, readbwps, writebwps;
+        static time_t last_log = 0;
 
         now = time(NULL);
         memset(buf, 0x0, sizeof(buf));
@@ -84,6 +85,12 @@ static int __io_analysis_dump()
                          writebwps,
                          core_latency_get());
                 __io_analysis__->last_output = now;
+
+                time_t now = time(NULL);
+                if (now - last_log > 10) {
+                        DINFO("READ BWPS %u WRITE BWPS %u READ OPS %u WRITE OPS %u LATENCY %f\n",
+                              readbwps, writebwps, readps, writeps, (float)core_latency_get() / 1000);
+                }
         }
 
         if (now - __io_analysis__->last_output < 0) {
@@ -188,20 +195,33 @@ err_ret:
 
 static void *__io_analysis_rept(void *arg)
 {
+        int ret;
         char path[MAX_PATH_LEN], buf[MAX_INFO_LEN];
         io_analysis_t *io_analysis = __io_analysis__;
 
         (void) arg;
         
-        snprintf(path, MAX_PATH_LEN, "/analysis/%s/%d", __io_analysis__->name, net_getnid()->id);
+        snprintf(path, MAX_PATH_LEN, "/analysis/%s/%d", __io_analysis__->name,
+                 net_getnid()->id);
         
         while (1) {
-                snprintf(buf, MAX_PATH_LEN, "read_count:%ju;write_count:%ju;read_bytes:%ju;write_bytes:%ju;latency:%ju",
+                snprintf(buf, MAX_PATH_LEN, "read_count:%ju;write_count:%ju;"
+                         "read_bytes:%ju;write_bytes:%ju;latency:%ju",
                          io_analysis->read_count, io_analysis->write_count,
                          io_analysis->read_bytes, io_analysis->write_bytes,
                          core_latency_get());
 
                 mond_rpc_set(net_getnid(), path, buf, strlen(buf) + 1);
+
+                ret = sy_spin_lock(&__io_analysis__->lock);
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+                
+                ret = __io_analysis_dump();
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+                
+                sy_spin_unlock(&__io_analysis__->lock);
 
                 sleep(2);
         }
