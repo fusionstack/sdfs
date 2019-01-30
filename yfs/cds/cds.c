@@ -553,9 +553,11 @@ int cds_run(void *args)
         while (cds_info.running) { //we got nothing to do here
                 sleep(1);
 
+#if 0
                 if (time(NULL) % 10 == 0) {
                         DINFO("latency %ju\n", core_latency_get());
                 }
+#endif
         }
 
         ret = ly_update_status("stopping", -1);

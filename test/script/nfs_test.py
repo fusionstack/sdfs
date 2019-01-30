@@ -383,6 +383,8 @@ def t_unlink(mount_point):
 def nfs_test(mount_point='/mnt/nfs'):
     cmd = "sdfs.mkdir /nfs_test"
     os.system(cmd)
+    cmd = "sdfs share -p nfs -m rw -n nfs_test -s /nfs_test -H 0.0.0.0"
+    os.system(cmd)
     cmd = "mkdir -p /mnt/nfs"
     os.system(cmd)
     cmd = "mount -o nfsvers=3,noacl,nolock 127.0.0.1:/nfs_test /mnt/nfs"

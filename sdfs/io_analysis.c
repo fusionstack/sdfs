@@ -11,6 +11,9 @@
 
 #include "configure.h"
 #include "schedule.h"
+#include "net_global.h"
+#include "mond_rpc.h"
+#include "network.h"
 #include "io_analysis.h"
 #include "core.h"
 #include "dbg.h"
@@ -54,6 +57,7 @@ static int __io_analysis_dump()
         time_t now;
         char path[MAX_PATH_LEN], buf[MAX_INFO_LEN];
         uint32_t readps, writeps, readbwps, writebwps;
+        static time_t last_log = 0;
 
         now = time(NULL);
         memset(buf, 0x0, sizeof(buf));
@@ -81,6 +85,13 @@ static int __io_analysis_dump()
                          writebwps,
                          core_latency_get());
                 __io_analysis__->last_output = now;
+
+                time_t now = time(NULL);
+                if (now - last_log > 10) {
+                        last_log = now;
+                        DINFO("READ BWPS %u WRITE BWPS %u READ OPS %u WRITE OPS %u LATENCY %f\n",
+                              readbwps, writebwps, readps, writeps, (float)core_latency_get() / 1000);
+                }
         }
 
         if (now - __io_analysis__->last_output < 0) {
@@ -122,9 +133,9 @@ int io_analysis(analysis_op_t op, int count)
                 __io_analysis__->write_count++;
                 __io_analysis__->write_bytes += count;
         } else if (op == ANALYSIS_OP_READ) {
-                __io_analysis__->write_count++;
-        } else if (op == ANALYSIS_OP_WRITE) {
                 __io_analysis__->read_count++;
+        } else if (op == ANALYSIS_OP_WRITE) {
+                __io_analysis__->write_count++;
         } else {
                 YASSERT(0);
         }
@@ -183,6 +194,84 @@ err_ret:
         return ret;
 }
 
+static void *__io_analysis_rept(void *arg)
+{
+        int ret;
+        char path[MAX_PATH_LEN], buf[MAX_INFO_LEN];
+        io_analysis_t *io_analysis = __io_analysis__;
+
+        (void) arg;
+        
+        snprintf(path, MAX_PATH_LEN, "/analysis/%s/%d", __io_analysis__->name,
+                 net_getnid()->id);
+        
+        while (1) {
+                snprintf(buf, MAX_PATH_LEN, "read_count:%ju;write_count:%ju;"
+                         "read_bytes:%ju;write_bytes:%ju;latency:%ju",
+                         io_analysis->read_count, io_analysis->write_count,
+                         io_analysis->read_bytes, io_analysis->write_bytes,
+                         core_latency_get());
+
+                mond_rpc_set(net_getnid(), path, buf, strlen(buf) + 1);
+
+                ret = sy_spin_lock(&__io_analysis__->lock);
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+                
+                ret = __io_analysis_dump();
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+                
+                sy_spin_unlock(&__io_analysis__->lock);
+
+                sleep(2);
+        }
+
+        pthread_exit(NULL);
+}
+
+#define mond_for_each(buf, buflen, mon, off)                \
+        for (mon = (void *)(buf);                                       \
+             (void *)mon < (void *)(buf) + buflen ;                     \
+             off = mon->offset, mon = (void *)mon + (sizeof(*(mon)) + mon->klen + mon->vlen))
+
+int io_analysis_dump(const char *type)
+{
+        int ret, buflen, eof;
+        char buf[MON_ENTRY_MAX], path[MAX_PATH_LEN];
+        mon_entry_t *ent;
+        uint64_t offset;
+        const char *key, *value;
+
+        offset = 0;
+        snprintf(path, MAX_PATH_LEN, "/analysis/%s", type);
+retry:
+        buflen = MON_ENTRY_MAX;
+        ret = mond_rpc_get(net_getnid(), path, offset, buf, &buflen);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        nid_t nid;
+        mond_for_each(buf, buflen, ent, offset) {
+                key = ent->buf;
+                value = key + ent->klen;
+                eof = ent->eof;
+                
+                str2nid(&nid, key);
+                printf("%s %s\n", network_rname(&nid), value);
+        }
+
+        return 0;
+        
+        if (!eof) {
+                goto retry;
+        }
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
 int io_analysis_init(const char *name, int seq)
 {
         int ret;
@@ -203,6 +292,10 @@ int io_analysis_init(const char *name, int seq)
         
         strcpy(__io_analysis__->name, name);
 
+        ret = sy_thread_create2(__io_analysis_rept, NULL, "core_check_health");
+        if (ret)
+                GOTO(err_ret, ret);
+        
         return 0;
 err_ret:
         return ret;

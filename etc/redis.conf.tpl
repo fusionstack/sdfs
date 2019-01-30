@@ -20,8 +20,8 @@ repl-disable-tcp-nodelay no
 slave-priority 100
 appendonly yes
 appendfilename "appendonly.aof"
-appendfsync always
-#appendfsync everysec
+#appendfsync always
+appendfsync everysec
 no-appendfsync-on-rewrite no
 auto-aof-rewrite-percentage 150
 auto-aof-rewrite-min-size 64mb

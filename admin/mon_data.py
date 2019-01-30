@@ -28,6 +28,8 @@ import struct
 import sys
 import time
 
+from utils import dmsg, derror, dwarn, _check_config, set_value, get_value, exec_shell, _str2dict, Exp
+from config import Config
 
 # Try to ensure time.monotonic() is available
 # This normally requires Python 3.3 or later.
@@ -391,24 +393,66 @@ class ProcessList(DumpableObject):
     def __init__(self, taskstats_connection, options):
         # {pid: ProcessInfo}
         self.processes = {}
+        self.instence = {}
+        self.rawdata = {}
+        self.config = Config()
         self.taskstats_connection = taskstats_connection
         self.options = options
         self.timestamp = time.monotonic()
+
+        self.total_fs = [0, 0, 0, 0, 0]
+        self.total_cds = [0, 0, 0, 0, 0]
         #self.vmstat = vmstat.VmStat()
 
         # A first time as we are interested in the delta
         #self.update_process_counts()
 
-    def get_process(self, pid):
-        """Either get the specified PID from self.processes or build a new
-        ProcessInfo if we see this PID for the first time"""
-        process = self.processes.get(pid, None)
-        if not process:
-            process = ProcessInfo(pid)
-            self.processes[pid] = process
+        
+    def get_process(self, t):
+        def get_diff(new, old):
+            diff = {}
+            for k, v in new.items():
+                diff[k] = v - old[k]
 
-        if process.is_monitored(self.options):
-            return process
+            diff['latency'] = new['latency']
+                
+            return diff
+        
+        cmd = "%s --type %s" % (self.config.sdfs_mon, t)
+        try:
+            out, err = exec_shell(cmd, p=False, need_return=True)
+        except:
+            return
+
+        d = _str2dict(out, col=' ')
+        #print (d)
+
+        newdata = {}
+        diff = {}
+        for k, v in d.items():
+            #print (k, v)
+            
+            tmp = _str2dict(v, row=';', col=':')
+            for k1, v1 in tmp.items():
+                tmp[k1] = int(v1)
+        
+            newdata[k] = tmp
+
+            try:
+                olddata = self.rawdata[t][k]
+                diff[k] = get_diff(tmp, olddata)
+                #print ("got old--------------")
+            except:#not exists
+                diff[k] = tmp
+                #print ("no old---------------%s %s---" % (t, k))
+                #print (self.rawdata)
+                #print ("no old---------------%s %s---" % (t, k))
+
+
+        self.rawdata[t] = newdata
+        self.instence[t] = diff
+        #print (t, newdata)
+        #print (t, diff)
 
     def list_tgids(self):
         if self.options.pids:
@@ -443,13 +487,50 @@ class ProcessList(DumpableObject):
 
         return tids
 
-    def update_process_counts(self):
+    def __update_total_io(self, d, t):
+        for k, v in d.items():
+            t[0] += int(v['read_bytes'])
+            t[1] += int(v['write_bytes'])
+            t[2] += int(v['read_count'])
+            t[3] += int(v['write_count'])
+            ltc = int(v['latency'])
+            if (ltc > t[4]):
+                t[4] = ltc
+
+        return t
+    
+    def update_total_io(self, lst):
+        t = [0, 0, 0, 0, 0]
+        for k in lst:
+            try:
+                d = self.instence[k]
+                t = self.__update_total_io(d, t)
+            except:
+                pass
+
+        return t
+        """
+        return ([t[0] - last[0],
+                 t[1] - last[1],
+                 t[2] - last[2],
+                 t[3] - last[3],
+                 t[4] - last[4]], t)
+        """
+    
+    def refresh_data(self, lst):
         new_timestamp = time.monotonic()
         self.duration = new_timestamp - self.timestamp
         self.timestamp = new_timestamp
 
         total_read = total_write = 0
 
+        for k in lst:
+            self.get_process(k)
+
+        return
+
+    
+        """
         return
         
         for tgid in self.list_tgids():
@@ -466,15 +547,51 @@ class ProcessList(DumpableObject):
                     total_write += delta.write_bytes
                     thread.mark = False
         return (total_read, total_write), self.vmstat.delta()
+        """
 
+    def get_data(self, t, sort):
+        #return []
+        
+        from operator import itemgetter, attrgetter
+        lst = []
+
+        for i in t:
+            try:
+                #{'latency': 0, 'write_bytes': 0, 'read_count': 0, 'read_bytes': 0, 'write_count': 0}
+                #print (i, self.instence[i])
+                for k, v in self.instence[i].items():
+                    #print (k, v['latency'], v['read_bytes'], v['write_bytes'], v['read_count'], v['write_count'])
+                    lst.append([k, v['latency'], v['read_bytes'], v['write_bytes'], v['read_count'], v['write_count']])
+            except:
+                pass
+
+        #print(lst)
+        newlist = []
+        slist = sorted(lst, key=itemgetter(1), reverse=True)
+        return slist
+        
+        for i in slist:
+            newlist.append(str(i))
+
+        #print(newlist)
+        return newlist
+            
     def refresh_processes(self):
-         
+
+        """
         for process in self.processes.values():
             for thread in process.threads.values():
                 thread.mark = True
+        """
 
-        total_read_and_write = self.update_process_counts()
+        self.refresh_data(['cds', 'nfs', 'ganesha', 'cifs'])
+        #self.refresh_data(['nfs', 'ganesha', 'cifs'])
+        #self.io_cds, self.total_cds = self.update_total_io(self.total_cds, ["cds"])
+        #self.io_fs, self.total_fs = self.update_total_io(self.total_fs, ["nfs", "ganesha", "samba"])
+        self.io_cds = self.update_total_io(["cds"])
+        self.io_fs = self.update_total_io(["nfs", "ganesha", "samba"])
 
+    """
         return {"123456": "391.1309", "1929333" : "398977"}
         
         self.processes = dict([(pid, process) for pid, process in
@@ -482,6 +599,8 @@ class ProcessList(DumpableObject):
                                process.update_stats()])
 
         return total_read_and_write
+    """
 
     def clear(self):
         self.processes = {}
+        self.instence = {}

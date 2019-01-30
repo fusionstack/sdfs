@@ -27,6 +27,7 @@ typedef struct {
         struct list_head list;
 #endif
         sy_rwlock_t rwlock;
+        char key[MAX_PATH_LEN];
         redis_ctx_t *ctx;
 } redis_conn_t;
 
@@ -43,7 +44,7 @@ int redis_hset(redis_conn_t *conn, const char *hash, const char *key,
 int redis_hdel(redis_conn_t *conn, const char *hash, const char *key);
 int redis_hiterator(redis_conn_t *conn, const char *hash, const char *match, func2_t func2, void *arg);
 int redis_keys(redis_conn_t *conn, func1_t func1, void *arg);
-int redis_connect(redis_conn_t **_conn, const char *addr, const int *port);
+int redis_connect(redis_conn_t **_conn, const char *addr, const int *port, const char *key);
 int redis_sset(redis_conn_t *conn, const char *set, const char *key);
 int redis_sdel(redis_conn_t *conn, const char *set, const char *key);
 int redis_scount(redis_conn_t *conn, const char *set, uint64_t *count);

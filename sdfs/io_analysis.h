@@ -12,5 +12,6 @@ typedef enum {
 
 int io_analysis_init(const char *name, int seq);
 int io_analysis(analysis_op_t op, int count);
+int io_analysis_dump(const char *type);
 
 #endif

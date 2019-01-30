@@ -52,8 +52,10 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
 
         snprintf(key, MAX_NAME_LEN, "%s/slot/%d/master", volume, sharding);
         ret = etcd_get_text(ETCD_VOLUME, key, addr, NULL);
-        if(ret)
+        if(ret) {
+                DWARN("%s not found\n", key);
                 GOTO(err_ret, ret);
+        }
 
         count = 2;
         _str_split(addr, ' ', list, &count);
@@ -65,7 +67,7 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
         DBUG("get volume %s sharding[%d] master @ %s:%s\n", volume, sharding, list[0], list[1]);
 
         int port = atoi(list[1]);
-        ret = redis_connect(&conn->conn, list[0], &port);
+        ret = redis_connect(&conn->conn, list[0], &port, key);
         if(ret)
                 GOTO(err_ret, ret);
 

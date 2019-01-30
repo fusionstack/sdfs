@@ -16,11 +16,11 @@
 #include "redis_util.h"
 #include "schedule.h"
 
-static int __redis_error(const char *func, redisReply *reply)
+static int __redis_error(redis_conn_t *conn, const char *func, redisReply *reply)
 {
         int ret;
         
-        DWARN("%s reply->type %u, reply->str %s\n", func, reply->type, reply->str);
+        DWARN("srv %s, %s reply->type %u, reply->str %s\n", conn->key, func, reply->type, reply->str);
 
         if (strcmp(reply->str, "LOADING Redis is loading the dataset in memory") == 0) {
                 ret = EAGAIN;
@@ -85,6 +85,7 @@ err_ret:
         return ret;
 }
 
+#if 0
 int disconnect_redis(redis_ctx_t **ctx)
 {
         redisFree(*ctx);
@@ -179,6 +180,9 @@ err_free:
         return ret;
 }
 
+#endif
+
+
 #define TYPE_SCHE 1
 #define TYPE_SEM 2
 
@@ -188,7 +192,7 @@ typedef struct {
         sem_t sem;
 } args_t;
 
-int redis_connect(redis_conn_t **_conn, const char *addr, const int *port)
+int redis_connect(redis_conn_t **_conn, const char *addr, const int *port, const char *key)
 {
         int ret;
         redisContext *c;
@@ -209,6 +213,7 @@ int redis_connect(redis_conn_t **_conn, const char *addr, const int *port)
         if ((unlikely(ret)))
                 UNIMPLEMENTED(__DUMP__);
 
+        strcpy(conn->key, key);
 #if 0
         ret = sy_spin_init(&conn->lock);
         if ((unlikely(ret)))
@@ -263,7 +268,7 @@ int redis_hget(redis_conn_t *conn, const char *hash, const char *key, void *buf,
                 
         if (reply->type != REDIS_REPLY_STRING) {
                 DWARN("redis reply->type: %d\n", reply->type);
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -311,7 +316,7 @@ int redis_kget(redis_conn_t *conn, const char *key, void *buf, size_t *len)
                 
         if (reply->type != REDIS_REPLY_STRING) {
                 DWARN("redis reply->type: %d\n", reply->type);
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -366,7 +371,7 @@ int redis_kset(redis_conn_t *conn, const char *key, const void *value,
         }
         
         if (reply->type != REDIS_REPLY_STATUS || strcmp(reply->str, "OK") != 0) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -412,7 +417,7 @@ int redis_hset(redis_conn_t *conn, const char *hash, const char *key, const void
         }
 
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -451,7 +456,7 @@ int redis_hdel(redis_conn_t *conn, const char *hash, const char *key)
         }
         
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -490,7 +495,7 @@ int redis_hexist(redis_conn_t *conn, const char *hash, const char *key, int *exi
         }
         
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -544,7 +549,7 @@ static int __redis_hiterator(redis_conn_t *conn, const char *hash, size_t *_cur,
 
         if (reply->type != REDIS_REPLY_ARRAY) {
                 DWARN("redis reply->type: %d\n", reply->type);
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -698,7 +703,7 @@ static int __redis_siterator(redis_conn_t *conn, const char *set, size_t *_cur, 
 
         if (reply->type != REDIS_REPLY_ARRAY) {
                 DWARN("redis reply->type: %d\n", reply->type);
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -767,7 +772,7 @@ int redis_sset(redis_conn_t *conn, const char *set, const char *key)
         }
 
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -800,7 +805,7 @@ int redis_sdel(redis_conn_t *conn, const char *set, const char *key)
         }
 
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -833,7 +838,7 @@ int redis_scount(redis_conn_t *conn, const char *set, uint64_t *count)
         }
 
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -899,7 +904,7 @@ int redis_exec(redis_conn_t *conn, const char *buf)
         }
 
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -1198,7 +1203,7 @@ int redis_multi_exec(redis_conn_t *conn, const char *op, const char *tab,
                         || strcmp(op, "SREM") == 0);
         } else {
                 DWARN("redis reply->type: %d\n", reply->type);
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_ret, ret);
         }
 
@@ -1284,7 +1289,7 @@ int redis_kdel(redis_conn_t *conn, const char *key)
         }
         
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -1343,7 +1348,7 @@ int redis_del(redis_conn_t *conn, const char *key)
         }
         
         if (reply->type != REDIS_REPLY_INTEGER) {
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 
@@ -1403,7 +1408,7 @@ static int __redis_iterator(redis_conn_t *conn, const char *match, size_t *_cur,
 
         if (reply->type != REDIS_REPLY_ARRAY) {
                 DWARN("redis reply->type: %d\n", reply->type);
-                ret = __redis_error(__FUNCTION__, reply);
+                ret = __redis_error(conn, __FUNCTION__, reply);
                 GOTO(err_free, ret);
         }
 

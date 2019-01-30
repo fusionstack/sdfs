@@ -277,6 +277,7 @@ add_library(mond SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/nodepool_hdd.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/nodepool_ssd.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mond/mond_rpc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/mond/mond_kv.c
 )
 
 SET_TARGET_PROPERTIES(mond
@@ -498,6 +499,9 @@ target_link_libraries(sdfs.group ${CMAKE_C_LIBS})
 add_executable(sdfs.health ${CMAKE_CURRENT_SOURCE_DIR}/yfs/utils/sdfs.health.c)
 target_link_libraries(sdfs.health ${CMAKE_C_LIBS})
 
+add_executable(sdfs.mon ${CMAKE_CURRENT_SOURCE_DIR}/yfs/utils/sdfs.mon.c)
+target_link_libraries(sdfs.mon ${CMAKE_C_LIBS})
+
 add_executable(sdfs.ln ${CMAKE_CURRENT_SOURCE_DIR}/yfs/utils/uss.ln.c)
 target_link_libraries(sdfs.ln ${CMAKE_C_LIBS})
 
@@ -605,6 +609,7 @@ install(TARGETS sdfs.perf RUNTIME DESTINATION app/bin)
 #install(TARGETS sdfs.prof RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.ls RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.health RUNTIME DESTINATION app/bin)
+install(TARGETS sdfs.mon RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.ln RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.rmdir RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.rm RUNTIME DESTINATION app/bin)

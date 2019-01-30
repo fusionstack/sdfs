@@ -158,7 +158,7 @@ def share_ls(path, pro = None):
     print '\n'
 
 
-def sdfs_share.help():
+def sdfs_share_help():
     cmd = "sdfs.share --help"
     share_test_shell(cmd)
     print '\n'
@@ -168,7 +168,7 @@ def share_test():
     cmd = "sdfs.mkdir %s" % path
     share_test_shell(cmd)
 
-    sdfs_share.help()
+    sdfs_share_help()
     share_ls(path)
     share_create_get_del(path)
     share_set_error(path)
