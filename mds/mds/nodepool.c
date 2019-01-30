@@ -245,6 +245,8 @@ int nodepool_dump()
                 } else 
                         GOTO(err_ret, ret);
         }
+
+        DINFO("update diskmap\n");
         
         DBUG("------\n%s\n-----", buf);
 

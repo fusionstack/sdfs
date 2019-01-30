@@ -176,7 +176,7 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
         mbuffer_init(buf, io->size);
         iov_count = Y_MSG_MAX / PAGE_SIZE + 1;
         ret = mbuffer_trans(iov, &iov_count, buf);
-        DINFO("ret %u %u\n", ret, buf->len);
+        DBUG("ret %u %u\n", ret, buf->len);
         YASSERT(ret == (int)buf->len);
 
         io_prep_preadv(&iocb, fd, iov, iov_count, io->offset);

@@ -88,6 +88,7 @@ static int __io_analysis_dump()
 
                 time_t now = time(NULL);
                 if (now - last_log > 10) {
+                        last_log = now;
                         DINFO("READ BWPS %u WRITE BWPS %u READ OPS %u WRITE OPS %u LATENCY %f\n",
                               readbwps, writebwps, readps, writeps, (float)core_latency_get() / 1000);
                 }
