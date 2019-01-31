@@ -126,6 +126,7 @@ add_library(ylib SHARED
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/sysutil.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/timer.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ylog.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/plock.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/tpool.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ytime.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bmap.c

@@ -15,7 +15,7 @@
 #include "math.h"
 
 typedef struct {
-        pthread_rwlock_t lock;
+        sy_spinlock_t lock;
         hashtable_t tab;
 } vol_tab_t;
 
@@ -55,7 +55,7 @@ int redis_vol_init()
         if(ret)
                 GOTO(err_ret, ret);
 
-        ret = pthread_rwlock_init(&vol_tab->lock, NULL);
+        ret = sy_spin_init(&vol_tab->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -77,7 +77,7 @@ int redis_vol_get(uint64_t volid, void **conn)
 
         YASSERT(!schedule_running());
         
-        ret = pthread_rwlock_rdlock(&__vol_tab__->lock);
+        ret = sy_spin_lock(&__vol_tab__->lock);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -89,11 +89,11 @@ int redis_vol_get(uint64_t volid, void **conn)
 
         *conn = ent->vol;
 
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        sy_spin_unlock(&__vol_tab__->lock);
         
         return 0;
 err_lock:
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        sy_spin_unlock(&__vol_tab__->lock);
 err_ret:
         return ret;
 }
@@ -109,7 +109,7 @@ int redis_vol_insert(uint64_t volid, void *conn)
         int ret;
         entry_t *ent;
 
-        ret = pthread_rwlock_wrlock(&__vol_tab__->lock);
+        ret = sy_spin_lock(&__vol_tab__->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -125,13 +125,13 @@ int redis_vol_insert(uint64_t volid, void *conn)
                 GOTO(err_free, ret);
         }
 
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        sy_spin_unlock(&__vol_tab__->lock);
         
         return 0;
 err_free:
         yfree((void **)&ent);
 err_lock:
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        sy_spin_unlock(&__vol_tab__->lock);
 err_ret:
         return ret;
 }

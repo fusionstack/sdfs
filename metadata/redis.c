@@ -40,8 +40,6 @@ typedef struct {
         int eventfd;
 } redis_worker_t;
 
-
-
 static int __seq__ = 0;
 static __thread int __workerid__ = -1;
 static redis_worker_t *__redis_worker__;
@@ -1005,6 +1003,7 @@ int redis_init()
         redis_worker_t *worker;
 
         count = ng.daemon ? gloconf.polling_core : 1;
+        count = 1;
 
         ret = ymalloc((void **)&__redis_worker__, sizeof(*__redis_worker__) * count);
         if (unlikely(ret))

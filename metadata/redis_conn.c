@@ -247,11 +247,11 @@ int redis_conn_get(uint64_t volid, int sharding, int worker, redis_handler_t *ha
                 GOTO(err_release, ret);
 
         idx = sharding % vol->sharding;
-        handler->sharding = idx;
         ret = __redis_conn_get_sharding(&vol->shardings[handler->sharding], worker, handler);
         if(ret)
                 GOTO(err_lock, ret);
 
+        handler->sharding = idx;
         handler->volid = volid;
         
         pthread_rwlock_unlock(&vol->lock);
