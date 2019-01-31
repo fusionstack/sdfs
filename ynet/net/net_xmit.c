@@ -31,26 +31,3 @@ inline int net_discard_sd_sync(int sd, uint32_t len, int timeout)
         return sock_discard_sd_sync(sd, len, timeout);
 }
 #endif
-
-int net_send(const net_handle_t *nh, job_t *job, uint64_t hash, int is_request)
-{
-        int ret;
-
-        if (nh->type == NET_HANDLE_PERSISTENT)
-                ret = netable_send(nh, job, hash, is_request);
-        else {
-                if (job->timeout == 0) {
-                        job->timeout = gloconf.rpc_timeout;
-                }
-
-                YASSERT(job->iocb.op == FREE_JOB);
-                ret = sdevent1_queue(nh, job);
-        }
-
-        if (ret)
-                GOTO(err_ret, ret);
-
-        return 0;
-err_ret:
-        return ret;
-}

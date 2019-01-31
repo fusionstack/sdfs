@@ -147,32 +147,6 @@ typedef struct {
                 GOTO(__err_ret__, __ret__);
 #endif
 
-#ifndef BUFFER_CHECK
-#ifdef BUFFER_DEBUG
-#define BUFFER_CHECK(buf)                                               \
-        do {                                                            \
-                if (buf->len == 0) { \
-                    break; \
-                } \
-                uint32_t __len = 0;                                     \
-                seg_t *__seg;                                           \
-                struct list_head *pos;                                  \
-                list_for_each(pos, &(buf->list)) {                        \
-                        __seg = (seg_t *)pos;                           \
-                        YASSERT(__seg->type != BUFFER_NONE);            \
-                        __len += __seg->len;                            \
-                }                                                       \
-                if (unlikely(__len != (buf)->len)) {                              \
-                        DERROR("__len %u (buf)->len %u\n", __len, (buf)->len); \
-                        YASSERT(0);                                     \
-                }                                                       \
-        } while (0)
-
-#else
-#define BUFFER_CHECK(buf)
-#endif
-#endif
-
 typedef void (*func_t)(void *arg);
 typedef void (*func1_t)(void *, void *);
 typedef void (*func2_t)(void *, void *, void *);

@@ -26,9 +26,10 @@
 #include "io_analysis.h"
 #include "../../sdfs/replica_rpc.h"
 #include "net_global.h"
-#include "dbg.h"
+#include "mem_hugepage.h"
 #include "license_helper.h"
 #include "main_loop.h"
+#include "dbg.h"
 
 extern int is_daemon;
 extern jobtracker_t *jobtracker;
@@ -537,8 +538,8 @@ int init_stage1()
 
         fnotify_init();
         dmsg_init();
-        
-        ret = buffer_pool_init(1024 * 10);
+
+        ret = mem_hugepage_init();
         if (ret)
                 GOTO(err_ret, ret);
 

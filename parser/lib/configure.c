@@ -163,6 +163,8 @@ int conf_init(const char *conf_path)
         cdsconf.queue_depth = 127;
         gloconf.network = 0;
         gloconf.solomode = 0;
+        gloconf.memcache_count = 512;
+        gloconf.memcache_seg = 1024 * 1024 * 2;
         gloconf.mask = 0;
         gloconf.maxcore = 1;
         memset(gloconf.cluster_name, 0x0, MAXSIZE);
@@ -523,6 +525,10 @@ int set_value(const char* key, const char* value, int type)
                 mdsconf.chknew_hardend = _value;
         else if (keyis("solomode", key))
                 gloconf.solomode = _value;
+        else if (keyis("memcache_count", key))
+                gloconf.memcache_count = _value;
+        else if (keyis("memcache_seg", key))
+                gloconf.memcache_seg = _value;
         else if (keyis("redis_sharding", key))
                 mdsconf.redis_sharding = _value;
         else if (keyis("redis_replica", key))

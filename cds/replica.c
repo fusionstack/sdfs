@@ -92,7 +92,7 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
         int fd;
         task_t task;
         struct iocb iocb;
-        struct iovec iov[Y_MSG_MAX / PAGE_SIZE + 1];
+        struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
 
         ret = io_analysis(ANALYSIS_IO_WRITE, io->size);
         if (ret)
@@ -109,7 +109,7 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
         if (ret)
                 GOTO(err_ret, ret);
 
-        iov_count = Y_MSG_MAX / PAGE_SIZE + 1;
+        iov_count = Y_MSG_MAX / BUFFER_SEG_SIZE + 1;
         ret = mbuffer_trans(iov, &iov_count, buf);
         //DBUG("ret %u %u\n", ret, buf->len);
         YASSERT(ret == (int)buf->len);
@@ -155,7 +155,7 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
         int fd;
         task_t task;
         struct iocb iocb;
-        struct iovec iov[Y_MSG_MAX / PAGE_SIZE + 1];
+        struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
 
         ret = io_analysis(ANALYSIS_IO_READ, io->size);
         if (ret)
@@ -174,7 +174,7 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
 
         YASSERT(buf->len == 0);
         mbuffer_init(buf, io->size);
-        iov_count = Y_MSG_MAX / PAGE_SIZE + 1;
+        iov_count = Y_MSG_MAX / BUFFER_SEG_SIZE + 1;
         ret = mbuffer_trans(iov, &iov_count, buf);
         DBUG("ret %u %u\n", ret, buf->len);
         YASSERT(ret == (int)buf->len);

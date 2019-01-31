@@ -357,6 +357,7 @@ static void __sock_wbuffer_queue(sock_wbuffer_t *wbuf, const buffer_t *buf, int 
         DBUG("queue msg %u\n", buf->len);
 
         if (flag & BUFFER_KEEP) {
+                UNIMPLEMENTED(__DUMP__);
                 mbuffer_reference(&wbuf->buf, buf);
         } else {
                 mbuffer_merge(&wbuf->buf, (void *)buf);

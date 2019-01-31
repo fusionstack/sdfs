@@ -115,12 +115,12 @@ add_library(ylib SHARED
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/journal.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/lock.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem_hugepage.c
 	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls.c
 	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls/nls_cp936.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/path.c
 	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/pipe_pool.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/skiplist.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/shm.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/stat.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/str.c
 	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/sysutil.c

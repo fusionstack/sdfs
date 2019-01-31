@@ -184,6 +184,9 @@ struct gloconf_t
         char nfs_srv[MAXSIZE];
 
         int solomode;
+
+        int memcache_count;
+        int memcache_seg;
         
         //fake config
         int rdma;

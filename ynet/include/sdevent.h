@@ -45,8 +45,4 @@ void sdevent_exit(int fd);
 int sdevent_heartbeat_get(const sockid_t *id, uint64_t *send, uint64_t *reply);
 int sdevent_heartbeat_set(const sockid_t *id, const uint64_t *send, const uint64_t *reply);
 
-
-//just for compatible, will be removed
-int sdevent1_queue(const net_handle_t *nh, job_t *job);
-
 #endif

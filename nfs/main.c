@@ -37,6 +37,7 @@
 
 static int nfs_srv_running;
 extern char *__restart_cmd__;
+extern int use_memcache;
 nfs_analysis_t nfs_analysis;
 int nfs_remove_init();
 
@@ -199,6 +200,7 @@ int ynfs_srv(void *args)
                 GOTO(err_ret, ret);
 #endif
 
+        use_memcache = 1;
         ret = ly_init(daemon, "nfs/0", -1);
         if (ret)
                 GOTO(err_ret, ret);

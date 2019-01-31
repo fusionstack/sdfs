@@ -83,7 +83,7 @@ static int __sdfs_chunk_pull(const nid_t *nid, const chkid_t *chkid, int *_fd, i
                 offset += buf.len;
                 //YASSERT(offset > 0 && offset <= chksize);
 
-                ret = mbuffer_writefile(&buf, fd, 0, buf.len);
+                ret = mbuffer_writefile(&buf, fd, buf.len);
                 if (ret)
                         GOTO(err_fd, ret);
 

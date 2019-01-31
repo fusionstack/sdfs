@@ -313,9 +313,11 @@ int mem_cache_private_destroy()
         return 0;
 }
 
+#if 0
 int mem_hugepage_private_init()
 {
         //not support
         YASSERT(0);
         return 0;
 }
+#endif

@@ -70,7 +70,7 @@
 #define MAX_MSG_LEN     (1024 * 16)
 #define BIG_BUF_LEN     (1024 * 512)
 
-#define PAGE_SIZE (1024 * 32)
+#define PAGE_SIZE (1024 * 4)
 #define SDFS_BLOCK_SIZE 512
 
 #define RW_TIMEOUT gloconf.rpc_timeout
@@ -199,7 +199,7 @@ typedef struct {
 #pragma pack()
 
 #define MAX_NODEID_LEN 128
-#define BUFFER_SEG_SIZE PAGE_SIZE
+#define BUFFER_SEG_SIZE (1024 * 32)
 
 #define SEC_PER_MIN                 (60)
 #define SEC_PER_HOU                 (60 * 60)

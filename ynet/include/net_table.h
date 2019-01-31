@@ -79,11 +79,7 @@ time_t netable_last_update(const nid_t *nid);
 int netable_start();
 
 //just for compatible, will be removed
-int netable_msgpush(const nid_t *nid, const void *buf, int len);
 void netable_put(net_handle_t *nh, const char *why);
-int netable_send(const net_handle_t *nh, job_t *job, uint64_t hash, int is_request);
-int netable_msgget(const nid_t *nid, void *buf, int len);
-int netable_msgpop(const nid_t *nid, void *buf, int len);
 
 
 #endif
