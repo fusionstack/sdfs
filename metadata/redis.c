@@ -119,7 +119,7 @@ int hget(const fileid_t *fileid, const char *name, char *value, size_t *size)
 
         ANALYSIS_BEGIN(0);
         
-        int ret =  __redis_request(++__seq__, "hget", __hget,
+        int ret =  __redis_request(fileid_hash(fileid), "hget", __hget,
                                fileid, name, value, size);
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
@@ -190,7 +190,7 @@ int hset(const fileid_t *fileid, const char *name, const void *value, uint32_t s
 {
         ANALYSIS_BEGIN(0);
         
-        int ret = __redis_request(++__seq__, "hset", __hset,
+        int ret = __redis_request(fileid_hash(fileid), "hset", __hset,
                                fileid, name, value, size, flag);
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
@@ -244,7 +244,7 @@ static int __hlen(va_list ap)
 
 int hlen(const fileid_t *fileid, uint64_t *count)
 {
-        return __redis_request(++__seq__, "hlen", __hlen,
+        return __redis_request(fileid_hash(fileid), "hlen", __hlen,
                                fileid, count);
 }
 
@@ -294,7 +294,7 @@ static int __hscan(va_list ap)
 redisReply *hscan(const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
 {
         redisReply *reply;
-        __redis_request(++__seq__, "hscan", __hscan,
+        __redis_request(fileid_hash(fileid), "hscan", __hscan,
                         fileid, match, cursor, count, &reply);
 
         return reply;
@@ -347,7 +347,7 @@ static int __hdel(va_list ap)
 
 int hdel(const fileid_t *fileid, const char *name)
 {
-        return __redis_request(++__seq__, "hdel", __hdel,
+        return __redis_request(fileid_hash(fileid), "hdel", __hdel,
                                fileid, name);
 }
 
@@ -399,7 +399,7 @@ static int __kget(va_list ap)
 
 int kget(const fileid_t *fileid, void *value, size_t *size)
 {
-        return __redis_request(++__seq__, "kget", __kget,
+        return __redis_request(fileid_hash(fileid), "kget", __kget,
                                fileid, value, size);
 }
 
@@ -452,7 +452,7 @@ static int __kset(va_list ap)
 
 int kset(const fileid_t *fileid, const void *value, size_t size, int flag)
 {
-        return __redis_request(++__seq__, "kset", __kset,
+        return __redis_request(fileid_hash(fileid), "kset", __kset,
                                fileid, value, size, flag);
 }
 
@@ -501,7 +501,7 @@ static int __kdel(va_list ap)
 
 int kdel(const fileid_t *fileid)
 {
-        return __redis_request(++__seq__, "kdel", __kdel,
+        return __redis_request(fileid_hash(fileid), "kdel", __kdel,
                                fileid);
 }
 
@@ -575,7 +575,7 @@ inline static int __klock(va_list ap)
 int klock(const fileid_t *fileid, int ttl, int block)
 {
 #if ENABLE_KLOCK
-        return __redis_request(++__seq__, "klock", __klock,
+        return __redis_request(fileid_hash(fileid), "klock", __klock,
                                fileid, ttl, block);
 #else
         (void) fileid;
@@ -631,7 +631,7 @@ inline static int __kunlock(va_list ap)
 int kunlock(const fileid_t *fileid)
 {
 #if ENABLE_KLOCK
-        return __redis_request(++__seq__, "kunlock", __kunlock,
+        return __redis_request(fileid_hash(fileid), "kunlock", __kunlock,
                                fileid);
 #else
         (void) fileid;
@@ -687,7 +687,7 @@ static int __hiter(va_list ap)
 
 int hiter(const fileid_t *fileid, const char *match, func2_t func, void *ctx)
 {
-        return __redis_request(++__seq__, "hiter", __hiter,
+        return __redis_request(fileid_hash(fileid), "hiter", __hiter,
                                fileid, match, func, ctx);
 }
 
@@ -753,8 +753,6 @@ int rm_push(const nid_t *nid, int _hash, const chkid_t *chkid)
         return __redis_request(++__seq__, "rm_push", __rm_push,
                                nid, _hash, chkid);
 }
-
-
 
 typedef struct {
         const nid_t *nid;
@@ -1006,7 +1004,7 @@ int redis_init()
         int ret, count;
         redis_worker_t *worker;
 
-        count = ng.daemon ? REDIS_CONN_POOL : 1;
+        count = ng.daemon ? gloconf.polling_core : 1;
 
         ret = ymalloc((void **)&__redis_worker__, sizeof(*__redis_worker__) * count);
         if (unlikely(ret))

@@ -161,6 +161,12 @@ typedef chkid_t volid_t;
 typedef chkid_t poolid_t;
 
 
+static inline int fileid_hash(const fileid_t *fileid)
+{
+        return fileid->sharding;
+}
+
+
 typedef struct {
         uint32_t crc;
         uint32_t version; /*yfs meta version*/

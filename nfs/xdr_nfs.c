@@ -1579,43 +1579,43 @@ int xdr_dump(xdr_t * xdrs, mountlist *objp)
 
 inline uint64_t hash_getattr(getattr_args *args)
 {
-        return ((fileid_t *)(args->obj.val))->sharding;
+        return fileid_hash((fileid_t *)(args->obj.val));
 }
 
 inline uint64_t hash_lookup(lookup_args *args)
 {
-        return ((fileid_t *)(args->dir.val))->sharding;
+        return fileid_hash((fileid_t *)(args->dir.val));
 }
 
 inline uint64_t hash_access(access_args *args)
 {
-        return ((fileid_t *)(args->obj.val))->sharding;
+        return fileid_hash((fileid_t *)(args->obj.val));
 }
 
 inline uint64_t hash_read(read_args *args)
 {
-        return ((fileid_t *)(args->file.val))->sharding;
+        return fileid_hash((fileid_t *)(args->file.val));
 }
 
 inline uint64_t hash_write(write_args *args)
 {
-        return ((fileid_t *)(args->file.val))->sharding;
+        return fileid_hash((fileid_t *)(args->file.val));
 }
 
 inline uint64_t hash_create(create_args *args)
 {
-        return ((fileid_t *)(args->where.dir.val))->sharding;
+        return fileid_hash((fileid_t *)(args->where.dir.val));
 }
 
 inline uint64_t hash_mkdir(mkdir_args *args)
 {
-        return ((fileid_t *)(args->where.dir.val))->sharding;
+        return fileid_hash((fileid_t *)(args->where.dir.val));
 }
 
 inline uint64_t hash_remove(remove_args *args)
 {
 #if 0
-        return ((fileid_t *)(args->obj.dir.val))->sharding;
+        return fileid_hash((fileid_t *)(args->obj.dir.val));
 #else
         (void) args;
         return 0;
@@ -1624,35 +1624,35 @@ inline uint64_t hash_remove(remove_args *args)
 
 inline uint64_t hash_rmdir(rmdir_args *args)
 {
-        return ((fileid_t *)(args->obj.dir.val))->sharding;
+        return fileid_hash((fileid_t *)(args->obj.dir.val));
 }
 
 inline uint64_t hash_readdir(readdir_args *args)
 {
-        return ((fileid_t *)(args->dir.val))->sharding;
+        return fileid_hash((fileid_t *)(args->dir.val));
 }
 
 inline uint64_t hash_readdirplus(readdirplus_args *args)
 {
-        return ((fileid_t *)(args->dir.val))->sharding;
+        return fileid_hash((fileid_t *)(args->dir.val));
 }
 
 inline uint64_t hash_fsstat(fsstat_args *args)
 {
-        return ((fileid_t *)(args->fsroot.val))->sharding;
+        return fileid_hash((fileid_t *)(args->fsroot.val));
 }
 
 inline uint64_t hash_fsinfo(fsinfo_args *args)
 {
-        return ((fileid_t *)(args->fsroot.val))->sharding;
+        return fileid_hash((fileid_t *)(args->fsroot.val));
 }
 
 inline uint64_t hash_pathconf3(pathconf3_args *args)
 {
-        return ((fileid_t *)(args->object.val))->sharding;
+        return fileid_hash((fileid_t *)(args->object.val));
 }
 
 inline uint64_t hash_setattr(setattr3_args *args)
 {
-        return ((fileid_t *)(args->obj.val))->sharding;
+        return fileid_hash((fileid_t *)(args->obj.val));
 }

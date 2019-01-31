@@ -43,7 +43,7 @@ int connect_redis(const char *ip, short port, redis_ctx_t **ctx)
         c = redisConnectWithTimeout(ip, port, timeout);
         if (!c || c->err) {
                 if (c) {
-                        DINFO("Connection error: %s\n", c->errstr);
+                        DINFO("Connection error: %s, addr %s:%d\n", c->errstr, ip, port);
                 } else {
                         DINFO("Connection error: can't allocate redis context\n");
                 }

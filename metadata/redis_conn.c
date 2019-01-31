@@ -68,8 +68,10 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
 
         int port = atoi(list[1]);
         ret = redis_connect(&conn->conn, list[0], &port, key);
-        if(ret)
+        if(ret) {
+                DWARN("get volume %s sharding[%d] master @ %s:%s fail\n", volume, sharding, list[0], list[1]);
                 GOTO(err_ret, ret);
+        }
 
         conn->magic = magic;
         conn->used = 0;
