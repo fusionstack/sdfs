@@ -203,6 +203,7 @@ SET_TARGET_PROPERTIES(ynet
 add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/license/src/aes.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_pipeline.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_vol.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_conn.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md.c

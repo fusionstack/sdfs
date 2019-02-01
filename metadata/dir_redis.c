@@ -9,6 +9,7 @@
 #include "dir.h"
 #include "net_global.h"
 #include "redis.h"
+#include "redis_pipeline.h"
 #include "md.h"
 #include "md_db.h"
 #include "dbg.h"
@@ -18,7 +19,8 @@ static int dir_lookup(const fileid_t *parent, const char *name, fileid_t *fid, u
         dir_entry_t *ent;
         char buf[sizeof(dir_entry_t)];
         size_t buflen;
-        
+
+        //DWARN("--------------pipeline test--------------------\n");
         ret = hget(parent, name, buf, &buflen);
         if (ret)
                 GOTO(err_ret, ret);

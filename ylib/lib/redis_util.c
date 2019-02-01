@@ -34,6 +34,25 @@ static int __redis_error(redis_conn_t *conn, const char *func, redisReply *reply
         return ret;
 }
 
+int redis_error(const char *func, redisReply *reply)
+{
+        int ret;
+
+        DWARN("%s reply->type %u, reply->str %s\n", func, reply->type, reply->str);
+        
+        if (strcmp(reply->str, "LOADING Redis is loading the dataset in memory") == 0) {
+                ret = EAGAIN;
+        } else if (strncmp(reply->str, "READONLY", strlen("READONLY")) == 0) {
+                ret = ECONNRESET;
+        } else {
+                ret = EIO;
+                UNIMPLEMENTED(__DUMP__);
+        }
+
+        return ret;
+        
+}
+
 int connect_redis(const char *ip, short port, redis_ctx_t **ctx)
 {
         int ret;

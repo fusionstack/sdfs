@@ -32,6 +32,7 @@ typedef struct {
 } redis_conn_t;
 
 int connect_redis(const char *ip, short port, redis_ctx_t **ctx);
+int redis_error(const char *func, redisReply *reply);
 int connect_redis_unix(const char *path, redis_ctx_t **ctx);
 int disconnect_redis(redis_ctx_t **ctx);
 

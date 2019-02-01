@@ -40,6 +40,7 @@ extern int kunlock(const fileid_t *fileid);
 extern int hiter(const fileid_t *fid, const char *match, func2_t func, void *ctx);
 extern int rm_push(const nid_t *nid, int _hash, const chkid_t *chkid);
 extern int rm_pop(const nid_t *nid, int _hash, chkid_t *array, int *count);
+extern int redis_exec(const fileid_t *fileid, func_va_t exec, void *arg);
 extern int redis_init();
 
 extern int hset(const fileid_t *fid, const char *name, const void *buf, uint32_t size, int flag);

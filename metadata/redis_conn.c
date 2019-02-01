@@ -106,7 +106,9 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
         int ret, count, i;
         __conn_t *conn;
 
-        count = ng.daemon ? REDIS_CONN_POOL : 1;
+        //count = ng.daemon ? REDIS_CONN_POOL : 1;
+        count = ng.daemon ? gloconf.polling_core : 1;
+        YASSERT(count);
 
         ret = ymalloc((void **)&conn, sizeof(*conn) * count);
         if(ret)
@@ -120,6 +122,7 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
 
         sharding->count = count;
         sharding->conn = conn;
+        YASSERT(conn);
 
         DINFO("redis sharding[%u] conn %u connected\n", idx, count);
 
@@ -247,11 +250,11 @@ int redis_conn_get(uint64_t volid, int sharding, int worker, redis_handler_t *ha
                 GOTO(err_release, ret);
 
         idx = sharding % vol->sharding;
+        handler->sharding = idx;
         ret = __redis_conn_get_sharding(&vol->shardings[handler->sharding], worker, handler);
         if(ret)
                 GOTO(err_lock, ret);
 
-        handler->sharding = idx;
         handler->volid = volid;
         
         pthread_rwlock_unlock(&vol->lock);
