@@ -1034,7 +1034,7 @@ int redis_init()
 
         __worker_count__ = count;
 
-#if 0
+#if 1
         ret = redis_pipeline_init();
         if(ret)
                 GOTO(err_ret, ret);

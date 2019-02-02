@@ -12,6 +12,7 @@
 #include "redis_conn.h"
 #include "md_lib.h"
 #include "redis.h"
+#include "redis_pipeline.h"
 #include "quota.h"
 #include "md.h"
 #include "md_db.h"
@@ -125,6 +126,7 @@ static int __inode_getattr(const fileid_t *fileid, md_proto_t *md)
 
         DBUG("getattr "CHKID_FORMAT"\n", CHKID_ARG(fileid));
         
+        //DWARN("--------------pipeline test--------------------\n");
         len = MAX_BUF_LEN;
         ret = hget(fileid, SDFS_MD, buf, &len);
         if (ret) {
