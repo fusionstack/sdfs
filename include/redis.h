@@ -4,8 +4,10 @@
 #include <hiredis/hiredis.h>
 //#include <hircluster.h>
 #include "sdfs_id.h"
+#include "redis_pipeline.h"
 #include "cJSON.h"
 #include "zlib.h"
+
 
 #define REDIS_THREAD_MAX 256
 #define REDIS_INSTANCE_MAX 1000

@@ -330,14 +330,26 @@ static int __redis_pipline_run()
         
         sy_spin_unlock(&__lock__);
 
-        list_for_each_safe(pos, n, &list) {
+        while (!list_empty(&list)) {
+                pos = (void *)list.next;
                 ctx = (redis_pipline_ctx_t *)pos;
-
-                INIT_LIST_HEAD(&arg.list);
                 arg.fileid = ctx->fileid;
-                YASSERT(ctx->fileid.type);
+                INIT_LIST_HEAD(&arg.list);
                 list_del(pos);
                 list_add_tail(pos, &arg.list);
+                YASSERT(ctx->fileid.type);
+                
+                list_for_each_safe(pos, n, &list) {
+                        ctx = (redis_pipline_ctx_t *)pos;
+
+                        if (ctx->fileid.sharding == arg.fileid.sharding
+                            && ctx->fileid.volid == arg.fileid.volid) {
+                                list_del(pos);
+                                list_add_tail(pos, &arg.list);
+                        }
+
+                        YASSERT(ctx->fileid.type);
+                }
 
                 DINFO("%s\n", ctx->format);
                 ret = redis_exec(&ctx->fileid, __redis_exec, &arg);
@@ -389,6 +401,172 @@ int pipeline_hget(const fileid_t *fileid, const char *key, void *buf, size_t *le
         freeReplyObject(reply);
         return 0;
 
+err_free:
+        freeReplyObject(reply);
+err_ret:
+        return ret;
+}
+
+int pipeline_hset(const fileid_t *fileid, const char *key, const void *value, uint32_t size, int flag)
+{
+        int ret;
+        redisReply *reply;
+        char hash[MAX_NAME_LEN];
+
+        id2key(ftype(fileid), fileid, hash);
+
+        if (flag & O_EXCL) {
+                ret = redis_pipeline(fileid, &reply, "HSETNX %s %s %b", hash, key, value, size);
+        } else {
+                ret = redis_pipeline(fileid, &reply,  "HSET %s %s %b", hash, key, value, size);
+        }
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        if (reply == NULL) {
+                ret = ECONNRESET;
+                DWARN("redis reset\n");
+                GOTO(err_ret, ret);
+        }
+
+        if (reply->type != REDIS_REPLY_INTEGER) {
+                ret = redis_error(__FUNCTION__, reply);
+                GOTO(err_free, ret);
+        }
+
+        //DINFO("reply->integer  %u\n", reply->integer);
+        if (flag & O_EXCL && reply->integer == 0) {
+                ret = EEXIST;
+                GOTO(err_free, ret);
+        }
+        
+        freeReplyObject(reply);
+
+        return 0;
+err_free:
+        freeReplyObject(reply);
+err_ret:
+        return ret;
+}
+
+int pipeline_hdel(const fileid_t *fileid, const char *key)
+{
+        int ret;
+        redisReply *reply;
+        char hash[MAX_NAME_LEN];
+
+        id2key(ftype(fileid), fileid, hash);
+
+        ret = redis_pipeline(fileid, &reply, "HDEL %s %s", hash, key);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);        
+
+        if (reply == NULL) {
+                ret = ECONNRESET;
+                DWARN("redis reset\n");
+                GOTO(err_ret, ret);
+        }
+        
+        if (reply->type != REDIS_REPLY_INTEGER) {
+                ret = redis_error(__FUNCTION__, reply);
+                GOTO(err_free, ret);
+        }
+
+        if (reply->integer == 0) {
+                ret = ENOENT;
+                GOTO(err_free, ret);
+        }
+        
+        freeReplyObject(reply);
+
+        return 0;
+err_free:
+        freeReplyObject(reply);
+err_ret:
+        return ret;
+}
+
+int pipeline_kget(const fileid_t *fileid, const char *key, void *buf, size_t *len)
+{
+        int ret;
+        redisReply *reply;
+        
+        ret = redis_pipeline(fileid, &reply,"GET %s", key);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        if (reply == NULL) {
+                ret = ECONNRESET;
+                DWARN("redis reset\n");
+                GOTO(err_ret, ret);
+        }
+        
+        if (reply->type == REDIS_REPLY_NIL) {
+                ret = ENOENT;
+                GOTO(err_free, ret);
+        }
+                
+        if (reply->type != REDIS_REPLY_STRING) {
+                DWARN("redis reply->type: %d\n", reply->type);
+                ret = redis_error(__FUNCTION__, reply);
+                GOTO(err_free, ret);
+        }
+
+        *len = reply->len;
+        memcpy(buf, reply->str, reply->len);
+
+        freeReplyObject(reply);
+        return 0;
+
+err_free:
+        freeReplyObject(reply);
+err_ret:
+        return ret;
+}
+
+int pipeline_kset(const fileid_t *fileid, const char *key, const void *value,
+                  size_t size, int flag, int _ttl)
+{
+        int ret;
+        redisReply *reply;
+
+        if (_ttl != -1) {
+                size_t ttl = _ttl;
+                if (flag & O_EXCL) {
+                        ret = redis_pipeline(fileid, &reply, "SET %s %b EX %d NX", key, value, size, ttl);
+                } else {
+                        ret = redis_pipeline(fileid, &reply, "SET %s %b EX %d", key, value, size, ttl);
+                }
+        } else {
+                if (flag & O_EXCL) {
+                        ret = redis_pipeline(fileid, &reply, "SET %s %b NX", key, value, size);
+                } else {
+                        ret = redis_pipeline(fileid, &reply, "SET %s %b", key, value, size);
+                }
+        }
+
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        if (reply == NULL) {
+                ret = ECONNRESET;
+                DWARN("redis reset\n");
+                GOTO(err_ret, ret);
+        }
+
+        if (flag & O_EXCL && reply->type == REDIS_REPLY_NIL) {
+                ret = EEXIST;
+                GOTO(err_free, ret);
+        }
+        
+        if (reply->type != REDIS_REPLY_STATUS || strcmp(reply->str, "OK") != 0) {
+                ret = redis_error(__FUNCTION__, reply);
+                GOTO(err_free, ret);
+        }
+
+        freeReplyObject(reply);
+
+        return 0;
 err_free:
         freeReplyObject(reply);
 err_ret:

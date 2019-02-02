@@ -21,7 +21,7 @@ static int __kv_get(root_type_t type, const char *key, void *value, size_t *len)
 
         fileid = *md_root_getid(type);
 
-        ret = hget(&fileid, key, value, len);
+        ret = pipeline_hget(&fileid, key, value, len);
         if (ret)
                 GOTO(err_ret, ret);
 
