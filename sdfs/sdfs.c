@@ -537,48 +537,6 @@ int sdfs_listxattr(const fileid_t *fileid, char *list, size_t *size)
         return md_listxattr(fileid, list, size);
 }
 
-
-inline static int __chunk_setxattr(const fileinfo_t *md, const char *key, const char *value)
-{
-        int ret, set, status, i;
-        char buf[MAX_BUF_LEN];
-        objinfo_t *objinfo;
-        chkid_t chkid;
-
-        if (strcmp(key, ATTR_PREALLOC) == 0) {
-                status = __S_PREALLOC;
-        } else if (strcmp(key, ATTR_WRITEBACK) == 0) {
-                status = __S_WRITEBACK;
-        } else
-                goto out;
-
-        if (strcmp(value, ATTR_TRUE) == 0)
-                set = 1;
-        else if (strcmp(value, ATTR_FALSE) == 0)
-                set = 0;
-        else {
-                ret = EINVAL;
-                GOTO(err_ret, ret);
-        }
-
-        objinfo = (void *)buf;
-        for (i = 0; i < (int)md->chknum; i++) {
-                fid2cid(&chkid, &md->fileid, i);
-                ret = md_objset(objinfo, &chkid, set, status);
-                if (ret) {
-                        if (ret == ENOENT)
-                                continue;
-                        else
-                                GOTO(err_ret, ret);
-                }
-        }
-
-out:
-        return 0;
-err_ret:
-        return ret;
-}
-
 int sdfs_setxattr(const fileid_t *fileid, const char *name, const void *value,
                  size_t size, int flags)
 {
@@ -643,15 +601,6 @@ int sdfs_setxattr(const fileid_t *fileid, const char *name, const void *value,
         ret = md_setxattr(fileid, name, value, size, flags);
         if (ret)
                 GOTO(err_ret, ret);
-
-        UNIMPLEMENTED(__NULL__);
-#if 0
-        if (S_ISREG(md->at_mode)) {
-                ret = __chunk_setxattr((void *)md, name, value);
-                if (ret)
-                        GOTO(err_ret, ret);
-        }
-#endif
 
         return 0;
 err_ret:

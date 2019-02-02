@@ -114,6 +114,10 @@ static int __hget(va_list ap)
 
 int hget(const fileid_t *fileid, const char *name, char *value, size_t *size)
 {
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_hget(fileid, name, value, size);
+#endif        
+        
         YASSERT(fileid->type);
 
         ANALYSIS_BEGIN(0);
@@ -187,6 +191,10 @@ static int __hset(va_list ap)
 
 int hset(const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
 {
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_hset(fileid, name, value, size, flag);
+#endif
+        
         ANALYSIS_BEGIN(0);
         
         int ret = __redis_request(fileid_hash(fileid), "hset", __hset,
@@ -243,6 +251,9 @@ static int __hlen(va_list ap)
 
 int hlen(const fileid_t *fileid, uint64_t *count)
 {
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_hlen(fileid, count);
+#endif
         return __redis_request(fileid_hash(fileid), "hlen", __hlen,
                                fileid, count);
 }
@@ -346,6 +357,10 @@ static int __hdel(va_list ap)
 
 int hdel(const fileid_t *fileid, const char *name)
 {
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_hdel(fileid, name);
+#endif
+        
         return __redis_request(fileid_hash(fileid), "hdel", __hdel,
                                fileid, name);
 }
@@ -398,6 +413,10 @@ static int __kget(va_list ap)
 
 int kget(const fileid_t *fileid, void *value, size_t *size)
 {
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_kget(fileid, value, size);
+#endif
+
         return __redis_request(fileid_hash(fileid), "kget", __kget,
                                fileid, value, size);
 }
@@ -451,6 +470,10 @@ static int __kset(va_list ap)
 
 int kset(const fileid_t *fileid, const void *value, size_t size, int flag)
 {
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_kset(fileid, value, size, flag, -1);
+#endif
+        
         return __redis_request(fileid_hash(fileid), "kset", __kset,
                                fileid, value, size, flag);
 }
@@ -500,6 +523,10 @@ static int __kdel(va_list ap)
 
 int kdel(const fileid_t *fileid)
 {
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_kdel(fileid);
+#endif
+        
         return __redis_request(fileid_hash(fileid), "kdel", __kdel,
                                fileid);
 }
@@ -574,6 +601,10 @@ inline static int __klock(va_list ap)
 int klock(const fileid_t *fileid, int ttl, int block)
 {
 #if ENABLE_KLOCK
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_klock(fileid, ttl, block);
+#endif
+
         return __redis_request(fileid_hash(fileid), "klock", __klock,
                                fileid, ttl, block);
 #else
@@ -630,6 +661,10 @@ inline static int __kunlock(va_list ap)
 int kunlock(const fileid_t *fileid)
 {
 #if ENABLE_KLOCK
+#if ENABLE_REDIS_PIPELINE
+        return pipeline_kunlock(fileid);
+#endif
+        
         return __redis_request(fileid_hash(fileid), "kunlock", __kunlock,
                                fileid);
 #else
@@ -1004,7 +1039,6 @@ int redis_init()
         redis_worker_t *worker;
 
         count = ng.daemon ? gloconf.polling_core : 1;
-        count = 1;
 
         ret = ymalloc((void **)&__redis_worker__, sizeof(*__redis_worker__) * count);
         if (unlikely(ret))
@@ -1034,7 +1068,7 @@ int redis_init()
 
         __worker_count__ = count;
 
-#if 1
+#if ENABLE_REDIS_PIPELINE
         ret = redis_pipeline_init();
         if(ret)
                 GOTO(err_ret, ret);

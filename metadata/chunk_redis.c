@@ -45,7 +45,7 @@ static int __chunk_load(const chkid_t *chkid, chkinfo_t *chkinfo)
 
         snprintf(key, MAX_NAME_LEN, "%u", chkid->idx);
         len = CHKINFO_SIZE(YFS_CHK_REP_MAX);
-        ret = pipeline_hget(&fileid, key, (char *)chkinfo, &len);
+        ret = hget(&fileid, key, (char *)chkinfo, &len);
         if (ret)
                 GOTO(err_ret, ret);
 

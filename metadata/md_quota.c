@@ -329,7 +329,7 @@ int md_update_quota(const quota_t *quota)
         return 0;
 #if !QUOTA_NEW
 err_lock:
-        kunlock(&quota->dirid);
+        pipeline_kunlock(&quota->dirid);
 #endif
 err_ret:
         return ret;

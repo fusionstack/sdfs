@@ -106,8 +106,8 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
         int ret, count, i;
         __conn_t *conn;
 
-        //count = ng.daemon ? REDIS_CONN_POOL : 1;
-        count = ng.daemon ? gloconf.polling_core : 1;
+        count = ng.daemon ? REDIS_CONN_POOL : 1;
+        //count = ng.daemon ? gloconf.polling_core : 1;
         YASSERT(count);
 
         ret = ymalloc((void **)&conn, sizeof(*conn) * count);

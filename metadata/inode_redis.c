@@ -61,7 +61,7 @@ static int __inode_getlock(const fileid_t *fileid, void *opaque, size_t *len)
                 GOTO(err_ret, ret);
         }
         
-        ret = pipeline_hget(fileid, SDFS_LOCK, opaque, len);
+        ret = hget(fileid, SDFS_LOCK, opaque, len);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -128,7 +128,7 @@ static int __inode_getattr(const fileid_t *fileid, md_proto_t *md)
         
         //DWARN("--------------pipeline test--------------------\n");
         len = MAX_BUF_LEN;
-        ret = pipeline_hget(fileid, SDFS_MD, buf, &len);
+        ret = hget(fileid, SDFS_MD, buf, &len);
         if (ret) {
                 if (ret == ENOENT) {
                         memset(md, 0x0, sizeof(*md));
@@ -307,7 +307,7 @@ static int __inode_getxattr(const fileid_t *id, const char *key, char *value, si
 
         __inode_getxattrid(id, &xattrid, 0);
 
-        ret = pipeline_hget(&xattrid, key, value, value_len);
+        ret = hget(&xattrid, key, value, value_len);
         if (ret) {
                 ret = ENOENT ? ENOKEY : ret;
                 GOTO(err_ret, ret);

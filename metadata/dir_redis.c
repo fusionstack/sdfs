@@ -21,7 +21,7 @@ static int dir_lookup(const fileid_t *parent, const char *name, fileid_t *fid, u
         size_t buflen;
 
         //DWARN("--------------pipeline test--------------------\n");
-        ret = pipeline_hget(parent, name, buf, &buflen);
+        ret = hget(parent, name, buf, &buflen);
         if (ret)
                 GOTO(err_ret, ret);
 

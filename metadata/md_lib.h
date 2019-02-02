@@ -71,16 +71,7 @@ int md_chkget_prep(job_t *job, const chkid_t *chkid);
 int md_chkget(const fileinfo_t *md, chkinfo_t *chk, const chkid_t *chkid,
               const nid_t *owner);
 int md_chkload(chkinfo_t *chk, const chkid_t *chkid, const nid_t *nid);
-int md_chkunload(struct yfs_chunk *chk);
 int md_chkupdate(const chkinfo_t *chkinfo, const nid_t *nid);
-
-int md_chkavailable(objinfo_t *objinfo, const chkid_t *chkid,
-                     const diskid_t *diskid, int available);
-int md_chunk_set(const chkid_t *chkid, const diskid_t *diskid,
-                 int available, chkinfo_t *chkinfo);
-int md_chknewmaster(chkinfo_t *chkinfo, const chkid_t *chkid, int type);
-int md_newrep(chkinfo_t *chkinfo, const chkid_t *chkid, int lock, int flag);
-int md_objset(objinfo_t *objinfo, const chkid_t *chkid, int set, int status);
 
 /* file.c */
 int md_create(const fileid_t *parent, const char *name, const setattr_t *setattr,
