@@ -1,7 +1,7 @@
 #ifndef __REDIS_PIPELINE__
 #define __REDIS_PIPELINE__
 
-#define ENABLE_REDIS_PIPELINE 0
+#define ENABLE_REDIS_PIPELINE 1
 
 #if ENABLE_REDIS_PIPELINE
 int redis_pipeline_init();

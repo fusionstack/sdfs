@@ -193,6 +193,8 @@ static void *__redis_schedule(void *arg)
 
                 __redis_pipline_run(pipeline);
 
+                schedule_run(pipeline->schedule);
+
                 schedule_scan(pipeline->schedule);
         }
 
@@ -291,10 +293,8 @@ static int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
                 list_del(pos);
                 
                 ret = redisGetReply(conn->ctx, (void **)&ctx->reply);
-                if ((unlikely(ret)))
-                        GOTO(err_lock, ret);
 
-                schedule_resume(&ctx->task, 0, NULL);
+                schedule_resume(&ctx->task, ret, NULL);
         }
 
         sy_rwlock_unlock(&conn->rwlock);
@@ -351,12 +351,24 @@ err_ret:
         return ret;
 }
 
+inline static void __redis_pipline_run__(void *_arg)
+{
+        int ret;
+        arg2_t *arg = _arg;
+                
+        ret = redis_exec(&arg->fileid, __redis_exec, arg);
+        if (unlikely(ret))
+                UNIMPLEMENTED(__DUMP__);
+
+        yfree((void **)&arg);
+}
+
 static int __redis_pipline_run(pipeline_t *pipeline)
 {
         int ret;
         struct list_head list, *pos, *n;
         redis_pipline_ctx_t *ctx;
-        arg2_t arg;
+        arg2_t *arg;
 
         INIT_LIST_HEAD(&list);
         ret = sy_spin_lock(&pipeline->lock);
@@ -364,26 +376,30 @@ static int __redis_pipline_run(pipeline_t *pipeline)
                 GOTO(err_ret, ret);
 
         list_splice_init(&pipeline->list, &list);
-        
+
         sy_spin_unlock(&pipeline->lock);
 
         while (!list_empty(&list)) {
+                ret = ymalloc((void **)&arg, sizeof(*arg));
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+
                 pos = (void *)list.next;
                 ctx = (redis_pipline_ctx_t *)pos;
-                arg.fileid = ctx->fileid;
-                INIT_LIST_HEAD(&arg.list);
+                arg->fileid = ctx->fileid;
+                INIT_LIST_HEAD(&arg->list);
                 list_del(pos);
-                list_add_tail(pos, &arg.list);
+                list_add_tail(pos, &arg->list);
                 YASSERT(ctx->fileid.type);
 
                 int count = 1;
                 list_for_each_safe(pos, n, &list) {
                         ctx = (redis_pipline_ctx_t *)pos;
 
-                        if (ctx->fileid.sharding == arg.fileid.sharding
-                            && ctx->fileid.volid == arg.fileid.volid) {
+                        if (ctx->fileid.sharding == arg->fileid.sharding
+                            && ctx->fileid.volid == arg->fileid.volid) {
                                 list_del(pos);
-                                list_add_tail(pos, &arg.list);
+                                list_add_tail(pos, &arg->list);
                                 count++;
                         }
 
@@ -391,9 +407,16 @@ static int __redis_pipline_run(pipeline_t *pipeline)
                 }
 
                 DBUG("submit count %u\n", count);
-                ret = redis_exec(&ctx->fileid, __redis_exec, &arg);
+
+#if 1
+                ret = redis_exec(&arg->fileid, __redis_exec, arg);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
+
+                yfree((void **)&arg);
+#else
+                schedule_task_new("pipeline_run", __redis_pipline_run__, arg, -1);
+#endif
         }
 
         return 0;
@@ -744,7 +767,6 @@ err_ret:
         ret = ret == ENOENT ? EAGAIN : ret;
         return ret;
 }
-
 
 int pipeline_kget(const fileid_t *fileid, void *buf, size_t *len)
 {
