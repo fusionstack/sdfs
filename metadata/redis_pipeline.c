@@ -34,6 +34,7 @@ static sy_spinlock_t __lock__;
 static struct list_head __list__;
 #endif
 extern __thread int __redis_workerid__;
+extern int __redis_conn_pool__;
 //static redis_ctx_array_t *__redis_ctx_array__;
 
 typedef struct {
@@ -66,7 +67,11 @@ int redis_pipeline_init()
         int ret, count;
         pipeline_t *pipeline;
 
+#if 0
         count = ng.daemon ? gloconf.polling_core : 1;
+#else
+        count = __redis_conn_pool__;
+#endif
         ret = ymalloc((void **)&__pipeline_array__, sizeof(*__pipeline_array__) * count);
         if (ret)
                 GOTO(err_ret, ret);

@@ -31,8 +31,6 @@ static inline int id2key(const char *prefix, const fileid_t *fid, char *key)
         return 0;
 }
 
-extern int init_redis();
-
 extern int kdel(const fileid_t *fid);
 extern int kset(const fileid_t *fid, const void *buf, size_t size, int flag);
 extern int kget(const fileid_t *fid, void *buf, size_t *size);

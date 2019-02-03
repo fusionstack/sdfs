@@ -144,7 +144,7 @@ int md_root_init()
         int ret, i;
 
         YASSERT(__inited__ == 0);
-
+        
         for (i = 0; i < roottype_max; i++) {
                 ret = __md_root_load(__type__[i], &__idarray__[i]);
                 if (unlikely(ret))

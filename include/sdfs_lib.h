@@ -91,6 +91,8 @@ typedef struct {
 /* return negative number on error */
 
 /* yfs_lib.c */
+int sdfs_init_verbose(const char *name, int redis_conn);
+int sdfs_init(const char *name);
 extern int ly_prep(int daemon, const char *name, int64_t maxopenfile);
 extern int ly_init(int daemon, const char *name, int64_t maxopenfile);
 extern int ly_run(char *home, int (*server)(void *args), void *args);

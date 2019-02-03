@@ -40,7 +40,7 @@ typedef struct {
 
 //static redis_vol_t *__conn__;
 static int __conn_magic__ = 0;
-
+extern int __redis_conn_pool__;
 
 static int __redis_vol_get(uint64_t volid, redis_vol_t **_vol, int flag);
 
@@ -127,8 +127,12 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
         int ret, count, i;
         __conn_t *conn;
 
-        count = ng.daemon ? REDIS_CONN_POOL : 1;
-        //count = ng.daemon ? gloconf.polling_core : 1;
+        //count = ng.daemon ? REDIS_CONN_POOL : 1;
+#if 0
+        count = ng.daemon ? gloconf.polling_core : 1;
+#else
+        count = __redis_conn_pool__;
+#endif
         YASSERT(count);
 
         ret = ymalloc((void **)&conn, sizeof(*conn) * count);

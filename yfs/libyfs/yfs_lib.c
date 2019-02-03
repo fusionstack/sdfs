@@ -586,7 +586,7 @@ err_ret:
         return ret;
 }
 
-int init_stage2(const char *name, int noroot)
+int init_stage2(const char *name, int noroot, int redis_conn)
 {
         int ret, thread;
         char home[MAX_PATH_LEN], path[MAX_PATH_LEN];
@@ -595,7 +595,7 @@ int init_stage2(const char *name, int noroot)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = redis_init();
+        ret = redis_init(redis_conn);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -672,7 +672,7 @@ int ly_init(int daemon, const char *name, int64_t maxopenfile)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = init_stage2(name, __no_root__);
+        ret = init_stage2(name, __no_root__, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -910,15 +910,36 @@ err_ret:
         return ret;
 }
 
-int sdfs_init_verbose(const char *name, int workdir, int daemon)
+int sdfs_init_verbose(const char *name, int redis_conn)
 {
         int ret;
 
-        (void) workdir;
-
-        ret = ly_init(daemon, name, -1);
+        ret = init_stage1();
         if (ret)
                 GOTO(err_ret, ret);
+
+        ret = init_stage2(name, __no_root__, redis_conn);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        ret = init_stage3();
+        if (ret)
+                GOTO(err_ret, ret);
+
+        _fence_test1_init(ng.home);
+
+        ng.live = 1;
+        ng.uptime = time(NULL);
+
+        ret = md_init();
+        if (ret)
+                GOTO(err_ret, ret);
+
+        ret = replica_rpc_init();
+        if (ret)
+                GOTO(err_ret, ret);
+        
+        main_loop_start();
 
         ret = io_analysis_init(name, -1);
         if (ret)
@@ -941,5 +962,5 @@ err_ret:
 
 int sdfs_init(const char *name)
 {
-        return sdfs_init_verbose(name, -1, 0);
+        return sdfs_init_verbose(name, gloconf.polling_core);
 }

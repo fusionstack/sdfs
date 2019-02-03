@@ -170,14 +170,13 @@ int ynfs_reset_handler(net_handle_t *nh, uuid_t *nodeid)
 
 int ynfs_srv(void *args)
 {
-        int ret, daemon;
+        int ret;
         net_proto_t net_op;
         ynfs_args_t *ynfs_args;
         char service[MAX_NAME_LEN];
         char path[MAX_PATH_LEN];
 
         ynfs_args = args;
-        daemon = ynfs_args->daemon;
 
         snprintf(path, MAX_NAME_LEN, "%s/status/status.pid", ynfs_args->home);
         ret = daemon_pid(path);
@@ -201,7 +200,7 @@ int ynfs_srv(void *args)
 #endif
 
         use_memcache = 1;
-        ret = ly_init(daemon, "nfs/0", -1);
+        ret = sdfs_init_verbose("nfs/0", gloconf.polling_core);
         if (ret)
                 GOTO(err_ret, ret);
 

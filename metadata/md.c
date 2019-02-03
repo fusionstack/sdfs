@@ -145,12 +145,6 @@ int md_init()
 
         __mdid__ = array;
 
-#if 1
-        ret = init_redis();
-        if(ret)
-                GOTO(err_ret, ret);
-#endif
-
         return 0;
 err_ret:
         return ret;

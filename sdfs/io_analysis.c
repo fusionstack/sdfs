@@ -219,8 +219,9 @@ static void *__io_analysis_rept(void *arg)
                         UNIMPLEMENTED(__DUMP__);
                 
                 ret = __io_analysis_dump();
-                if (ret)
-                        UNIMPLEMENTED(__DUMP__);
+                if (ret) {
+                        DERROR("dump fail\n");
+                }
                 
                 sy_spin_unlock(&__io_analysis__->lock);
 

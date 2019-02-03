@@ -103,6 +103,7 @@ class Redisd():
         self.hostname = socket.gethostname()
         self.etcd = etcd.Client(host='127.0.0.1', port=2379)
         self.id = None
+        self.redis_pid = -1        
         self.lock = False
         self.volume = None
         self.running = True
@@ -287,24 +288,27 @@ class Redisd():
 
     def __redis_pid(self, force):
         pidfile = os.path.join(self.workdir, 'run/redis-server.pid')
+        if os.path.exists(pidfile):
+            self.redis_pid = int(get_value(pidfile))
 
+                    
+    def __redis_start(self):
+        cmd = "redis-server %s/config/redis.conf" % (self.workdir)
+        pidfile = os.path.join(self.workdir, 'run/redis-server.pid')
+        dmsg("start: " + cmd)
+
+        retry = 0;
         while (1):
+            os.system(cmd)
+
             if os.path.exists(pidfile):
                 self.redis_pid = int(get_value(pidfile))
                 break;
             else:
-                if force:
-                    time.sleep(0.1)
-                else:
-                    break;
-                    
-    def __redis_start(self):
-        cmd = "redis-server %s/config/redis.conf" % (self.workdir)
-        os.system(cmd)
-
-        pidfile = os.path.join(self.workdir, 'run/redis-server.pid')
-
-        self.__redis_pid(True);
+                dwarn("start %s fail, retry %u\n" % (self.name, retry))
+                time.sleep(0.2)
+                retry = retry + 1
+            
         
     def __init_redis_master(self, config):
         try:
@@ -559,8 +563,9 @@ class Redisd():
             try:
                 res = exec_shell(cmd, need_return=True)
             except:
-                if (retry > 10):
+                if (retry > 1000):
                     self.running = False
+                    derror(self.name + " get dbversion fail")
                     exit(1)
                 time.sleep(1)
                 retry += 1;
@@ -573,7 +578,7 @@ class Redisd():
             try:
                 version = int(r)
             except ValueError:
-                derror(r)
+                derror("value error:" + str(r))
                 time.sleep(1)
                 continue;
 
@@ -586,7 +591,7 @@ class Redisd():
             try:
                 res = exec_shell(cmd, p=False, need_return=True)
             except Exp as e:
-                derror(str(Exp))
+                derror("get info replication error: " + str(Exp))
                 time.sleep(1)
                 continue;
 
@@ -674,7 +679,7 @@ class Redisd():
         dmsg("health check begin")
         def __health__(args):
             ctx = args
-            cmd = "/opt/sdfs/app/bin/sdfs.health -s /sdfs/volume/%s/slot/%d  > /opt/sdfs/log/health_%s_%d.log 2>&1" % (ctx.volume, ctx.sharding, ctx.volume, ctx.sharding)
+            cmd = "/opt/sdfs/app/bin/sdfs.health -s /sdfs/volume/%s/slot/%d  > /opt/sdfs/log/health_%s_%d.log 2>&1" % (ctx.volume, ctx.id[0], ctx.volume, ctx.id[0])
             dmsg(cmd)
             os.system(cmd)
         
@@ -765,6 +770,8 @@ class Redisd():
         self.watch_thread.start()
                 
     def run(self):
+        self.name = "%s %s/slot/%d" % (self.workdir, self.volume, self.id[0])
+        dmsg("run " + self.name)
         key = "redis/%s" % (self.id[1])
 
         addr = self.__redis_addr()
@@ -779,15 +786,16 @@ class Redisd():
             exit(1)
 
         self.__redis_start()
+        dmsg("run 0 " + self.name)
         self.__wait_sync()
+        dmsg("run 1 " + self.name)
 
         self.__lock()
+        dmsg("run 2 " + self.name)
 
         self.__watch_start()
 
-        self.name = "%s %s/slot/%d" % (self.workdir, self.volume, self.sharding)
-        
-        #dmsg("%s lock %d, 0" % (self.workdir, self.lock.is_acquired))
+        dmsg("run 3 " + self.name)
         while (self.running):
             if (self.lock.is_acquired):
                 self.__run_master()

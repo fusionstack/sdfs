@@ -45,23 +45,9 @@ static int __seq__ = 0;
 __thread int __redis_workerid__ = -1;
 static redis_worker_t *__redis_worker__;
 static int __worker_count__ = 0;
+int __redis_conn_pool__ = -1;
 
 static int __redis_request(const int hash, const char *name, func_va_t exec, ...);
-
-#define ASYNC 1
-
-int init_redis()
-{
-        int ret;
-
-        ret = redis_conn_init();
-        if(ret)
-                GOTO(err_ret, ret);
-
-        return 0;
-err_ret:
-        return ret;
-}
 
 static int __hget__(const fileid_t *fileid, const char *name, char *value, size_t *size)
 {
@@ -1033,12 +1019,14 @@ err_ret:
         return ret;
 }
 
-int redis_init()
+int redis_init(int count)
 {
-        int ret, count;
+        int ret;
         redis_worker_t *worker;
 
+#if 0
         count = ng.daemon ? gloconf.polling_core : 1;
+#endif
 
         ret = ymalloc((void **)&__redis_worker__, sizeof(*__redis_worker__) * count);
         if (unlikely(ret))
@@ -1067,7 +1055,12 @@ int redis_init()
         }
 
         __worker_count__ = count;
+        __redis_conn_pool__ = count;
 
+        ret = redis_conn_init();
+        if(ret)
+                GOTO(err_ret, ret);
+        
 #if ENABLE_REDIS_PIPELINE
         ret = redis_pipeline_init();
         if(ret)
