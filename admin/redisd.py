@@ -93,6 +93,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 #class Redisd(Daemon):
 class Redisd():
     def __init__(self, workdir, diskid, disk_idx):
+        self.name = ""
         self.config = Config()
         self.uuid = str(uuid.uuid1())
         self.workdir = workdir
@@ -375,7 +376,7 @@ class Redisd():
 
     
     def init(self, volume):
-        self.volume = volume;
+        self.volume = volume
 
         if not self.__layout_global():
             dwarn("load global layout fail")
@@ -739,6 +740,29 @@ class Redisd():
 
     def __redis_addr(self):
         return self.hostname + " " + self.port + " " + self.diskid
+
+    def __watch_start(self):
+        def __watch__(args):
+            ctx = args
+            last_scan = time.time()
+            while (ctx.running):
+                if (time.time() - last_scan < 10):
+                    time.sleep(1)
+                    continue
+
+                last_scan = time.time()
+                cmd = "ps aux | grep redis-server | grep %s | wc -l" % (self.port)
+                #dmsg("instence check %s:%s" % (ctx.name, cmd))
+                dmsg("instence check %s" % (ctx.name))
+                res = exec_shell(cmd, p=False, need_return=True)
+                c = int(res[0])
+                if (c == 0):
+                    derror(self.name + " stopped, try to start")
+                    ctx.__redis_start();
+                
+        
+        self.watch_thread = threading.Thread(target=__watch__, args=[self])
+        self.watch_thread.start()
                 
     def run(self):
         key = "redis/%s" % (self.id[1])
@@ -759,6 +783,10 @@ class Redisd():
 
         self.__lock()
 
+        self.__watch_start()
+
+        self.name = "%s %s/slot/%d" % (self.workdir, self.volume, self.sharding)
+        
         #dmsg("%s lock %d, 0" % (self.workdir, self.lock.is_acquired))
         while (self.running):
             if (self.lock.is_acquired):
@@ -804,7 +832,7 @@ class RedisDisk(Daemon):
         self.id = None
         self.running = True
         self.replica_info = None
-        self.disk_check = time.time();
+        self.disk_check = time.time()
         self.instence = []
 
         diskid = os.path.join(self.workdir, "inited")

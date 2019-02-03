@@ -72,7 +72,7 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
         } else {
                 DBUG("found %s, %s\n", id, addr);
                 if (time(NULL) - ctime > 5) {
-                        DWARN("%s, %s, time expired\n", id, addr);
+                        DBUG("%s, %s, time expired\n", id, addr);
                         goto retry;
                 }
         }
