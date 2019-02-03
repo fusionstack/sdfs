@@ -88,7 +88,7 @@ static int __rpc_request_send(const sockid_t *sockid, const msgid_t *msgid, cons
               _inet_ntoa(sockid->addr), msgid->idx,
               msgid->figerprint, buf.len);
 
-#if 0
+#if 1
         ret = core_pipeline_send(sockid, &buf, 0);
         if (unlikely(ret)) {
                 ret = _errno_net(ret);
