@@ -6,13 +6,14 @@
 #include "redis_conn.h"
 #include "redis.h"
 #include "configure.h"
-#include "dbg.h"
 #include "adt.h"
 #include "net_global.h"
 #include "schedule.h"
 #include "cJSON.h"
 #include "sdfs_conf.h"
 #include "math.h"
+#include "maping.h"
+#include "dbg.h"
 
 typedef struct{
         int magic;
@@ -47,14 +48,33 @@ static int __redis_vol_get(uint64_t volid, redis_vol_t **_vol, int flag);
 static int __redis_connect(const char *volume, int sharding, int magic, __conn_t *conn)
 {
         int ret, count;
-        char addr[MAX_BUF_LEN], key[MAX_BUF_LEN];
+        char addr[MAX_BUF_LEN], key[MAX_BUF_LEN], id[MAX_NAME_LEN];
         char *list[2];
+        time_t ctime;
 
-        snprintf(key, MAX_NAME_LEN, "%s/slot/%d/master", volume, sharding);
-        ret = etcd_get_text(ETCD_VOLUME, key, addr, NULL);
+        snprintf(id, MAX_NAME_LEN, "%s/%d", volume, sharding);
+        ret = maping_get(NAME2ADDR, id, addr, &ctime);
         if(ret) {
-                DWARN("%s not found\n", key);
-                GOTO(err_ret, ret);
+                if (ret == ENOENT) {
+                retry:
+                        snprintf(key, MAX_NAME_LEN, "%s/slot/%d/master", volume, sharding);
+                        ret = etcd_get_text(ETCD_VOLUME, key, addr, NULL);
+                        if(ret) {
+                                DWARN("%s not found\n", key);
+                                GOTO(err_ret, ret);
+                        }
+
+                        ret = maping_set(NAME2ADDR, id, addr);
+                        if(ret)
+                                GOTO(err_ret, ret);
+                } else
+                        GOTO(err_ret, ret);
+        } else {
+                DBUG("found %s, %s\n", id, addr);
+                if (time(NULL) - ctime > 5) {
+                        DWARN("%s, %s, time expired\n", id, addr);
+                        goto retry;
+                }
         }
 
         count = 2;
@@ -69,7 +89,8 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
         int port = atoi(list[1]);
         ret = redis_connect(&conn->conn, list[0], &port, key);
         if(ret) {
-                DWARN("get volume %s sharding[%d] master @ %s:%s fail\n", volume, sharding, list[0], list[1]);
+                DWARN("connect volume %s sharding[%d] master @ %s:%s fail\n",
+                      volume, sharding, list[0], list[1]);
                 GOTO(err_ret, ret);
         }
 
@@ -474,9 +495,23 @@ static int __redis_vol_getnamebyid(uint64_t _volid, char *volume, int *sharding)
 {
         int ret, i;
         char *name;
-        char key[MAX_NAME_LEN], value[MAX_BUF_LEN];
+        char key[MAX_NAME_LEN], value[MAX_BUF_LEN], id[MAX_NAME_LEN], buf[MAX_BUF_LEN];
         uint64_t volid;
         etcd_node_t *array, *node;
+
+        snprintf(id, MAX_NAME_LEN, "%ju", _volid);
+        ret = maping_get(ID2NAME, id, buf, NULL);
+        if(ret) {
+                if (ret == ENOENT) {
+                        //pass
+                } else
+                        GOTO(err_ret, ret);
+        } else {
+                ret = sscanf(buf, "%[^,],%d", volume, sharding);
+                DBUG("found %s\n", volume);
+                YASSERT(ret == 2);
+                goto out;
+        }
         
         ret = etcd_list(ETCD_VOLUME, &array);
         if(ret)
@@ -512,7 +547,13 @@ static int __redis_vol_getnamebyid(uint64_t _volid, char *volume, int *sharding)
         }
 
         free_etcd_node(array);
+
+        snprintf(buf, MAX_NAME_LEN, "%s,%u", volume, *sharding);
+        ret = maping_set(ID2NAME, id, buf);
+        if(ret)
+                GOTO(err_ret, ret);
         
+out:
         return 0;
 err_free:
         free_etcd_node(array);
@@ -555,7 +596,7 @@ int redis_conn_vol(uint64_t volid)
         ret = __redis_vol_getnamebyid(volid, volume, &sharding);
         if(ret)
                 GOTO(err_ret, ret);
-
+        
         ret = __redis_vol_connect(volid, volume, sharding, &vol);
         if(ret)
                 GOTO(err_ret, ret);

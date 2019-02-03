@@ -196,6 +196,7 @@ int rpc_passive(uint32_t port)
         if (port != (uint32_t)-1) {
                 snprintf(_port, MAX_LINE_LEN, "%u", port);
 
+                YASSERT(port > YNET_SERVICE_RANGE && port < 65535);
                 ret = tcp_sock_hostlisten(&sd, NULL, _port,
                                           YNET_QLEN, YNET_RPC_BLOCK, 1);
                 if (unlikely(ret)) {
@@ -207,6 +208,7 @@ int rpc_passive(uint32_t port)
                         port = (uint16_t)(YNET_SERVICE_BASE
                                           + (random() % YNET_SERVICE_RANGE));
 
+                        YASSERT(port > YNET_SERVICE_RANGE && port < 65535);
                         snprintf(_port, MAX_LINE_LEN, "%u", port);
 
                         ret = tcp_sock_hostlisten(&sd, NULL, _port,

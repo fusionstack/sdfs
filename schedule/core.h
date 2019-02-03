@@ -116,6 +116,7 @@ int core_dump_memory(uint64_t *memory);
 
 int core_poller_register(core_t *core, const char *name, void (*poll)(void *,void*), void *user_data);
 int core_poller_unregister(core_t *core, void (*poll)());
+int core_pipeline_send(const sockid_t *sockid, buffer_t *buf, int flag);
 
 #define CORE_ANALYSIS_BEGIN(mark)               \
         struct timeval t1##mark, t2##mark;      \

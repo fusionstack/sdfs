@@ -89,19 +89,18 @@ static int __rpc_request_send(const sockid_t *sockid, const msgid_t *msgid, cons
               msgid->figerprint, buf.len);
 
 #if 0
-        ret = vm_forward(sockid, &buf, 0);
+        ret = core_pipeline_send(sockid, &buf, 0);
         if (unlikely(ret)) {
+                ret = _errno_net(ret);
                 if (ret == ENOSYS) {
-                        // rpc here
                         sock2nh(&nh, sockid);
                         ret = sdevent_queue(&nh, &buf, 0);
                         if (unlikely(ret)) {
                                 ret = _errno_net(ret);
                                 GOTO(err_free, ret);
                         }
-                } else {
+                } else
                         GOTO(err_free, ret);
-                }
         }
 #else
         sock2nh(&nh, sockid);

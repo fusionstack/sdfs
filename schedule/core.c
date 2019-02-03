@@ -96,6 +96,8 @@ static core_latency_list_t *core_latency_list;
 
 static int __core_latency_init();
 static int __core_latency_private_init();
+static void  __core_pipeline_forward();
+static int __core_pipeline_create();
 #endif
 
 static core_t *__core_array__[256];
@@ -218,6 +220,8 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 
         schedule_run(core->schedule);
 
+        __core_pipeline_forward();
+        
 #if ENABLE_CORENET
         if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
                 corenet_tcp_commit();
@@ -404,6 +408,10 @@ static int __core_worker_init(core_t *core)
         variable_set(VARIABLE_CORE, core);
         //core_register_tls(VARIABLE_CORE, private_mem);
 
+        ret = __core_pipeline_create();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
         sem_post(&core->sem);
 
         return 0;
@@ -1068,3 +1076,150 @@ int core_poller_unregister(core_t *core, void (*poll)(void *,void*))
         return 0;
 }
 #endif 
+
+typedef struct __vm {
+#if 0
+        int sd; //io socket
+        int interrupt_eventfd;
+        int idx;
+        int stop;
+        int exiting;
+        char name[MAX_NAME_LEN];
+
+        sem_t sem;
+        
+        schedule_t *schedule;
+
+        buffer_t send_buf;
+        buffer_t recv_buf;
+        struct iovec iov[VM_IOV_MAX]; //iov for send/recv
+
+        /*callback  and ctx */
+        vm_exec exec; 
+        vm_exit exit;
+        vm_func init;
+        vm_func check;
+        vm_reconnect reconnect;
+        void *ctx;
+#endif
+
+        /*forward*/
+        struct list_head forward_list;
+
+        /*aio cb*/
+        //io_context_t  ioctx;
+        int iocb_count;
+        struct iocb *iocb[TASK_MAX];
+} vm_t;
+
+typedef struct {
+        struct list_head hook;
+        sockid_t sockid;
+        buffer_t buf;
+} vm_fwd_t;
+
+static __thread vm_t *__vm__ = NULL;
+
+int core_pipeline_send(const sockid_t *sockid, buffer_t *buf, int flag)
+{
+        int ret, found = 0;
+        vm_fwd_t *vm_fwd;
+        struct list_head *pos;
+
+        if (__vm__ == NULL) {
+                ret = ENOSYS;
+                goto err_ret;
+        }
+
+#if 1
+        ret = sdevent_check(sockid);
+        if (unlikely(ret)) {
+                DWARN("append forward to %s fail\n",
+                      _inet_ntoa(sockid->addr));
+                GOTO(err_ret, ret);
+        }
+#endif
+
+        YASSERT(flag == 0);
+
+        DBUG("vm_fwd\n");
+
+        list_for_each(pos, &__vm__->forward_list) {
+                vm_fwd = (void *)pos;
+
+                if (sockid_cmp(sockid, &vm_fwd->sockid) == 0) {
+                        DBUG("append forward to %s @ %u\n",
+                             _inet_ntoa(sockid->addr), sockid->sd);
+                        mbuffer_merge(&vm_fwd->buf, buf);
+                        found = 1;
+                        break;
+                }
+        }
+
+        if (found == 0) {
+                DBUG("new forward to %s @ %u\n",
+                      _inet_ntoa(sockid->addr), sockid->sd);
+
+#ifdef HAVE_STATIC_ASSERT
+                static_assert(sizeof(*vm_fwd)  < sizeof(mem_cache128_t), "vm_fwd_t");
+#endif
+
+                vm_fwd = mem_cache_calloc(MEM_CACHE_128, 0);
+                YASSERT(vm_fwd);
+                vm_fwd->sockid = *sockid;
+                mbuffer_init(&vm_fwd->buf, 0);
+                mbuffer_merge(&vm_fwd->buf, buf);
+                list_add_tail(&vm_fwd->hook, &__vm__->forward_list);
+        }
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+static void  __core_pipeline_forward()
+{
+        int ret;
+        net_handle_t nh;
+        struct list_head *pos, *n;
+        vm_fwd_t *vm_fwd;
+
+        YASSERT(__vm__);
+        list_for_each_safe(pos, n, &__vm__->forward_list) {
+                vm_fwd = (void *)pos;
+                list_del(pos);
+
+                DBUG("forward to %s @ %u\n",
+                     _inet_ntoa(vm_fwd->sockid.addr), vm_fwd->sockid.sd);
+
+                sock2nh(&nh, &vm_fwd->sockid);
+                ret = sdevent_queue(&nh, &vm_fwd->buf, 0);
+                if (unlikely(ret)) {
+                        DWARN("forward to %s @ %u fail\n",
+                              _inet_ntoa(vm_fwd->sockid.addr), vm_fwd->sockid.sd);
+                        mbuffer_free(&vm_fwd->buf);
+                }
+
+                mem_cache_free(MEM_CACHE_128, vm_fwd);
+        }
+}
+
+static int __core_pipeline_create()
+{
+        int ret;
+        vm_t *vm;
+
+        ret = ymalloc((void **)&vm, sizeof(*vm));
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        memset(vm, 0x0, sizeof(*vm));
+
+        INIT_LIST_HEAD(&vm->forward_list);
+
+        __vm__ = vm;
+
+        return 0;
+err_ret:
+        return ret;
+}

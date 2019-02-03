@@ -3,11 +3,15 @@
 
 /*from maping.c*/
 
+#include "ynet_net.h"
+
 #define HOST2NID    "network/host2nid"
 #define NID2NETINFO "network/nid2netinfo"
 #define NAME2NID    "storage/name2nid"
 #define ID2NID      "storage/id2nid"
 #define ROOT      "storage/root"
+#define ID2NAME      "storage/id2name"
+#define NAME2ADDR      "storage/name2addr"
 #define MAPING_MISC "misc"
 
 int maping_init(void);

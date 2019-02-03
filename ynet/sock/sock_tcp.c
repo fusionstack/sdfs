@@ -452,6 +452,9 @@ int tcp_sock_hostlisten(int *srv_sd, const char *host, const char *service,
         char buf[MAX_BUF_LEN];
         struct sockaddr_in sin;
 
+        //int port = atoi(service);
+        //YASSERT(port > YNET_SERVICE_RANGE && port < 65535);
+        
         _memset(&sin, 0, sizeof(sin));
         sin.sin_family = AF_INET;
 
