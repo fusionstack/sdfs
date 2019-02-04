@@ -215,7 +215,6 @@ struct gloconf_t
         int polling_core;
         int polling_timeout;
         int aio_core;
-        int direct_port;
 
         int sdevents_threads;
         int jobdock_size;

@@ -408,7 +408,7 @@ static int __redis_pipline_run(pipeline_t *pipeline)
 
                 DBUG("submit count %u\n", count);
 
-#if 1
+#if 0
                 ret = redis_exec(&arg->fileid, __redis_exec, arg);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);

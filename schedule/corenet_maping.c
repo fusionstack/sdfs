@@ -15,6 +15,7 @@
 #include "corenet.h"
 #include "corenet_maping.h"
 #include "corenet_connect.h"
+#include "net_rpc.h"
 #include "conn.h"
 #include "network.h"
 #include "variable.h"
@@ -245,7 +246,8 @@ STATIC void __corenet_maping_close_finally__(const sockid_t *sockid)
 
 }
 
-STATIC int __corenet_maping_connect____(const nid_t *nid, const ynet_sock_info_t *_sock, int sock_count,
+STATIC int __corenet_maping_connect____(const nid_t *nid, const ynet_sock_info_t *_sock,
+                                        int sock_count,
                                         sockid_t *_sockid, int *_count)
 {
         int ret;
@@ -253,20 +255,21 @@ STATIC int __corenet_maping_connect____(const nid_t *nid, const ynet_sock_info_t
         const ynet_sock_info_t *sock;
 
         YASSERT(sock_count);
-        
+
         int count = 0;
         for (int i = 0; i < sock_count; i++) {
                 sock = &_sock[i];
                 
-                DINFO("connect to %s @ %s %u\n", _inet_ntoa(sock->addr), network_rname(nid), i);
+                DINFO("connect to %s:%d @ %s [%u]\n", _inet_ntoa(sock->addr),
+                      ntohs(sock->port), network_rname(nid), i);
 
 #if ENABLE_RDMA
                 if (gloconf.rdma)
                         ret = corenet_rdma_connect(nid, sock->addr, &sockid);
                 else
-                        ret = corenet_tcp_connect(nid, sock->addr, &sockid);
+                        ret = corenet_tcp_connect(nid, sock->addr, sock->port, &sockid);
 #else
-                ret = corenet_tcp_connect(nid, sock->addr, &sockid);
+                ret = corenet_tcp_connect(nid, sock->addr, sock->port, &sockid);
 #endif
                 if (unlikely(ret))
                         continue;
@@ -298,7 +301,8 @@ STATIC int __corenet_maping_connect__(const nid_t *nid, sockid_t *_sockid, int *
                 GOTO(err_ret, ret);
 
         info = (void *)buf;
-        ret = conn_getinfo(nid, info);
+        int buflen = MAX_BUF_LEN;
+        ret = net_rpc_coreinfo(nid, buf, &buflen);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -631,7 +635,8 @@ static void __corenet_maping_check__(void *_info)
         }
 
         DWARN("%s need connect, lost %d\n", info->name, lost);
-        
+
+        UNIMPLEMENTED(__WARN__);
         ret = __corenet_maping_connect____(nid, info_array, lost, socks, &connected);
         if (unlikely(ret))
                 goto out;

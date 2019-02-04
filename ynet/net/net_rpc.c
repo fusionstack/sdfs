@@ -13,6 +13,8 @@
 #include "net_global.h"
 #include "sdevent.h"
 #include "ylib.h"
+#include "corenet_connect.h"
+#include "network.h"
 #include "xnect.h"
 #include "ylock.h"
 #include "ynet_net.h"
@@ -35,6 +37,7 @@ typedef struct {
 typedef enum {
         NET_RPC_NULL = 0,
         NET_RPC_HEARTBEAT,
+        NET_COREINFO,
         NET_RPC_MAX,
 } net_rpc_op_t;
 
@@ -196,9 +199,71 @@ err_ret:
         return;
 }
 
+#if 1
+static int __net_srv_corenetinfo(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+{
+        int ret, buflen;
+        msg_t *req;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        char infobuf[MAX_BUF_LEN];
+        uint32_t infobuflen = MAX_BUF_LEN;
+
+        __getmsg(_buf, &req, &buflen, buf);
+
+        ret = corenet_tcp_getinfo(infobuf, &infobuflen);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        rpc_reply(sockid, msgid, infobuf, infobuflen);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+
+int net_rpc_coreinfo(const nid_t *nid, char *infobuf, int *infobuflen)
+{
+        int ret;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t count;
+        msg_t *req;
+
+        ret = network_connect(nid, NULL, 1, 0);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        ANALYSIS_BEGIN(0);
+
+        //YASSERT(io->offset <= YFS_CHK_LEN_MAX);
+
+        req = (void *)buf;
+        req->op = NET_COREINFO;
+        _opaque_encode(&req->buf, &count, net_getnid(), sizeof(nid_t), NULL);
+
+        ret = rpc_request_wait("net_rpc_corenetinfo", nid,
+                               req, sizeof(*req) + count, infobuf, infobuflen,
+                               MSG_HEARTBEAT, 0, _get_timeout());
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+#endif
+
 int net_rpc_init()
 {
         __request_set_handler(NET_RPC_HEARTBEAT, __net_srv_heartbeat, "net_srv_heartbeat");
+        __request_set_handler(NET_COREINFO, __net_srv_corenetinfo, "net_srv_coreinfo");
 
         rpc_request_register(MSG_HEARTBEAT, __request_handler, NULL);
 

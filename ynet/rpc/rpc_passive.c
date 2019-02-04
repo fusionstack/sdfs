@@ -75,6 +75,8 @@ int rpc_getinfo(char *infobuf, uint32_t *infobuflen)
                 ret = net_getinfo(infobuf, infobuflen, ng.port);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
+
+                memcpy(ng.info_local, infobuf, *infobuflen);
         } else {
                 memcpy(_buf, ng.info_local, sizeof(ng.info_local));
                 info = (ynet_net_info_t *)_buf;
@@ -88,6 +90,8 @@ int rpc_getinfo(char *infobuf, uint32_t *infobuflen)
                 YASSERT(strcmp(info->name, "none"));
         }
 
+        info = (ynet_net_info_t *)infobuf;
+        DBUG("port %d, %u\n", ntohs(info->info[0].port), ng.port);
         ((ynet_net_info_t *)infobuf)->deleting = 0;
 
         return 0;

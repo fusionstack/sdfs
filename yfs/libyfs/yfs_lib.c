@@ -623,10 +623,12 @@ int init_stage2(const char *name, int noroot, int redis_conn)
         ret = rpc_init(NULL, name, -1, home);
         if (ret)
                 GOTO(err_ret, ret);
-        
-        ret = rpc_passive(-1);
-        if (ret)
-                GOTO(err_ret, ret);
+
+        if (ng.daemon) {
+                ret = rpc_passive(-1);
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
 
         ret = network_init();
         if (unlikely(ret))

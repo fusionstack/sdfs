@@ -360,6 +360,25 @@ def t_truncate(mount_point):
         sys.exit(-1)
     os.unlink(fn)
 
+def t_write(mount_point):
+    uid = str(uuid.uuid1())
+    fn = os.path.join(mount_point, uid)
+
+    try:
+        fd = open(fn, 'w')
+    except Exception as e:
+        logging.error('t_write failed, open failed, error : %s\n' %
+                        (str(e)))
+        sys.exit(-1)
+
+    try:
+        fd.write("1234567")
+    except Exception as e:
+        logging.error('t_write failed\n')
+        sys.exit(-1)
+    os.unlink(fn)
+
+    
 def t_unlink(mount_point):
     uid = str(uuid.uuid1())
     fn = os.path.join(mount_point, uid)
@@ -408,6 +427,9 @@ def nfs_test(mount_point='/mnt/nfs'):
     logging.info('!!!t_symlink succ!!!')
     t_truncate(mount_point)
     logging.info('!!!t_truncate succ!!!')
+    t_write(mount_point)
+    logging.info('!!!t_write succ!!!')
+    
     t_unlink(mount_point)
     logging.info('!!!t_unlink succ!!!')
 

@@ -463,9 +463,10 @@ int tcp_sock_hostlisten(int *srv_sd, const char *host, const char *service,
                 sin.sin_addr.s_addr = INADDR_ANY;
 
         getservbyname_r(service, "tcp", &result, buf, MAX_BUF_LEN, &pse);
-        if (pse)
+        if (pse) {
+                DBUG("port %s %u\n", service, pse->s_port);
                 sin.sin_port = pse->s_port;
-        else if ((sin.sin_port=htons((unsigned short)atoi(service))) == 0) {
+        } else if ((sin.sin_port=htons((unsigned short)atoi(service))) == 0) {
                 DERROR("can't get \"%s\" service entry\n", service);
                 ret = ENOENT;
                 GOTO(err_ret, ret);
@@ -777,14 +778,14 @@ int tcp_sock_getaddr(uint32_t *info_count, ynet_sock_info_t *info,
                         continue;
                 }
 
-                DBUG("info[%u] addr %u\n", count, addr);
-                
                 info[count].addr = addr;
                 info[count].port = htons(port);
+                DBUG("info[%u] addr %u, port %d\n", count, addr, info[count].port);
+                
                 count++;
         }
 
-        DINFO("get sock count %u\n", count);
+        DBUG("get sock count %u\n", count);
         
         if (count == 0) {
                 ret = ENONET;

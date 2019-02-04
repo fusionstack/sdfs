@@ -93,7 +93,7 @@ retry:
                 sock = &_sock[i];
 
                 DINFO("hostname:%s count:%d addr %s %u\n", hostname, count,
-                      _inet_ntoa(sock->addr), ntohl(sock->addr));
+                      _inet_ntoa(sock->addr), ntohl(sock->port));
 
                 for (j = 0; result->h_addr_list[j] != NULL; j++) {
                         //YASSERT(j < *count);
@@ -145,16 +145,6 @@ int net_getinfo(char *infobuf, uint32_t *infobuflen, uint32_t port)
         ynet_net_info_t *info;
         uint32_t info_count_max, count = 0;
         char hostname[MAX_NAME_LEN];
-
-        if (ng.daemon && port == (uint32_t)-1) {
-                ret = EAGAIN;
-                GOTO(err_ret, ret);
-        }
-
-        while (ng.daemon && ng.local_nid.id == 0) {
-                DWARN("wait nid inited\n");
-                sleep(1);
-        }
 
         info = (ynet_net_info_t *)infobuf;
         _memset(infobuf, 0x0, sizeof(ynet_net_info_t));
@@ -211,7 +201,6 @@ int net_getinfo(char *infobuf, uint32_t *infobuflen, uint32_t port)
         }
 
         ng.info_time = gettime();
-        _memcpy(ng.info_local, info, info->len);
 
         DBUG("local nid "NID_FORMAT" info_count %u port %u\n",
              NID_ARG(&info->id), info->info_count, port);
