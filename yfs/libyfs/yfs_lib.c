@@ -25,7 +25,7 @@
 #include "bh.h"
 #include "core.h"
 #include "io_analysis.h"
-#include "../../sdfs/replica_rpc.h"
+#include "../../cds/cds_rpc.h"
 #include "net_global.h"
 #include "mem_hugepage.h"
 #include "license_helper.h"
@@ -690,7 +690,7 @@ int ly_init(int daemon, const char *name, int64_t maxopenfile)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = replica_rpc_init();
+        ret = cds_rpc_init();
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -936,7 +936,7 @@ int sdfs_init_verbose(const char *name, int redis_conn)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = replica_rpc_init();
+        ret = cds_rpc_init();
         if (ret)
                 GOTO(err_ret, ret);
         

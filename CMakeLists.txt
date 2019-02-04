@@ -217,7 +217,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/io_analysis.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_inode.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_dir.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/replica_rpc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cds/cds_rpc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_chunk.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_chunk_recovery.c
 	${CMAKE_CURRENT_SOURCE_DIR}/license/src/license_helper.c

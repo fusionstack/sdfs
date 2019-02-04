@@ -1,5 +1,5 @@
-#ifndef __REPLICA_RPC_H__
-#define __REPLICA_RPC_H__
+#ifndef __CDS_RPC_H__
+#define __CDS_RPC_H__
 
 
 static inline void io_init(io_t *io, const chkid_t *chkid,
@@ -17,8 +17,8 @@ static inline void io_init(io_t *io, const chkid_t *chkid,
         io->lease = -1;
 }
 
-int replica_rpc_init();
-int replica_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf);
-int replica_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf);
+int cds_rpc_init();
+int cds_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf);
+int cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf);
 
 #endif

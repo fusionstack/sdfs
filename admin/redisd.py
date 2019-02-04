@@ -302,8 +302,12 @@ class Redisd():
             os.system(cmd)
 
             if os.path.exists(pidfile):
-                self.redis_pid = int(get_value(pidfile))
-                break;
+                try:
+                    self.redis_pid = int(get_value(pidfile))
+                    break;
+                except ValueError:
+                    derror("get pid, value error")
+                    time.sleep(0.1)
             else:
                 dwarn("start %s fail, retry %u\n" % (self.name, retry))
                 time.sleep(0.2)

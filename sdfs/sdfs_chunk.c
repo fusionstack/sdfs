@@ -19,7 +19,7 @@
 #include "sdfs_chunk.h"
 #include "network.h"
 #include "yfs_limit.h"
-#include "replica_rpc.h"
+#include "cds_rpc.h"
 #include "schedule.h"
 #include "xattr.h"
 #include "dbg.h"
@@ -165,7 +165,7 @@ static int __chunk_read_ec(const chkid_t *chkid, buffer_t *buf, int count,
 
                 io_init(&io, chkid, strip->count, strip->offset, 0);
                 mbuffer_init(&strip->buf, 0);
-                ret = replica_rpc_read(nid, &io, &strip->buf);
+                ret = cds_rpc_read(nid, &io, &strip->buf);
                 if (ret) {
                         GOTO(err_ret, ret);
                 }
@@ -235,7 +235,7 @@ static int __chunk_read(const chkid_t *chkid, buffer_t *buf, int count, int offs
                         continue;
                 }
 
-                ret = replica_rpc_read(nid, &io, buf);
+                ret = cds_rpc_read(nid, &io, buf);
                 if (unlikely(ret)) {
                         GOTO(err_ret, ret);
                 }
@@ -268,7 +268,7 @@ STATIC void __chunk_replica_write__(void *arg)
                 GOTO(err_ret, ret);
         }
 
-        ret = replica_rpc_write(ctx->nid, &ctx->io, ctx->buf);
+        ret = cds_rpc_write(ctx->nid, &ctx->io, ctx->buf);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
@@ -359,7 +359,7 @@ static int __chunk_write__(const chkinfo_t *chkinfo, const buffer_t *buf, int co
                         continue;
                 }
 
-                ret = replica_rpc_write(nid, &io, buf);
+                ret = cds_rpc_write(nid, &io, buf);
                 if (unlikely(ret)) {
                         GOTO(err_ret, ret);
                 }
@@ -445,7 +445,7 @@ static int __chunk_write_ec_strip__(buffer_t *data, uint32_t begin, uint32_t end
 
                 io_t io;
                 io_init(&io, chkid, STRIP_BLOCK, off, 0);
-                ret = replica_rpc_read(nid, &io, &tmpbuf2);
+                ret = cds_rpc_read(nid, &io, &tmpbuf2);
                 if (ret) {
                         if (ret == ENOENT) {
                                 mbuffer_appendzero(&tmpbuf2, STRIP_BLOCK);
@@ -670,7 +670,7 @@ static int __chunk_write_ec__(const ec_arg_t *ec_arg, const chkinfo_t *chkinfo)
 
                 io_init(&io, &chkinfo->chkid, strip->count, strip->offset, 0);
                 YASSERT(strip->count == strip->buf.len);
-                ret = replica_rpc_write(nid, &io, &strip->buf);
+                ret = cds_rpc_write(nid, &io, &strip->buf);
                 if (ret)
                         GOTO(err_ret, ret);
         }

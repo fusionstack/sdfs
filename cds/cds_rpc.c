@@ -18,7 +18,7 @@
 #include "net_global.h"
 #include "ynet_rpc.h"
 #include "rpc_proto.h"
-#include "replica_rpc.h"
+#include "cds_rpc.h"
 #include "md_lib.h"
 #include "network.h"
 #include "mem_cache.h"
@@ -30,13 +30,13 @@
 extern net_global_t ng;
 
 typedef enum {
-        REPLICA_NULL = 400,
-        REPLICA_WRITE,
-        REPLICA_READ,
-        REPLICA_CORENET,
+        CDS_NULL = 400,
+        CDS_WRITE,
+        CDS_READ,
+        CDS_CORENET,
  
-        REPLICA_MAX,
-} replica_op_t;
+        CDS_MAX,
+} cds_op_t;
 
 typedef struct {
         uint32_t op;
@@ -45,20 +45,20 @@ typedef struct {
         char buf[0];
 } msg_t;
 
-static __request_handler_func__  __request_handler__[REPLICA_MAX - REPLICA_NULL];
-static char  __request_name__[REPLICA_MAX - REPLICA_NULL][__RPC_HANDLER_NAME__ ];
+static __request_handler_func__  __request_handler__[CDS_MAX - CDS_NULL];
+static char  __request_name__[CDS_MAX - CDS_NULL][__RPC_HANDLER_NAME__ ];
 
 static void __request_set_handler(int op, __request_handler_func__ func, const char *name)
 {
         YASSERT(strlen(name) + 1 < __RPC_HANDLER_NAME__ );
-        strcpy(__request_name__[op - REPLICA_NULL], name);
-        __request_handler__[op - REPLICA_NULL] = func;
+        strcpy(__request_name__[op - CDS_NULL], name);
+        __request_handler__[op - CDS_NULL] = func;
 }
 
 static void __request_get_handler(int op, __request_handler_func__ *func, const char **name)
 {
-        *func = __request_handler__[op - REPLICA_NULL];
-        *name = __request_name__[op - REPLICA_NULL];
+        *func = __request_handler__[op - CDS_NULL];
+        *name = __request_name__[op - CDS_NULL];
 }
 
 static void __getmsg(buffer_t *buf, msg_t **_req, int *buflen, char *_buf)
@@ -135,7 +135,7 @@ err_ret:
         return;
 }
 
-static int __replica_srv_read(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+static int __cds_srv_read(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
 {
         int ret, buflen;
         msg_t *req;
@@ -171,7 +171,7 @@ err_ret:
         return ret;
 }
 
-int replica_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
+int cds_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
 {
         int ret;
         char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
@@ -187,7 +187,7 @@ int replica_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
         //YASSERT(io->offset <= YFS_CHK_LEN_MAX);
 
         req = (void *)buf;
-        req->op = REPLICA_READ;
+        req->op = CDS_READ;
         req->chkid = io->id;
         _opaque_encode(&req->buf, &count, net_getnid(), sizeof(nid_t), io,
                        sizeof(*io), NULL);
@@ -195,7 +195,7 @@ int replica_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
 #if ENABLE_CORERPC
         if (likely(ng.daemon)) {
                 DINFO("corenet read\n");
-                ret = corerpc_postwait("replica_rpc_read", nid,
+                ret = corerpc_postwait("cds_rpc_read", nid,
                                        req, sizeof(*req) + count, NULL,
                                        _buf, MSG_REPLICA, io->size, _get_timeout());
                 if (unlikely(ret)) {
@@ -203,14 +203,14 @@ int replica_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
                         GOTO(err_ret, ret);
                 }
         } else {
-                ret = rpc_request_wait2("replica_rpc_read", nid,
+                ret = rpc_request_wait2("cds_rpc_read", nid,
                                         req, sizeof(*req) + count, _buf,
                                         MSG_REPLICA, 0, _get_timeout());
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
 #else 
-        ret = rpc_request_wait2("replica_rpc_read", nid,
+        ret = rpc_request_wait2("cds_rpc_read", nid,
                                 req, sizeof(*req) + count, _buf,
                                 MSG_REPLICA, 0, _get_timeout());
         if (unlikely(ret))
@@ -227,7 +227,7 @@ err_ret:
         return ret;
 }
 
-static int __replica_srv_write(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+static int __cds_srv_write(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
 {
         int ret;
         msg_t *req;
@@ -270,7 +270,7 @@ err_ret:
         return ret;
 }
 
-int replica_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
+int cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
 {
         int ret;
         char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
@@ -287,7 +287,7 @@ int replica_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
         //YASSERT(io->offset <= YFS_CHK_LEN_MAX);
 
         req = (void *)buf;
-        req->op = REPLICA_WRITE;
+        req->op = CDS_WRITE;
         req->chkid = io->id;
         _opaque_encode(&req->buf, &count, net_getnid(), sizeof(nid_t), io,
                        sizeof(*io), NULL);
@@ -297,7 +297,7 @@ int replica_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
 #if ENABLE_CORERPC
         if (likely(ng.daemon)) {
                 DINFO("corenet write\n");
-                ret = corerpc_postwait("replica_rpc_write", nid,
+                ret = corerpc_postwait("cds_rpc_write", nid,
                                        req, sizeof(*req) + count, _buf,
                                        NULL, MSG_CORENET, io->size, _get_timeout());
                 if (unlikely(ret)) {
@@ -305,14 +305,14 @@ int replica_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
                         GOTO(err_ret, ret);
                 }
         }  else {
-                ret = rpc_request_wait1("replica_rpc_write", nid,
+                ret = rpc_request_wait1("cds_rpc_write", nid,
                                         req, sizeof(*req) + count, _buf,
                                         MSG_REPLICA, 0, _get_timeout());
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
 #else
-        ret = rpc_request_wait1("replica_rpc_write", nid,
+        ret = rpc_request_wait1("cds_rpc_write", nid,
                                 req, sizeof(*req) + count, _buf,
                                 MSG_REPLICA, 0, _get_timeout());
         if (unlikely(ret))
@@ -331,7 +331,7 @@ err_ret:
 }
 
 #if 0
-static int __replica_srv_corenet(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+static int __cds_srv_corenet(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
 {
         int ret, buflen;
         msg_t *req;
@@ -346,7 +346,7 @@ static int __replica_srv_corenet(const sockid_t *sockid, const msgid_t *msgid, b
 
         mbuffer_init(&reply, 0);
 
-        ret = replica_corenet(io, &reply);
+        ret = cds_corenet(io, &reply);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -362,7 +362,7 @@ err_ret:
         return ret;
 }
 
-int replica_rpc_corenet(const nid_t *nid, const io_t *io, buffer_t *_buf)
+int cds_rpc_corenet(const nid_t *nid, const io_t *io, buffer_t *_buf)
 {
         int ret;
         char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
@@ -378,12 +378,12 @@ int replica_rpc_corenet(const nid_t *nid, const io_t *io, buffer_t *_buf)
         //YASSERT(io->offset <= YFS_CHK_LEN_MAX);
 
         req = (void *)buf;
-        req->op = REPLICA_CORENET;
+        req->op = CDS_CORENET;
         req->chkid = io->id;
         _opaque_encode(&req->buf, &count, net_getnid(), sizeof(nid_t), io,
                        sizeof(*io), NULL);
 
-        ret = rpc_request_wait2("replica_rpc_corenet", nid,
+        ret = rpc_request_wait2("cds_rpc_corenet", nid,
                                 req, sizeof(*req) + count, _buf,
                                 MSG_REPLICA, 0, _get_timeout());
         if (unlikely(ret))
@@ -400,12 +400,12 @@ err_ret:
 }
 #endif
 
-int replica_rpc_init()
+int cds_rpc_init()
 {
         DINFO("replica rpc init\n");
 
-        __request_set_handler(REPLICA_READ, __replica_srv_read, "replica_srv_read");
-        __request_set_handler(REPLICA_WRITE, __replica_srv_write, "replica_srv_write");
+        __request_set_handler(CDS_READ, __cds_srv_read, "cds_srv_read");
+        __request_set_handler(CDS_WRITE, __cds_srv_write, "cds_srv_write");
         
         if (ng.daemon) {
                 rpc_request_register(MSG_REPLICA, __request_handler, NULL);

@@ -22,7 +22,7 @@
 #include "sdfs_chunk.h"
 #include "network.h"
 #include "yfs_limit.h"
-#include "replica_rpc.h"
+#include "cds_rpc.h"
 #include "../cds/replica.h"
 #include "dbg.h"
 #include "worm_cli_lib.h"
@@ -69,7 +69,7 @@ static int __sdfs_chunk_pull(const nid_t *nid, const chkid_t *chkid, int *_fd, i
         offset = 0;
         while (offset < chksize) {
                 io_init(&io, chkid, Y_BLOCK_MAX, offset, 0);
-                ret = replica_rpc_read(nid, &io, &buf);
+                ret = cds_rpc_read(nid, &io, &buf);
                 if (ret) {
                         if (ret == ENOENT) {
                                 DWARN("pull chunk "OBJID_FORMAT" ENOENT\n", OBJID_ARG(chkid));
@@ -132,7 +132,7 @@ static int __sdfs_chunk_push(const nid_t *nid, const chkid_t *chkid, int fd, int
                         GOTO(err_free, ret);
 
                 io_init(&io, chkid, size, offset, 0);
-                ret = replica_rpc_write(nid, &io, &buf);
+                ret = cds_rpc_write(nid, &io, &buf);
                 if (ret)
                         GOTO(err_free1, ret);
 
@@ -227,7 +227,7 @@ static int __sdfs_chunk_ec_pull_off(buffer_t *recover, unsigned char *src_in_err
                 YASSERT(recover[i].len == 0);
 
                 nid = &chkinfo->diskid[i];
-                ret = replica_rpc_read(nid, &io, &recover[i]);
+                ret = cds_rpc_read(nid, &io, &recover[i]);
                 if (ret) {
                         if (ret == ENOENT) {
                                 mbuffer_appendzero(&recover[i], size);
@@ -353,7 +353,7 @@ static int __sdfs_chunk_ec_push__(const nid_t *nid, const chkid_t *chkid, buffer
                         GOTO(err_ret, ret);
 
                 io_init(&io, chkid, size, offset, 0);
-                ret = replica_rpc_write(nid, &io, &buf);
+                ret = cds_rpc_write(nid, &io, &buf);
                 if (ret)
                         GOTO(err_ret, ret);
 
