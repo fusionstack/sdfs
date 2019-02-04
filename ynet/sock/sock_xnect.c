@@ -110,14 +110,14 @@ int sock_info2sock(net_handle_t *nh, const ynet_sock_info_t *info, int nonblock,
         sin.sin_addr.s_addr = info->addr;
         sin.sin_port = info->port;
 
-        DBUG("try to connect %s:%u\n", inet_ntoa(sin.sin_addr),
-             ntohs(info->port));
+        DINFO("try to connect %s:%u/%u\n", inet_ntoa(sin.sin_addr),
+              ntohs(info->port), info->port);
 
         nh->u.sd.sd = -1;
         ret = tcp_sock_connect(nh, &sin, nonblock, timeout, 1);
         if (unlikely(ret)) {
-                DBUG("try to connect %s:%u (%u) %s\n", inet_ntoa(sin.sin_addr),
-                      ntohs(info->port), ret, strerror(ret));
+                DWARN("try to connect %s:%u/%u (%u) %s\n", inet_ntoa(sin.sin_addr),
+                      ntohs(info->port), info->port, ret, strerror(ret));
                 GOTO(err_ret, ret);
         }
 

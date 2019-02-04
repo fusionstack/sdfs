@@ -24,31 +24,17 @@
 #include "mem_cache.h"
 #include "../cds/replica.h"
 #include "schedule.h"
+#include "corerpc.h"
 #include "dbg.h"
 
 extern net_global_t ng;
 
 typedef enum {
         REPLICA_NULL = 400,
-        REPLICA_CREATE,             /* 1 */
         REPLICA_WRITE,
         REPLICA_READ,
-        REPLICA_SHA1,
-        REPLICA_CONNECT,
-        REPLICA_PUSH,
         REPLICA_UNLINK,
-        REPLICA_CLEANUP,
 
-        REPLICA_SETPARENT,
-        REPLICA_GETPARENT,
-        REPLICA_GETCLOCK,
-        REPLICA_SETCLOCK,
-        REPLICA_ANALYSIS_UPDATE,
-        REPLICA_SETTIER,
-        REPLICA_GETTIER,
-        REPLICA_SETPRIORITY,
-        REPLICA_GETPRIORITY,
-        REPLICA_ONLINE,
         REPLICA_MAX,
 } replica_op_t;
 
@@ -139,10 +125,8 @@ static void __request_handler(void *arg)
 err_ret:
         mbuffer_free(&buf);
         if (sockid.type == SOCKID_CORENET) {
-                UNIMPLEMENTED(__DUMP__);
-#if 0
+                DINFO("corenet\n");
                 corerpc_reply_error(&sockid, &msgid, ret);
-#endif
         } else {
                 rpc_reply_error(&sockid, &msgid, ret);
         }
@@ -171,10 +155,8 @@ static int __replica_srv_read(const sockid_t *sockid, const msgid_t *msgid, buff
                 GOTO(err_ret, ret);
 
         if (sockid->type == SOCKID_CORENET) {
-                UNIMPLEMENTED(__DUMP__);
-#if 0
+                DINFO("corenet read\n");
                 corerpc_reply1(sockid, msgid, &reply);
-#endif
         } else {
                 rpc_reply1(sockid, msgid, &reply);
         }
@@ -210,15 +192,24 @@ int replica_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
         _opaque_encode(&req->buf, &count, net_getnid(), sizeof(nid_t), io,
                        sizeof(*io), NULL);
 
-#if 0
-        ret = corerpc_postwait("replica_rpc_read", nid,
-                               req, sizeof(*req) + count, NULL,
-                               _buf, MSG_REPLICA, io->size, _get_timeout());
-        if (unlikely(ret)) {
-                YASSERT(ret != EINVAL);
-                GOTO(err_ret, ret);
+#if ENABLE_CORERPC
+        if (likely(ng.daemon)) {
+                DINFO("corenet read\n");
+                ret = corerpc_postwait("replica_rpc_read", nid,
+                                       req, sizeof(*req) + count, NULL,
+                                       _buf, MSG_REPLICA, io->size, _get_timeout());
+                if (unlikely(ret)) {
+                        YASSERT(ret != EINVAL);
+                        GOTO(err_ret, ret);
+                }
+        } else {
+                ret = rpc_request_wait2("replica_rpc_read", nid,
+                                        req, sizeof(*req) + count, _buf,
+                                        MSG_REPLICA, 0, _get_timeout());
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
         }
-#else
+#else 
         ret = rpc_request_wait2("replica_rpc_read", nid,
                                 req, sizeof(*req) + count, _buf,
                                 MSG_REPLICA, 0, _get_timeout());
@@ -254,7 +245,7 @@ static int __replica_srv_write(const sockid_t *sockid, const msgid_t *msgid, buf
 
         _opaque_decode(req->buf, buflen, &writer, NULL, &io, NULL, NULL);
 
-        DBUG("write chunk "CHKID_FORMAT", off %llu, len %u:%u\n",
+        DINFO("write chunk "CHKID_FORMAT", off %llu, len %u:%u\n",
               CHKID_ARG(&req->chkid), (LLU)io->offset, io->size, _buf->len);
 
         YASSERT(_buf->len == io->size);
@@ -265,10 +256,8 @@ static int __replica_srv_write(const sockid_t *sockid, const msgid_t *msgid, buf
         }
 
         if (sockid->type == SOCKID_CORENET) {
-                UNIMPLEMENTED(__DUMP__);
-#if 0
+                DINFO("correnet write\n");
                 corerpc_reply(sockid, msgid, NULL, 0);
-#endif
         } else {
                 rpc_reply(sockid, msgid, NULL, 0);
         }
@@ -305,13 +294,22 @@ int replica_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
 
         req->buflen = count;
 
-#if 0
-        ret = corerpc_postwait("replica_rpc_write", nid,
-                               req, sizeof(*req) + count, NULL,
-                               _buf, MSG_REPLICA, io->size, _get_timeout());
-        if (unlikely(ret)) {
-                YASSERT(ret != EINVAL);
-                GOTO(err_ret, ret);
+#if ENABLE_CORERPC
+        if (likely(ng.daemon)) {
+                DINFO("corenet write\n");
+                ret = corerpc_postwait("replica_rpc_write", nid,
+                                       req, sizeof(*req) + count, _buf,
+                                       NULL, MSG_CORENET, io->size, _get_timeout());
+                if (unlikely(ret)) {
+                        YASSERT(ret != EINVAL);
+                        GOTO(err_ret, ret);
+                }
+        }  else {
+                ret = rpc_request_wait1("replica_rpc_write", nid,
+                                        req, sizeof(*req) + count, _buf,
+                                        MSG_REPLICA, 0, _get_timeout());
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
         }
 #else
         ret = rpc_request_wait1("replica_rpc_write", nid,
@@ -319,6 +317,7 @@ int replica_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
                                 MSG_REPLICA, 0, _get_timeout());
         if (unlikely(ret))
                 GOTO(err_ret, ret);
+        
 #endif
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
@@ -342,8 +341,8 @@ int replica_rpc_init()
         if (ng.daemon) {
                 rpc_request_register(MSG_REPLICA, __request_handler, NULL);
 
-#if 0
-                corerpc_register(MSG_REPLICA, __request_handler, NULL);
+#if ENABLE_CORERPC
+                corerpc_register(MSG_CORENET, __request_handler, NULL);
 #endif
         }
 

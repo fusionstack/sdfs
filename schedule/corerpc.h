@@ -40,9 +40,6 @@ enum corerp_opcode {
         CORERPC_READ,
 };
 
-int corerpc_rdma_recv_msg(void *_ctx, void *iov, int *_count);
-int corerpc_rdma_recv_data(void *_ctx, void *_data_buf, void *_msg_buf);
-
 // rpc table
 void corerpc_register(int type, net_request_handler handler, void *context);
 
@@ -68,6 +65,11 @@ void corerpc_reset(const sockid_t *sockid);
 
 //rpc table
 int corerpc_init(const char *name, core_t *core);
+#if ENABLE_RDMA
 void corerpc_rdma_reset(const sockid_t *sockid);
+int corerpc_rdma_recv_msg(void *_ctx, void *iov, int *_count);
+int corerpc_rdma_recv_data(void *_ctx, void *_data_buf, void *_msg_buf);
+
+#endif
 
 #endif

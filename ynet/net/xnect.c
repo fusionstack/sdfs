@@ -93,7 +93,7 @@ int net_connect(net_handle_t *sock, const ynet_net_info_t *info, int timeout)
                 GOTO(err_ret, ret);
         }
 
-        ret = __sock_connect(sock, &info->info[0], buf, infolen, timeout);
+        ret = __sock_connect(sock, &info->main, buf, infolen, timeout);
         if (unlikely(ret)) {
                 ret = ENONET;
                 GOTO(err_ret, ret);

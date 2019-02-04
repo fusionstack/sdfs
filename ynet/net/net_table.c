@@ -342,7 +342,8 @@ static void __netable_close(void *_arg)
         yfree((void **)&_arg);
 }
 
-static int __netable_connect__(entry_t *ent, const net_handle_t *sock, const ynet_net_info_t *info, int flag)
+static int __netable_connect__(entry_t *ent, const net_handle_t *sock,
+                               const ynet_net_info_t *info, int flag)
 {
         int ret;
         arg_t *arg;
@@ -406,7 +407,8 @@ static int __network_connect2(entry_t *ent, const ynet_net_info_t *info)
 
         if (ent->status == NETABLE_CONN) {
                 DINFO("connect to %s sockid %s/%d time %u, exist\n",
-                      ent->lname, _inet_ntoa(ent->sock.u.sd.addr), ent->sock.u.sd.sd, (int)ent->ltime.now);
+                      ent->lname, _inet_ntoa(ent->sock.u.sd.addr),
+                      ent->sock.u.sd.sd, (int)ent->ltime.now);
                 goto out;
         }
         

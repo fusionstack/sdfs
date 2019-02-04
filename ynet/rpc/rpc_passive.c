@@ -237,7 +237,7 @@ int rpc_passive(uint32_t port)
         ng.port = port;
         ng.pasv_nh = nh;
 
-        DINFO("listen %u\n", port);
+        DINFO("listen %u, nid %u\n", port, net_getnid()->id);
 
         return 0;
 err_ret:

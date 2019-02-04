@@ -1657,6 +1657,7 @@ err_ret:
         return ret;
 }
 
+#if 0
 int select_nic(unsigned long *accessable_addr, ynet_net_info_t *netinfo,
                 unsigned long local_addr)
 {
@@ -1665,7 +1666,7 @@ int select_nic(unsigned long *accessable_addr, ynet_net_info_t *netinfo,
 
         n = netinfo->info_count;
         for (i = 0; i < n; i++) {
-                tmp.sin_addr.s_addr = netinfo->info[i].addr;
+                tmp.sin_addr.s_addr = netinfo->corenet[i].addr;
                 if (local_addr == (unsigned long) inet_netof(tmp.sin_addr)) {
                         accessable_addr[num] = tmp.sin_addr.s_addr;
                         num += 1;
@@ -1673,7 +1674,7 @@ int select_nic(unsigned long *accessable_addr, ynet_net_info_t *netinfo,
         }
         return num;
 }
-
+#endif
 
 static int get_coninfo(char *buf, uint32_t *bufsize, int connfd, uint32_t port)
 {

@@ -124,7 +124,7 @@ int corenet_tcp_connect(const nid_t *nid, uint32_t addr, sockid_t *sockid)
         ret = tcp_sock_connect(&nh, &sin, 0, 3, 0);
         if (unlikely(ret)) {
                 DINFO("try to connect %s:%u (%u) %s\n", inet_ntoa(sin.sin_addr),
-                     gloconf.direct_port, ret, strerror(ret));
+                      gloconf.direct_port, ret, strerror(ret));
                 GOTO(err_ret, ret);
         }
         

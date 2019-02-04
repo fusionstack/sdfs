@@ -601,19 +601,19 @@ int core_init(int polling_core, int polling_timeout, int flag)
                 }
         }
 
-#if 0
+#if ENABLE_CORERPC
         if (flag & CORE_FLAG_PASSIVE) {
-                if (!gloconf.rdma || sanconf.tcp_discovery) {
-                        ret = corenet_tcp_passive();
-                        if (unlikely(ret))
-                                UNIMPLEMENTED(__DUMP__);
-                } 
-                
+                ret = corenet_tcp_passive();
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
+
+#if ENABLE_RDMA
                 if (gloconf.rdma) {
                         ret = corenet_rdma_passive();
                         if (unlikely(ret))
                                 UNIMPLEMENTED(__DUMP__);
                 }
+#endif
         }
 #endif
 

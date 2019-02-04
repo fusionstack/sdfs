@@ -1097,7 +1097,8 @@ typedef struct {
         buffer_t buf;
 } corenet_fwd_t;
 
-static void __corenet_tcp_queue(corenet_tcp_t *__corenet__, const sockid_t *sockid, buffer_t *buf, int flag)
+static void __corenet_tcp_queue(corenet_tcp_t *__corenet__, const sockid_t *sockid,
+                                buffer_t *buf, int flag)
 {
         int found = 0;
         corenet_fwd_t *corenet_fwd;

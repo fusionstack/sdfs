@@ -452,9 +452,6 @@ int tcp_sock_hostlisten(int *srv_sd, const char *host, const char *service,
         char buf[MAX_BUF_LEN];
         struct sockaddr_in sin;
 
-        //int port = atoi(service);
-        //YASSERT(port > YNET_SERVICE_RANGE && port < 65535);
-        
         _memset(&sin, 0, sizeof(sin));
         sin.sin_family = AF_INET;
 
@@ -684,10 +681,12 @@ err_ret:
         return ret;
 }
 
-#if 0
-int tcp_sock_getdevice(char *name, const char *addr)
+#if 1
+
+static int __tcp_sock_getaddr(uint32_t network, uint32_t mask, uint32_t *_addr)
 {
-        int ret, sd, i, done = 0;
+        int ret, sd, i, done;
+        uint32_t addr;
         char buf[MAX_BUF_LEN];
         struct ifconf ifc;
         struct ifreq *ifcreq, ifr;
@@ -719,7 +718,9 @@ int tcp_sock_getdevice(char *name, const char *addr)
 
         ifcreq = ifc.ifc_req;
 
+        done = 0;
         for (i = ifc.ifc_len / sizeof(struct ifreq); --i >= 0; ifcreq++) {
+
                 _strncpy(ifr.ifr_name, ifcreq->ifr_name,
                          _strlen(ifcreq->ifr_name) + 1);
 
@@ -733,37 +734,27 @@ int tcp_sock_getdevice(char *name, const char *addr)
                 if ((ifr.ifr_flags & IFF_UP) == 0)
                         continue;
 
-                _strncpy(ifr.ifr_name, ifcreq->ifr_name,
-                         _strlen(ifcreq->ifr_name) + 1);
-
-                ret = ioctl(sd, SIOCGIFDSTADDR, &ifr);
-                if (unlikely(ret)) {
-                        ret = errno;
-                        DERROR("ret (%d) %s\n", ret, strerror(ret));
-                        GOTO(err_sd, ret);
-                }
-
-                sin = (void *)&ifr.ifr_dstaddr;
-
-                if (sin->sin_addr.s_addr == localaddr.sin_addr.s_addr)
-                        continue;
-
-                if (strcmp(inet_ntoa(sin->sin_addr), addr) == 0) {
-                        strcpy(name, ifr.ifr_name);
+                sin = (struct sockaddr_in *)&ifcreq->ifr_addr;
+                addr = sin->sin_addr.s_addr;
+                DBUG("ifname %s, %s\n", ifcreq->ifr_name, _inet_ntoa(addr));
+                //DBUG("got sock info %s %u %s\n", _inet_ntoa(addr), i, ifcreq->ifr_name);
+                if ((addr & mask) == (network & mask)) {
+                        DINFO("ifname %s, %s\n", ifcreq->ifr_name, _inet_ntoa(addr));
+                        //DINFO("got sock info %u & %u  %u & %u\n", addr, mask, network, mask);
                         done = 1;
                         break;
                 }
         }
 
-        ret = sy_close(sd);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        sy_close(sd);
 
         if (done == 0) {
-                ret = ENODEV;
+                ret = ENONET;
                 GOTO(err_ret, ret);
         }
 
+        *_addr = addr;
+        
         return 0;
 err_sd:
         (void) sy_close(sd);
@@ -771,7 +762,46 @@ err_ret:
         return ret;
 }
 
-#endif
+int tcp_sock_getaddr(uint32_t *info_count, ynet_sock_info_t *info,
+                     uint32_t info_count_max, uint32_t port)
+{
+        int ret, i, count;
+        uint32_t addr;
+
+        count = 0;
+        for (i = 0; i < netconf.count; i++) {
+                YASSERT(count < (int)info_count_max);
+                ret = __tcp_sock_getaddr(netconf.network[i].network,
+                                         netconf.network[i].mask, &addr);
+                if (unlikely(ret)) {
+                        continue;
+                }
+
+                DBUG("info[%u] addr %u\n", count, addr);
+                
+                info[count].addr = addr;
+                info[count].port = htons(port);
+                count++;
+        }
+
+        DINFO("get sock count %u\n", count);
+        
+        if (count == 0) {
+                ret = ENONET;
+                DBUG("connect refused\n");
+                GOTO(err_ret, ret);
+        }
+
+        *info_count = count;
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+
+
+#else
 
 int tcp_sock_getaddr(uint32_t *info_count, ynet_sock_info_t *info,
                      uint32_t info_count_max, uint32_t port)
@@ -849,7 +879,7 @@ int tcp_sock_getaddr(uint32_t *info_count, ynet_sock_info_t *info,
                         info[count].addr = addr;
                         info[count].port = htons(port);
 
-                        DBUG("got sock info %s:%u\n",
+                        DINFO("got sock info %s:%u\n",
                               _inet_ntoa(info[count].addr), port);
 
                         count++;
@@ -858,6 +888,8 @@ int tcp_sock_getaddr(uint32_t *info_count, ynet_sock_info_t *info,
 
         (void) info_count_max;
 
+        YASSERT(count <= netconf.count);
+        
         ret = sy_close(sd);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -877,115 +909,6 @@ err_ret:
         return ret;
 }
 
-#if 0
-int tcp_sock_getinfo(uint32_t *info_count, ynet_sock_info_t *info,
-                     uint32_t info_count_max, uint32_t port)
-{
-        int ret;
-        struct sockaddr_in localaddr, *sin;
-        char service[MAX_LINE_LEN], *strerr;
-        struct addrinfo hints, *res0, *res;
-        struct protoent ppe, *result;
-        char buf[MAX_BUF_LEN];
-        uint32_t count;
-
-        if (info_count_max == 0)
-                return 0;
-
-        if (port == (uint32_t)-1)
-                port = 10000;//we just need addr here;
-
-        ret = inet_aton(YNET_LOCALHOST, &localaddr.sin_addr);
-        if (ret == 0) {
-                ret = EINVAL;
-                DERROR("ret (%d) %s\n", ret, strerror(ret));
-                GOTO(err_ret, ret);
-        }
-
-        snprintf(service, MAX_LINE_LEN, "%lu", (unsigned long)port);
-        DBUG("port %s\n", service);
-
-        _memset(&hints, 0x0, sizeof(struct addrinfo));
-
-        hints.ai_flags = AI_NUMERICSERV;
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-
-        ret = getprotobyname_r(YNET_TRANSPORT, &ppe, buf, MAX_BUF_LEN, &result);
-        if (unlikely(ret)) {
-                DERROR("can't get \"tcp\" protocol entry\n");
-                GOTO(err_ret, ret);
-        }
-
-        hints.ai_protocol = ppe.p_proto;
-
-        ret = getaddrinfo(NULL, service, &hints, &res0);
-        if (unlikely(ret)) {
-                if (ret == EAI_SYSTEM)
-                        ret = errno;
-                else
-                        ret = EINVAL;
-
-                DERROR("ret (%d) %s\n", ret, strerror(ret));
-
-                strerr = (char *)gai_strerror(ret);
-                if (strerr)
-                        DERROR("%s\n", strerr);
-
-                GOTO(err_ret, ret);
-        }
-
-        count = 0;
-
-        for (res = res0; res; res = res->ai_next) {
-                if (res->ai_family != AF_INET)
-                        continue;
-
-                sin = (struct sockaddr_in *)res->ai_addr;
-
-                if ((sin->sin_addr.s_addr == 0)
-                    || (sin->sin_addr.s_addr == localaddr.sin_addr.s_addr))
-                        continue;
-
-                info[count].addr = sin->sin_addr.s_addr;
-                info[count].port = sin->sin_port;
-
-                /**
-                 * check whether addr on the same network segment.
-                 */
-                if (gloconf.network) {
-                        if ((info[count].addr & gloconf.mask) == (gloconf.network & gloconf.mask)) {
-                                DBUG("got sock info %s:%u\n",
-                                                inet_ntoa(sin->sin_addr), info[count].port);
-                                count++;
-                        } else 
-                                DWARN("got invalid sock info %s:%u\n",
-                                                inet_ntoa(sin->sin_addr), info[count].port);
-
-                } else {
-                        DBUG("got sock info %s:%u\n",
-                                        inet_ntoa(sin->sin_addr), info[count].port);
-                        count++;
-                }
-
-                if (count == info_count_max)
-                        break;
-        }
-
-        freeaddrinfo(res0);
-
-        if (count != 0)
-                *info_count = count;
-        else {
-                ret = tcp_sock_getaddr(info_count, info, info_count_max, port);
-                if (unlikely(ret))
-                        GOTO(err_ret, ret);
-        }
-
-        return 0;
-err_ret:
-        return ret;
-}
 #endif
 
 int tcp_sock_hostconnect(net_handle_t *nh, const char *host,

@@ -66,8 +66,7 @@ static int __net_getinfo(uint32_t *_count, ynet_sock_info_t *socks,
 #endif
 
         _sock = (void *)_info;
-        ret = sock_getinfo(&count, _sock,
-                           info_count_max, port);
+        ret = sock_getinfo(&count, _sock, info_count_max, port);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
@@ -93,7 +92,8 @@ retry:
         for (i = 0; i < count; i++) {
                 sock = &_sock[i];
 
-                DINFO("hostname:%s count:%d addr %s %u\n", hostname, count, _inet_ntoa(sock->addr), ntohl(sock->addr));
+                DINFO("hostname:%s count:%d addr %s %u\n", hostname, count,
+                      _inet_ntoa(sock->addr), ntohl(sock->addr));
 
                 for (j = 0; result->h_addr_list[j] != NULL; j++) {
                         //YASSERT(j < *count);
@@ -162,11 +162,16 @@ int net_getinfo(char *infobuf, uint32_t *infobuflen, uint32_t port)
                 info->info_count = 0;
 
                 if (port != (uint32_t)-1) {
+                        ret = __net_getinfo(&count, &info->main,
+                                            1, port);
+                        if (unlikely(ret)) {
+                                GOTO(err_ret, ret);
+                        }
+
                         info_count_max = (*infobuflen - sizeof(ynet_net_info_t))
                                 / sizeof(ynet_sock_info_t);
 
-
-                        ret = __net_getinfo(&count, info->info,
+                        ret = __net_getinfo(&count, info->corenet,
                                             info_count_max, port);
                         if (unlikely(ret)) {
                                 GOTO(err_ret, ret);
@@ -218,7 +223,7 @@ int net_getinfo(char *infobuf, uint32_t *infobuflen, uint32_t port)
                 DBUG("local nid "NID_FORMAT" info_count %u port %u\n",
                      NID_ARG(&info->id), info->info_count, port);
 
-                __net_checkinfo(info->info, info->info_count);
+                __net_checkinfo(info->corenet, info->info_count);
         } else {
                 memcpy(_buf, ng.info_local, sizeof(ng.info_local));
                 info = (ynet_net_info_t *)_buf;
@@ -230,7 +235,7 @@ int net_getinfo(char *infobuf, uint32_t *infobuflen, uint32_t port)
                 *infobuflen = info->len;
 
                 YASSERT(strcmp(info->name, "none"));
-                __net_checkinfo(info->info, info->info_count);
+                __net_checkinfo(info->corenet, info->info_count);
         }
 
         ((ynet_net_info_t *)infobuf)->deleting = 0;

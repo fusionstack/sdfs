@@ -50,6 +50,7 @@ typedef enum {
         MSG_CDP,
         MSG_ODP,
         MSG_REPLICA,
+        MSG_CORENET,
         MSG_MOND,
         MSG_MAX,
 } net_progtype_t;
