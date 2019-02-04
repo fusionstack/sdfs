@@ -1,5 +1,3 @@
-
-
 #include <limits.h>
 #include <time.h>
 #include <string.h>
@@ -20,13 +18,12 @@
 #include "configure.h"
 #include "net_global.h"
 #include "job_dock.h"
-#include "msgarray.h"
 #include "main_loop.h"
 #include "schedule.h"
-#include "bh.h"
+#include "conn.h"
 #include "timer.h"
 #include "adt.h"
-#include "cluster.h"
+#include "network.h"
 #include "../../ynet/sock/sock_tcp.h"
 #include "core.h"
 #include "corerpc.h"
@@ -42,6 +39,8 @@ typedef struct {
         nid_t to;
         char uuid[UUID_LEN];
 } corenet_msg_t;
+
+extern int nofile_max;
 
 #if 0
 int corenet_connect_host(const char *host, sockid_t *sockid)
@@ -105,31 +104,31 @@ err_ret:
  * @param sockid
  * @return
  */
-int corenet_tcp_connect(const nid_t *nid, sockid_t *sockid)
+int corenet_tcp_connect(const nid_t *nid, uint32_t addr, sockid_t *sockid)
 {
         int ret;
-        char host[MAX_NAME_LEN], port[MAX_NAME_LEN];
         net_handle_t nh;
         core_t *core = core_self();
         corenet_msg_t msg;
         corerpc_ctx_t *ctx;
+        struct sockaddr_in sin;
 
+        _memset(&sin, 0, sizeof(sin));
+        sin.sin_family = AF_INET;
+
+        sin.sin_addr.s_addr = addr;
+        sin.sin_port = htons(gloconf.direct_port);
+
+        DINFO("connect %s:%u\n", inet_ntoa(sin.sin_addr), gloconf.direct_port);
+
+        ret = tcp_sock_connect(&nh, &sin, 0, 3, 0);
+        if (unlikely(ret)) {
+                DINFO("try to connect %s:%u (%u) %s\n", inet_ntoa(sin.sin_addr),
+                     gloconf.direct_port, ret, strerror(ret));
+                GOTO(err_ret, ret);
+        }
+        
         YASSERT(strlen(gloconf.uuid) < UUID_LEN);
-        ret = network_connect(nid, NULL, 0, 0);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        ret = network_rname1(nid, host);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        snprintf(port, MAX_NAME_LEN, "%u", gloconf.direct_port);
-
-        DINFO("connect to %s:%s\n", host, port);
-
-        ret = tcp_sock_hostconnect(&nh, host, port, 0, 3, 0);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
 
         msg.hash = core->hash;
         msg.from = *net_getnid();
@@ -155,10 +154,13 @@ int corenet_tcp_connect(const nid_t *nid, sockid_t *sockid)
                 UNIMPLEMENTED(__DUMP__);
 
         ctx->running = 0;
+#if ENABLE_RDMA
         sockid->rdma_handler = 0;
+#endif
         ctx->sockid = *sockid;
         ctx->nid = *nid;
-        ret = corenet_tcp_add(NULL, sockid, ctx, corerpc_recv, corerpc_close, NULL, NULL, network_rname(nid));
+        ret = corenet_tcp_add(NULL, sockid, ctx, corerpc_recv, corerpc_close,
+                              NULL, NULL, network_rname(nid));
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
@@ -214,13 +216,17 @@ STATIC void *__corenet_accept__(void *arg)
 
         
         core = core_get(msg->hash);
+#if ENABLE_RDMA
         sockid->rdma_handler = 0;
+#endif
         ctx->nid = msg->from;
 
-        ret = corenet_maping_accept(core, &msg->from, sockid);
+#if 0
+        ret = corenet_maping_accept(core, &msg->from, sockid, 1);
         if (unlikely(ret)) {
                 UNIMPLEMENTED(__DUMP__);
         }
+#endif
 
         DINFO("hash %d core:%p maping:%p, sd %u\n", msg->hash, core, core->maping, sockid->sd);
         

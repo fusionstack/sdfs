@@ -13,7 +13,10 @@
 #include "ylock.h"
 #include "ynet_net.h"
 
-#if  ENABLE_RDMA
+#define ENABLE_RDMA 0
+
+#if ENABLE_RDMA
+
 typedef struct {
             int node_loc;
             int ref;
@@ -42,16 +45,6 @@ typedef struct {
             buffer_t data_buf;
             rdma_conn_t    *rdma_handler;
 } hyw_iovec_t;
-#endif
-
-#if ENABLE_TCP_THREAD
-#define CORE_IOV_MAX ((uint64_t)1024 * 10)
-#else
-#define CORE_IOV_MAX (1024 * 1)
-#endif
-#define DEFAULT_MH_NUM 1024
-#define MAX_REQ_NUM ((DEFAULT_MH_NUM) / 2)
-#define EXTRA_SIZE (4)
 
 #define CORENET_RDMA_ON_ACTIVE_WAIT FALSE
 
@@ -62,6 +55,17 @@ enum corenet_rdma_op_code {
         RDMA_READ,
         RDMA_OP_END,
 };
+
+#endif
+
+#if ENABLE_TCP_THREAD
+#define CORE_IOV_MAX ((uint64_t)1024 * 10)
+#else
+#define CORE_IOV_MAX (1024 * 1)
+#endif
+#define DEFAULT_MH_NUM 1024
+#define MAX_REQ_NUM ((DEFAULT_MH_NUM) / 2)
+#define EXTRA_SIZE (4)
 
 typedef struct {
         struct list_head hook;
@@ -105,15 +109,14 @@ typedef struct {
         buffer_t send_buf;
         buffer_t recv_buf;
         buffer_t queue_buf;
-
 #if ENABLE_RDMA
         rdma_conn_t handler;
+        void *head_sr;
 #endif
         int total_seg_count;
         struct list_head send_list;
         int ref;
         int closed;
-
 #if 0
         char name[MAX_NAME_LEN / 2]; /*!!!!can't be larger more*/
 #endif
@@ -159,7 +162,7 @@ int corenet_tcp_send(const sockid_t *sockid, buffer_t *buf, int flag);
 void corenet_tcp_commit();
 
 #if ENABLE_RDMA
-// below is RDMA
+// below is RDMA transfer
 
 int corenet_rdma_init(int max, corenet_rdma_t **corenet, void *private_mem);
 int corenet_rdma_dev_create(rdma_info_t * res);
@@ -171,7 +174,7 @@ int rdma_create_cq(rdma_info_t *res, int ib_port);
 void *rdma_get_mr_addr();
 void *rdma_register_mgr(void* pd, void* buf, size_t size);
 
-int corenet_rdma_add(core_t *core, sockid_t *sockid, void *ctx,
+int corenet_rdma_add(core_t *core, const nid_t *nid, sockid_t *sockid, void *ctx,
                      core_exec exec, core_exec1 exec1, func_t reset, func_t check, func_t recv, rdma_conn_t **_handler);
 void corenet_rdma_close(rdma_conn_t *rdma_handler);
 
@@ -181,24 +184,25 @@ int corenet_rdma_connected(const sockid_t *sockid);
 void corenet_rdma_established(struct rdma_cm_event *ev, void *core);
 void corenet_rdma_disconnected(struct rdma_cm_event *ev, void *core);
 
-int corenet_rdma_poll(core_t *core);
 int corenet_rdma_send(const sockid_t *sockid, buffer_t *buf, int flag);
 void corenet_rdma_commit();
+int corenet_rdma_poll(core_t *core);
+
+int corenet_rdma_post_recv(void *ptr);
 
 void corenet_rdma_put(rdma_conn_t *rdma_handler);
 void corenet_rdma_get(rdma_conn_t *rdma_handler, int n);
 
 int corenet_rdma_evt_channel_init();
 int corenet_rdma_listen_by_channel(int cpu_idx);
-int corenet_rdma_connect_by_channel(const char *host, const char *port, core_t *core,
+
+int corenet_rdma_connect_by_channel(const nid_t *nid, uint32_t addr, const char *port, core_t *core,
                                     sockid_t *sockid);
 
-int corenet_rdma_on_passive_event(int cpu_idx);
-int corenet_rdma_post_recv(void *ptr);
+// int corenet_rdma_on_passive_event(int cpu_idx);
 
 void corenet_rdma_timewait_exit(struct rdma_cm_event *ev, void *core);
 void corenet_rdma_connect_request(struct rdma_cm_event *ev, void *core);
-
 #endif
 
 #endif

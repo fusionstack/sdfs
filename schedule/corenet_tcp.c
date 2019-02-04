@@ -1,5 +1,3 @@
-
-
 #include <limits.h>
 #include <time.h>
 #include <string.h>
@@ -1340,6 +1338,11 @@ int corenet_tcp_connected(const sockid_t *sockid)
         corenet_node_t *node;
         corenet_tcp_t *__corenet__ = __corenet_get();
 
+        if (sockid->sd == -1) {
+                ret = ECONNRESET;
+                GOTO(err_ret, ret);
+        }
+        
         node = &__corenet__->array[sockid->sd];
         if (node->sockid.seq != sockid->seq || node->sockid.sd == -1) {
                 ret = ECONNRESET;

@@ -2,7 +2,6 @@
 #define __NET_GLOBAL_H__
 
 #include <uuid/uuid.h>
-
 #include "sdevent.h"
 #include "sdfs_conf.h"
 #include "ylib.h"

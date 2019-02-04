@@ -174,6 +174,7 @@ struct gloconf_t
 {
         char cluster_name[MAXSIZE];
         char iscsi_iqn[MAXSIZE];
+        char uuid[UUID_LEN];
         int coredump;
         int backtrace;
         int testing;

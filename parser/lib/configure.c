@@ -169,6 +169,7 @@ int conf_init(const char *conf_path)
         gloconf.maxcore = 1;
         memset(gloconf.cluster_name, 0x0, MAXSIZE);
         strcpy(gloconf.cluster_name, "uss");
+        strcpy(gloconf.uuid, "f7f67a9bf59e4f8096ff9222a12fa3c0");//fake uuid
         mdsconf.chknew_hardend = 1;
         mdsconf.main_loop_threads = 6;
 
