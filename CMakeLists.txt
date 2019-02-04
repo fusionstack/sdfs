@@ -150,9 +150,9 @@ add_library(ylib SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/aio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/core.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/corenet_tcp.c
-    #${CMAKE_CURRENT_SOURCE_DIR}/schedule/corenet_connect_tcp.c
-    #${CMAKE_CURRENT_SOURCE_DIR}/schedule/corenet_maping.c
-    #${CMAKE_CURRENT_SOURCE_DIR}/schedule/corerpc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/schedule/corenet_connect_tcp.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/schedule/corenet_maping.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/schedule/corerpc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/cpuset.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/schedule.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/schedule_thread.c

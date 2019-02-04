@@ -1,5 +1,3 @@
-
-
 #include <string.h>
 #include <errno.h>
 
@@ -18,7 +16,7 @@
 #include "corenet.h"
 #include "corerpc.h"
 #include "corenet_maping.h"
-#include "cluster.h"
+#include "network.h"
 #include "variable.h"
 #include "dbg.h"
 
@@ -40,8 +38,9 @@ static void __request_nosys(void *arg)
         sockid_t sockid;
         msgid_t msgid;
         buffer_t buf;
+        nid_t nid;
 
-        request_trans(arg, &sockid, &msgid, &buf, NULL);
+        request_trans(arg, &nid, &sockid, &msgid, &buf, NULL);
 
         schedule_task_setname("nosys");
         mbuffer_free(&buf);
@@ -54,8 +53,9 @@ static void __request_stale(void *arg)
         sockid_t sockid;
         msgid_t msgid;
         buffer_t buf;
+        nid_t nid;
 
-        request_trans(arg, &sockid, &msgid, &buf, NULL);
+        request_trans(arg, &nid, &sockid, &msgid, &buf, NULL);
 
         DERROR("got stale msg\n");
         
@@ -111,6 +111,8 @@ STATIC int __corerpc_wait__(const nid_t *nid, const char *name, buffer_t *rbuf, 
 {
         int ret;
 
+        (void) timeout;
+        
         ANALYSIS_BEGIN(0);
         //ANALYSIS_BEGIN(1);
 
@@ -146,6 +148,7 @@ err_ret:
         return ret;
 }
 
+#if ENABLE_RDMA
 static void __corerpc_msgid_prep(msgid_t *msgid, const buffer_t *wbuf, buffer_t *rbuf,
                                 int msg_size, const rdma_conn_t *handler)
 {
@@ -164,20 +167,22 @@ static void __corerpc_msgid_prep(msgid_t *msgid, const buffer_t *wbuf, buffer_t 
 	} else {
 		YASSERT(rbuf != NULL);
 		mbuffer_init(rbuf, msg_size);
+
 		msgid->data_prop.rkey = handler->mr->rkey;
 		msgid->data_prop.remote_addr = (uintptr_t)mbuffer_head(rbuf);
 		msgid->data_prop.size = msg_size;
 		msgid->opcode = CORERPC_READ;
 	}
 }
-
+#endif
 
 STATIC int __corerpc_send(msgid_t *msgid, const sockid_t *sockid, const void *request,
                               int reqlen, const buffer_t *wbuf, buffer_t *rbuf, int msg_type, int msg_size)
 {
         int ret;
         buffer_t buf;
-        
+
+#if ENABLE_RDMA
         if (likely(sockid->rdma_handler > 0)) {
 
                  rdma_conn_t *handler = (rdma_conn_t *)sockid->rdma_handler;
@@ -205,6 +210,24 @@ STATIC int __corerpc_send(msgid_t *msgid, const sockid_t *sockid, const void *re
                         GOTO(err_free, ret);
                 }
         }
+#else
+        (void) rbuf;
+        (void) msg_size;
+
+        ret = rpc_request_prep(&buf, msgid, request, reqlen, wbuf, msg_type, 1, -1);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        DBUG("send msg to %s, id (%u, %x), len %u\n",
+             _inet_ntoa(sockid->addr), msgid->idx,
+             msgid->figerprint, buf.len);
+
+        ret = corenet_tcp_send(sockid, &buf, 0);
+        if (unlikely(ret)) {
+                GOTO(err_free, ret);
+        }
+#endif
+        
         return 0;
 err_free:
         mbuffer_free(&buf);
@@ -224,8 +247,10 @@ static inline int __get_buffer_seg_count(const buffer_t *buf)
         return count;
 }
 
-int corerpc_send_and_wait(const char *name, const sockid_t *sockid, const nid_t *nid, const void *request,
-                          int reqlen, const buffer_t *wbuf, buffer_t *rbuf, int msg_type, int msg_size, int timeout)
+int corerpc_send_and_wait(const char *name, const sockid_t *sockid,
+                          const nid_t *nid, const void *request,
+                          int reqlen, const buffer_t *wbuf, buffer_t *rbuf,
+                          int msg_type, int msg_size, int timeout)
 {
         int ret;
         msgid_t msgid;
@@ -253,6 +278,15 @@ int corerpc_send_and_wait(const char *name, const sockid_t *sockid, const nid_t 
 		YASSERT(ret == ENONET || ret == ESHUTDOWN);
 		if (wbuf_seg_count > 1)
 			mbuffer_free(&cbuf);
+
+#if ENABLE_RDMA
+                // bugfix #11347
+                if (likely(sockid->rdma_handler > 0 && rbuf && wbuf == NULL))
+                        mbuffer_free(rbuf);
+#else
+                if (rbuf && wbuf == NULL)
+                        mbuffer_free(rbuf);
+#endif
 		GOTO(err_free, ret);
 	}
 
@@ -261,6 +295,13 @@ int corerpc_send_and_wait(const char *name, const sockid_t *sockid, const nid_t 
 
         ret = __corerpc_wait__(nid, name, rbuf, &ctx, timeout);
         if (unlikely(ret)) {
+#if ENABLE_RDMA
+                if (likely(sockid->rdma_handler > 0 && rbuf && wbuf == NULL))
+                        mbuffer_free(rbuf);
+#else
+                if (rbuf && wbuf == NULL)
+                        mbuffer_free(rbuf);
+#endif
                 GOTO(err_ret, ret);
         }
 
@@ -275,8 +316,9 @@ err_ret:
         return ret;
 }
 
-int corerpc_postwait(const char *name, const nid_t *nid, const void *request,
-                     int reqlen, const buffer_t *wbuf, buffer_t *rbuf, int msg_type, int msg_size, int timeout)
+int IO_FUNC corerpc_postwait(const char *name, const nid_t *nid, const void *request,
+                             int reqlen, const buffer_t *wbuf, buffer_t *rbuf,
+                             int msg_type, int msg_size, int timeout)
 {
         int ret;
         sockid_t sockid;
@@ -286,13 +328,15 @@ int corerpc_postwait(const char *name, const nid_t *nid, const void *request,
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        ret = corerpc_send_and_wait(name, &sockid, nid, request, reqlen, wbuf, rbuf, msg_type, msg_size, timeout);
+        ret = corerpc_send_and_wait(name, &sockid, nid, request, reqlen,
+                                    wbuf, rbuf, msg_type, msg_size, timeout);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
 
         return 0;
 err_ret:
+        corenet_maping_close(nid, &sockid);
         return ret;
 }
 
@@ -429,6 +473,7 @@ static int __corerpc_len(void *buf, uint32_t len)
         return msg_len + io_len;
 }
 
+#if ENABLE_RDMA
 static int __corerpc_rdma_handler(corerpc_ctx_t *ctx, buffer_t *data_buf, buffer_t *msg_buf)
 {
         int ret;
@@ -515,6 +560,7 @@ int corerpc_rdma_recv_msg(void *_ctx, void *iov, int *_count)
 
         return 0;
 }
+#endif
 
 int corerpc_recv(void *_ctx, void *buf, int *_count)
 {
@@ -571,14 +617,17 @@ void corerpc_close(void *_ctx)
 }
 
 
- void corerpc_reply1(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+void IO_FUNC corerpc_reply1(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
 {
-        int ret, seg_count = 0;
-        buffer_t data_buf, reply_buf, tmp, *_tmp;
+        int ret;
+        buffer_t reply_buf;
 
         DBUG("reply msgid (%d, %x) %s\n", msgid->idx, msgid->figerprint,
-              _inet_ntoa(sockid->addr));
+             _inet_ntoa(sockid->addr));
 
+#if ENABLE_RDMA
+        int seg_count = 0;
+        buffer_t data_buf, tmp, *_tmp;
         if (sockid->rdma_handler > 0) {
                 mbuffer_init(&data_buf, 0);
                 if (_buf && _buf->len) {
@@ -619,6 +668,13 @@ void corerpc_close(void *_ctx)
                 if (unlikely(ret))
                         mbuffer_free(&reply_buf);
         }
+#else
+                rpc_reply_prep(msgid, &reply_buf, _buf, 1);
+
+                ret = corenet_tcp_send(sockid, &reply_buf, 0);
+                if (unlikely(ret))
+                        mbuffer_free(&reply_buf);
+#endif
 }
 
 void corerpc_reply(const sockid_t *sockid, const msgid_t *msgid, const void *_buf, int len)
@@ -637,6 +693,7 @@ void corerpc_reply_error(const sockid_t *sockid, const msgid_t *msgid, int _erro
         int ret;
         buffer_t buf;
 
+#if ENABLE_RDMA
         rpc_reply_error_prep(msgid, &buf, _error);
         if (sockid->rdma_handler > 0) {
                 ret = corenet_rdma_send(sockid, &buf, 0);
@@ -645,6 +702,13 @@ void corerpc_reply_error(const sockid_t *sockid, const msgid_t *msgid, int _erro
         }
         if (unlikely(ret))
                 mbuffer_free(&buf);
+#else
+        rpc_reply_error_prep(msgid, &buf, _error);
+        ret = corenet_tcp_send(sockid, &buf, 0);
+        if (unlikely(ret))
+                mbuffer_free(&buf);
+        
+#endif
 }
 
 int corerpc_init(const char *name, core_t *core)
@@ -678,6 +742,7 @@ void corerpc_scan()
         }
 }
 
+#if ENABLE_RDMA
 void corerpc_rdma_reset(const sockid_t *sockid)
 {
         rpc_table_t *__rpc_table_private__ = NULL;
@@ -692,6 +757,7 @@ void corerpc_rdma_reset(const sockid_t *sockid)
         } else 
                 YASSERT(0);
 }
+#endif
 
 void corerpc_reset(const sockid_t *sockid)
 {

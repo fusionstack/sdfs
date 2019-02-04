@@ -4,8 +4,11 @@
 
 int corenet_tcp_connect(const nid_t *nid, uint32_t addr, sockid_t *sockid);
 int corenet_tcp_passive();
+
+#if ENABLE_RDMA
 int corenet_rdma_connect(const nid_t *nid, uint32_t addr, sockid_t *sockid);
 int corenet_rdma_passive();
+#endif
 /** @file 不同节点上多个core间的RPC.
  *
  * CORE地址： <nid, core hash>
