@@ -52,9 +52,47 @@ int rpc_portlisten(int *sd, uint32_t addr, uint32_t *port, int qlen,
         return net_portlisten(sd, addr, port, qlen, nonblock);
 }
 
+#define NETINFO_TIMEOUT (10 * 60)
+
 int rpc_getinfo(char *infobuf, uint32_t *infobuflen)
 {
-        return net_getinfo(infobuf, infobuflen, ng.port);
+        int ret;
+        uint32_t port = ng.port;
+        ynet_net_info_t *info;
+        char _buf[MAX_BUF_LEN];
+        
+        if (ng.daemon && port == (uint32_t)-1) {
+                ret = EAGAIN;
+                GOTO(err_ret, ret);
+        }
+
+        while (ng.daemon && ng.local_nid.id == 0) {
+                DWARN("wait nid inited\n");
+                sleep(1);
+        }
+        
+        if (ng.info_local[0] == '\0' ||  gettime() - ng.info_time > NETINFO_TIMEOUT) {
+                ret = net_getinfo(infobuf, infobuflen, ng.port);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        } else {
+                memcpy(_buf, ng.info_local, sizeof(ng.info_local));
+                info = (ynet_net_info_t *)_buf;
+
+                if (net_isnull(&info->id) && !net_isnull(net_getnid()))
+                        info->id = *net_getnid();
+
+                _memcpy(infobuf, info, info->len);
+                *infobuflen = info->len;
+
+                YASSERT(strcmp(info->name, "none"));
+        }
+
+        ((ynet_net_info_t *)infobuf)->deleting = 0;
+
+        return 0;
+err_ret:
+        return ret;
 }
 
 typedef struct {

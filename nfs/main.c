@@ -212,10 +212,6 @@ int ynfs_srv(void *args)
         if (ret)
                 GOTO(err_ret, ret);
         
-        ret = core_init(gloconf.polling_core, gloconf.polling_timeout, 0);
-        if (ret)
-                GOTO(err_ret, ret);
-
 retry:
         ret = network_connect_mond(0);
         if (ret) {

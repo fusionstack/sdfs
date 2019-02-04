@@ -23,6 +23,7 @@
 #include "network.h"
 #include "redis.h"
 #include "bh.h"
+#include "core.h"
 #include "io_analysis.h"
 #include "../../sdfs/replica_rpc.h"
 #include "net_global.h"
@@ -942,6 +943,10 @@ int sdfs_init_verbose(const char *name, int redis_conn)
         main_loop_start();
 
         ret = io_analysis_init(name, -1);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        ret = core_init(gloconf.polling_core, gloconf.polling_timeout, 0);
         if (ret)
                 GOTO(err_ret, ret);
 retry:

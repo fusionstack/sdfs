@@ -33,8 +33,8 @@ typedef enum {
         REPLICA_NULL = 400,
         REPLICA_WRITE,
         REPLICA_READ,
-        REPLICA_UNLINK,
-
+        REPLICA_CORENET,
+ 
         REPLICA_MAX,
 } replica_op_t;
 
@@ -330,6 +330,75 @@ err_ret:
         return ret;
 }
 
+#if 0
+static int __replica_srv_corenet(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf)
+{
+        int ret, buflen;
+        msg_t *req;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        const io_t *io;
+        buffer_t reply;
+        const nid_t *coreneter;
+
+        __getmsg(_buf, &req, &buflen, buf);
+
+        _opaque_decode(req->buf, buflen, &coreneter, NULL, &io, NULL, NULL);
+
+        mbuffer_init(&reply, 0);
+
+        ret = replica_corenet(io, &reply);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        rpc_reply1(sockid, msgid, &reply);
+
+        mbuffer_free(&reply);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+
+int replica_rpc_corenet(const nid_t *nid, const io_t *io, buffer_t *_buf)
+{
+        int ret;
+        char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
+        uint32_t count;
+        msg_t *req;
+
+        ret = network_connect(nid, NULL, 1, 0);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        ANALYSIS_BEGIN(0);
+
+        //YASSERT(io->offset <= YFS_CHK_LEN_MAX);
+
+        req = (void *)buf;
+        req->op = REPLICA_CORENET;
+        req->chkid = io->id;
+        _opaque_encode(&req->buf, &count, net_getnid(), sizeof(nid_t), io,
+                       sizeof(*io), NULL);
+
+        ret = rpc_request_wait2("replica_rpc_corenet", nid,
+                                req, sizeof(*req) + count, _buf,
+                                MSG_REPLICA, 0, _get_timeout());
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        mem_cache_free(MEM_CACHE_4K, buf);
+
+        return 0;
+err_ret:
+        mem_cache_free(MEM_CACHE_4K, buf);
+        return ret;
+}
+#endif
 
 int replica_rpc_init()
 {

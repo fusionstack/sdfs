@@ -144,7 +144,7 @@ int net_getinfo(char *infobuf, uint32_t *infobuflen, uint32_t port)
         int ret;
         ynet_net_info_t *info;
         uint32_t info_count_max, count = 0;
-        char _buf[MAX_BUF_LEN], hostname[MAX_NAME_LEN];
+        char hostname[MAX_NAME_LEN];
 
         if (ng.daemon && port == (uint32_t)-1) {
                 ret = EAGAIN;
@@ -155,89 +155,68 @@ int net_getinfo(char *infobuf, uint32_t *infobuflen, uint32_t port)
                 DWARN("wait nid inited\n");
                 sleep(1);
         }
-        
-        if (ng.info_local[0] == '\0' ||  gettime() - ng.info_time > NETINFO_TIMEOUT) {
-                info = (ynet_net_info_t *)infobuf;
-                _memset(infobuf, 0x0, sizeof(ynet_net_info_t));
-                info->info_count = 0;
 
-                if (port != (uint32_t)-1) {
-                        ret = __net_getinfo(&count, &info->main,
-                                            1, port);
-                        if (unlikely(ret)) {
-                                GOTO(err_ret, ret);
-                        }
+        info = (ynet_net_info_t *)infobuf;
+        _memset(infobuf, 0x0, sizeof(ynet_net_info_t));
+        info->info_count = 0;
 
-                        info_count_max = (*infobuflen - sizeof(ynet_net_info_t))
-                                / sizeof(ynet_sock_info_t);
+        if (port != (uint32_t)-1) {
+                info_count_max = (*infobuflen - sizeof(ynet_net_info_t))
+                        / sizeof(ynet_sock_info_t);
 
-                        ret = __net_getinfo(&count, info->corenet,
-                                            info_count_max, port);
-                        if (unlikely(ret)) {
-                                GOTO(err_ret, ret);
-                        }
-
-                        info->info_count = count;
-                        
-                        YASSERT(strlen(ng.name));
-                        if (ng.daemon) {
-                                YASSERT(count);
-                        }
+                ret = __net_getinfo(&count, info->info,
+                                    info_count_max, port);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
                 }
 
+                info->info_count = count;
+                        
+                YASSERT(strlen(ng.name));
                 if (ng.daemon) {
                         YASSERT(count);
                 }
-                
-                info->id = *net_getnid();
-                info->magic = YNET_PROTO_TCP_MAGIC;
-                info->uptime = ng.uptime;
-                uuid_unparse(ng.nodeid, info->nodeid);
-
-                ret = gethostname(hostname, MAX_NAME_LEN);
-                if (unlikely(ret < 0)) {
-                        ret = errno;
-                        GOTO(err_ret, ret);
-                }
-                
-                snprintf(info->name, MAX_NAME_LEN, "%s:%s", hostname, ng.name);
-
-                DINFO("info.name %s\n", info->name);
-
-                if (port != YNET_PORT_NULL)
-                        YASSERT(info->info_count);
-
-                *infobuflen = sizeof(ynet_net_info_t)
-                        + sizeof(ynet_sock_info_t) * info->info_count;
-
-                info->len = *infobuflen;
-
-                if (strcmp(info->name, "none") == 0) {
-                        ret = EAGAIN;
-                        GOTO(err_ret, ret);
-                }
-
-                ng.info_time = gettime();
-                _memcpy(ng.info_local, info, info->len);
-
-                DBUG("local nid "NID_FORMAT" info_count %u port %u\n",
-                     NID_ARG(&info->id), info->info_count, port);
-
-                __net_checkinfo(info->corenet, info->info_count);
-        } else {
-                memcpy(_buf, ng.info_local, sizeof(ng.info_local));
-                info = (ynet_net_info_t *)_buf;
-
-                if (net_isnull(&info->id) && !net_isnull(net_getnid()))
-                        info->id = *net_getnid();
-
-                _memcpy(infobuf, info, info->len);
-                *infobuflen = info->len;
-
-                YASSERT(strcmp(info->name, "none"));
-                __net_checkinfo(info->corenet, info->info_count);
         }
 
+        if (ng.daemon) {
+                YASSERT(count);
+        }
+                
+        info->id = *net_getnid();
+        info->magic = YNET_PROTO_TCP_MAGIC;
+        info->uptime = ng.uptime;
+        uuid_unparse(ng.nodeid, info->nodeid);
+
+        ret = gethostname(hostname, MAX_NAME_LEN);
+        if (unlikely(ret < 0)) {
+                ret = errno;
+                GOTO(err_ret, ret);
+        }
+                
+        snprintf(info->name, MAX_NAME_LEN, "%s:%s", hostname, ng.name);
+
+        DINFO("info.name %s\n", info->name);
+
+        if (port != YNET_PORT_NULL)
+                YASSERT(info->info_count);
+
+        *infobuflen = sizeof(ynet_net_info_t)
+                + sizeof(ynet_sock_info_t) * info->info_count;
+
+        info->len = *infobuflen;
+
+        if (strcmp(info->name, "none") == 0) {
+                ret = EAGAIN;
+                GOTO(err_ret, ret);
+        }
+
+        ng.info_time = gettime();
+        _memcpy(ng.info_local, info, info->len);
+
+        DBUG("local nid "NID_FORMAT" info_count %u port %u\n",
+             NID_ARG(&info->id), info->info_count, port);
+
+        __net_checkinfo(info->info, info->info_count);
         ((ynet_net_info_t *)infobuf)->deleting = 0;
 
         return 0;

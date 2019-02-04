@@ -126,9 +126,7 @@ typedef struct {
         uint16_t deleting;
         uint16_t info_count;       /**< network interface number */
         uint16_t __padding;
-        ynet_sock_info_t main;
-        ynet_sock_info_t corenet[0];  /**< host byte order */
-        //ynet_sock_info_t info[0];
+        ynet_sock_info_t info[0];  /**< host byte order */
 } ynet_net_info_t;
 
 #pragma pack()
@@ -137,7 +135,7 @@ static inline int str2netinfo(ynet_net_info_t *info, const char *buf)
 {
         int ret;
         const char *addrs;
-        char addr[MAX_NAME_LEN], name[MAX_NAME_LEN];
+        char addr[MAX_NAME_LEN];
         uint32_t port, i;
 
         memset(info, 0x0, sizeof(*info));
@@ -149,33 +147,29 @@ static inline int str2netinfo(ynet_net_info_t *info, const char *buf)
                      "hostname:%[^\n]\n"
                      "nodeid:%[^\n]\n"
                      "magic:%d\n"
-                     "main:%[^/]/%d\n"
-                     "corenet_count:%"SCNd16"\n"
-                     "corenet:",
+                     "info_count:%"SCNd16"\n"
+                     "info:",
                      &info->len,
                      &info->uptime,
                      &info->id.id,
                      info->name,
                      info->nodeid,
                      &info->magic,
-                     name, &port,
                      &info->info_count);
-        if (ret != 9) {
+        if (ret != 7) {
                 UNIMPLEMENTED(__DUMP__);
                 ret = EAGAIN;
                 GOTO(err_ret, ret);
         }
 
-        info->main.addr = inet_addr(name);
-        info->main.port = htons(port);
-        addrs = strstr(buf, "corenet:") + 5;
+        addrs = strstr(buf, "info:") + 5;
         for (i = 0; i < info->info_count; ++i) {
                 ret = sscanf(addrs, "%[^/]/%d", addr, &port);
                 YASSERT(ret == 2);
                 addrs = strchr(addrs, ',') + 1;
 
-                info->corenet[i].addr = inet_addr(addr);
-                info->corenet[i].port = htons(port);
+                info->info[i].addr = inet_addr(addr);
+                info->info[i].port = htons(port);
         }
 
         return 0;
@@ -195,23 +189,21 @@ static inline void netinfo2str(char *buf, const ynet_net_info_t *info)
                  "hostname:%s\n"
                  "nodeid:%s\n"
                  "magic:%d\n"
-                 "main:%s/%d\n"
-                 "corenet_count:%u\n"
-                 "corenet:",
+                 "info_count:%u\n"
+                 "info:",
                  info->len,
                  info->uptime,
                  NID_ARG(&info->id),
                  info->name,
                  info->nodeid,
                  info->magic,
-                 _inet_ntoa(info->main.addr), ntohs(info->main.port),
                  info->info_count);
 
         YASSERT(strlen(info->name));
         YASSERT(info->info_count * sizeof(ynet_sock_info_t) + sizeof(ynet_net_info_t) == info->len);
         
         for (i = 0; i < info->info_count; i++) {
-                sock = &info->corenet[i];
+                sock = &info->info[i];
                 snprintf(buf + strlen(buf), MAX_NAME_LEN, "%s/%u,",
                          _inet_ntoa(sock->addr), ntohs(sock->port));
         }
@@ -334,9 +326,9 @@ static inline void ynet_net_info_dump(void *infobuf)
 
         info_count = netinfo->info_count < 2 ? netinfo->info_count:2;
         for (i = 0; i < info_count; ++i) {
-                sin.s_addr = netinfo->corenet[i].addr;
-                DBUG("sock %p [%u, %u]\n", &netinfo->corenet[i], netinfo->corenet[i].addr, netinfo->corenet[i].port);
-                DBUG("net[%u]: (%u)%s:%u\n", i, netinfo->corenet[i].addr, inet_ntoa(sin), netinfo->corenet[i].port);
+                sin.s_addr = netinfo->info[i].addr;
+                DBUG("sock %p [%u, %u]\n", &netinfo->info[i], netinfo->info[i].addr, netinfo->info[i].port);
+                DBUG("net[%u]: (%u)%s:%u\n", i, netinfo->info[i].addr, inet_ntoa(sin), netinfo->info[i].port);
         }
 }
 

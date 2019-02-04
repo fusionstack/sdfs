@@ -10,6 +10,7 @@
 #include "../sock/ynet_sock.h"
 #include "net_events.h"
 #include "net_global.h"
+#include "../include/ynet_rpc.h"
 #include "sdevent.h"
 #include "xnect.h"
 #include "configure.h"
@@ -88,12 +89,12 @@ int net_connect(net_handle_t *sock, const ynet_net_info_t *info, int timeout)
 
         infolen = MAX_BUF_LEN;
 
-        ret = net_getinfo(buf, &infolen, ng.port);
+        ret = rpc_getinfo(buf, &infolen);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
 
-        ret = __sock_connect(sock, &info->main, buf, infolen, timeout);
+        ret = __sock_connect(sock, &info->info[0], buf, infolen, timeout);
         if (unlikely(ret)) {
                 ret = ENONET;
                 GOTO(err_ret, ret);
@@ -140,7 +141,7 @@ retry:
         }
 
         if (!net_isnull(&info->id)) {
-                ret = net_getinfo(buf, &buflen, ng.port);
+                ret = rpc_getinfo(buf, &buflen);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
 

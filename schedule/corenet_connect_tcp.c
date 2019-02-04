@@ -41,6 +41,7 @@ typedef struct {
 } corenet_msg_t;
 
 extern int nofile_max;
+int __corenet_port__ = -1;
 
 #if 0
 int corenet_connect_host(const char *host, sockid_t *sockid)
@@ -310,16 +311,31 @@ err_ret:
 
 int corenet_tcp_passive()
 {
-        int ret;
-        char port[MAX_BUF_LEN];
+        int ret, port;
+        char _port[MAX_BUF_LEN];
 
-        snprintf(port, MAX_BUF_LEN, "%u", gloconf.direct_port);
-        ret = tcp_sock_hostlisten(&__listen_sd__, NULL, port,
-                                  YNET_QLEN, YNET_RPC_BLOCK, 1);
-        if (unlikely(ret)) {
-                GOTO(err_ret, ret);
+        while (1) {
+                port = (uint16_t)(YNET_SERVICE_BASE
+                                  + (random() % YNET_SERVICE_RANGE));
+
+                YASSERT(port > YNET_SERVICE_RANGE && port < 65535);
+                snprintf(_port, MAX_LINE_LEN, "%u", port);
+
+                ret = tcp_sock_hostlisten(&__listen_sd__, NULL, _port,
+                                          YNET_QLEN, YNET_RPC_BLOCK, 1);
+                if (unlikely(ret)) {
+                        if (ret == EADDRINUSE) {
+                                DBUG("port (%u + %u) %s\n", YNET_SERVICE_BASE,
+                                     port - YNET_SERVICE_BASE, strerror(ret));
+                                continue;
+                        } else
+                                GOTO(err_ret, ret);
+                } else {
+                        __corenet_port__ = port;
+                        break;
+                }
         }
-
+        
         ret = sy_thread_create2(__corenet_passive, NULL, "corenet_passive");
         if (unlikely(ret))
                 GOTO(err_ret, ret);

@@ -302,7 +302,7 @@ STATIC int __corenet_maping_connect__(const nid_t *nid, sockid_t *_sockid, int *
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        ret = __corenet_maping_connect____(nid, info->corenet, info->info_count, _sockid, _count);
+        ret = __corenet_maping_connect____(nid, info->info, info->info_count, _sockid, _count);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
@@ -592,7 +592,7 @@ static int __corenet_maping_getlost(corenet_maping_t *entry, const ynet_net_info
 
         for (i = 0; i < info->info_count; i++) {
                 //sockid = &entry->sockid[i];
-                sock = &info->corenet[i];
+                sock = &info->info[i];
                 
                 if (__connected__(entry, sock->addr)) {
                         continue;
