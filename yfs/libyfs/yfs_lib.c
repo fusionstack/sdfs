@@ -948,7 +948,8 @@ int sdfs_init_verbose(const char *name, int redis_conn)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = core_init(gloconf.polling_core, gloconf.polling_timeout, 0);
+        ret = core_init(gloconf.polling_core, gloconf.polling_timeout,
+                        CORE_FLAG_ACTIVE);
         if (ret)
                 GOTO(err_ret, ret);
 retry:

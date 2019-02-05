@@ -198,7 +198,7 @@ int cds_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
                 DBUG("corenet read\n");
                 ret = corerpc_postwait("cds_rpc_read", nid,
                                        req, sizeof(*req) + count, NULL,
-                                       _buf, MSG_REPLICA, io->size, _get_timeout());
+                                       _buf, MSG_CORENET, io->size, _get_timeout());
                 if (unlikely(ret)) {
                         YASSERT(ret != EINVAL);
                         GOTO(err_ret, ret);

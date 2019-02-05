@@ -44,6 +44,7 @@ def usage():
            "    worm\n"
            "    share\n"
            "    health\n"
+           "    mon\n"
            )
 
 
@@ -64,7 +65,7 @@ def run_c_type(cmd, argv):
     #exec_pipe(array, 0, False, 0)
 
 def is_python_type(cmd):
-    lst = ['cluster', 'node']
+    lst = ['cluster', 'node', 'mon']
     if cmd in lst:
         return True
     else:

@@ -373,17 +373,20 @@ static int __core_worker_init(core_t *core)
 
         DINFO("core[%u] rpc inited\n", core->hash);
 
-        
-        corenet_maping_t *maping;
-        ret = corenet_maping_init(&maping);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (core->flag & CORE_FLAG_ACTIVE) {
+                corenet_maping_t *maping;
+                ret = corenet_maping_init(&maping);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
 
-        YASSERT(maping);
+                YASSERT(maping);
 
-        DINFO("core[%u] maping inited\n", core->hash);
+                DINFO("core[%u] maping inited\n", core->hash);
 
-        core->maping = maping;
+                core->maping = maping;
+        } else {
+                core->maping = NULL;
+        }
 #endif
 
 #if 1

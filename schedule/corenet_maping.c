@@ -215,6 +215,8 @@ int corenet_maping_accept(core_t *core, const nid_t *nid, const sockid_t *sockid
         int ret, i;
         arg_t *arg;
 
+        YASSERT(core->maping);
+
         for (i = 0; i < count; i++) {
                 YASSERT(sockid->sd < nofile_max);
                 ret = ymalloc((void **)&arg, sizeof(*arg));
@@ -422,6 +424,7 @@ int corenet_maping(const nid_t *nid, sockid_t *sockid)
 
 retry:
         entry = &__corenet_maping_get__()[nid->id];
+        YASSERT(entry);
 
         ret = __corenet_maping_get(nid, entry, sockid);
         if (unlikely(ret)) {
