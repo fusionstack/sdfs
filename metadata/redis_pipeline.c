@@ -15,6 +15,8 @@
 #include "schedule.h"
 #include "dbg.h"
 
+#define PIPELINE_PARALLEL 0
+
 #if ENABLE_REDIS_PIPELINE
 typedef struct {
         struct list_head hook;
@@ -46,7 +48,7 @@ typedef struct {
 static pipeline_t *__pipeline_array__ = NULL;
 static int __count__ = 0;
 
-static int __redis_pipline_run(pipeline_t *pipeline);
+static int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd);
 
 typedef struct {
         task_t task;
@@ -152,22 +154,15 @@ err_ret:
         return ret;
 }
 
-static void *__redis_schedule(void *arg)
+static int __redis_poll(int fd)
 {
-        int ret, interrupt_eventfd;
-        char name[MAX_NAME_LEN];
+        int ret;
         struct pollfd pfd;
         uint64_t e;
-        pipeline_t *pipeline = arg;
 
-        snprintf(name, sizeof(name), "redis");
-        ret = schedule_create(&interrupt_eventfd, name, NULL, &pipeline->schedule, NULL);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        pfd.fd = interrupt_eventfd;
+        pfd.fd = fd;
         pfd.events = POLLIN;
-
+        
         while (1) { 
                 ret = poll(&pfd, 1, 1000 * 1000);
                 if (ret  < 0)  {
@@ -179,7 +174,7 @@ static void *__redis_schedule(void *arg)
                                 GOTO(err_ret, ret);
                 }
 
-                ret = read(interrupt_eventfd, &e, sizeof(e));
+                ret = read(fd, &e, sizeof(e));
                 if (ret < 0)  {
                         ret = errno;
                         if (ret == EAGAIN) {
@@ -188,13 +183,43 @@ static void *__redis_schedule(void *arg)
                         }
                 }
 
+                break;
+        }
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+static void *__redis_schedule(void *arg)
+{
+        int ret, interrupt_eventfd;
+        char name[MAX_NAME_LEN];
+        pipeline_t *pipeline = arg;
+
+        snprintf(name, sizeof(name), "redis");
+        ret = schedule_create(&interrupt_eventfd, name, NULL, &pipeline->schedule, NULL);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        while (1) {
+                ret = __redis_poll(interrupt_eventfd);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+
                 DBUG("poll return\n");
 
+#if PIPELINE_PARALLEL
+                while (!list_empty(&pipeline->list)) {
+                        schedule_run(pipeline->schedule);
+                        __redis_pipline_run(pipeline, interrupt_eventfd);
+                        schedule_run(pipeline->schedule);
+                }
+#else
                 schedule_run(pipeline->schedule);
-
-                __redis_pipline_run(pipeline);
-
+                __redis_pipline_run(pipeline, interrupt_eventfd);
                 schedule_run(pipeline->schedule);
+#endif
 
                 schedule_scan(pipeline->schedule);
         }
@@ -314,6 +339,7 @@ err_ret:
 typedef struct {
         struct list_head list;
         fileid_t fileid;
+        int finished;
 } arg2_t;
 
 static int __redis_exec(va_list ap)
@@ -365,15 +391,19 @@ inline static void __redis_pipline_run__(void *_arg)
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
-        yfree((void **)&arg);
+        DBUG("-------------return-------------\n");
+
+        arg->finished = 1;
+        
+        //yfree((void **)&arg);
 }
 
-static int __redis_pipline_run(pipeline_t *pipeline)
+static int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd)
 {
-        int ret;
+        int ret, count = 0;
         struct list_head list, *pos, *n;
         redis_pipline_ctx_t *ctx;
-        arg2_t *arg;
+        arg2_t *arg, array[512];
 
         INIT_LIST_HEAD(&list);
         ret = sy_spin_lock(&pipeline->lock);
@@ -384,20 +414,22 @@ static int __redis_pipline_run(pipeline_t *pipeline)
 
         sy_spin_unlock(&pipeline->lock);
 
+        count = 0;
         while (!list_empty(&list)) {
-                ret = ymalloc((void **)&arg, sizeof(*arg));
-                if (unlikely(ret))
-                        GOTO(err_ret, ret);
+                arg = &array[count];
+                count++;
+                YASSERT(count < 512);
 
                 pos = (void *)list.next;
                 ctx = (redis_pipline_ctx_t *)pos;
                 arg->fileid = ctx->fileid;
+                arg->finished = 0;
                 INIT_LIST_HEAD(&arg->list);
                 list_del(pos);
                 list_add_tail(pos, &arg->list);
                 YASSERT(ctx->fileid.type);
 
-                int count = 1;
+                int submit = 1;
                 list_for_each_safe(pos, n, &list) {
                         ctx = (redis_pipline_ctx_t *)pos;
 
@@ -405,24 +437,50 @@ static int __redis_pipline_run(pipeline_t *pipeline)
                             && ctx->fileid.volid == arg->fileid.volid) {
                                 list_del(pos);
                                 list_add_tail(pos, &arg->list);
-                                count++;
+                                submit++;
                         }
 
                         YASSERT(ctx->fileid.type);
                 }
 
-                DINFO("submit count %u\n", count);
+                DBUG("submit %u\n", submit);
 
-#if 1
+#if PIPELINE_PARALLEL
+                schedule_task_new("pipeline_run", __redis_pipline_run__, arg, -1);
+#else
+                (void) interrupt_eventfd;
+                
                 ret = redis_exec(&arg->fileid, __redis_exec, arg);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
-
-                yfree((void **)&arg);
-#else
-                schedule_task_new("pipeline_run", __redis_pipline_run__, arg, -1);
 #endif
         }
+
+#if PIPELINE_PARALLEL
+        while (1) {
+                schedule_run(pipeline->schedule);
+                
+                ret = __redis_poll(interrupt_eventfd);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+
+                schedule_run(pipeline->schedule);
+
+                int finished = 0;
+                for (int i = 0; i < count; i++) {
+                        arg = &array[i];
+
+                        if (arg->finished) {
+                                finished++;
+                        }
+                }
+
+                DBUG("finished %u count %u\n", finished, count);
+                if (finished == count) {
+                        break;
+                }
+        }
+#endif
 
         return 0;
 err_ret:
