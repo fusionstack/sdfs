@@ -49,6 +49,7 @@ int __redis_conn_pool__ = -1;
 
 static int __redis_request(const int hash, const char *name, func_va_t exec, ...);
 
+#if !ENABLE_REDIS_PIPELINE
 static int __hget__(const fileid_t *fileid, const char *name, char *value, size_t *size)
 {
         int ret, retry = 0;
@@ -97,26 +98,30 @@ static int __hget(va_list ap)
 
         return __hget__(fileid, name, value, size);
 }
+#endif
 
 int hget(const fileid_t *fileid, const char *name, char *value, size_t *size)
 {
-#if ENABLE_REDIS_PIPELINE
-        return pipeline_hget(fileid, name, value, size);
-#endif        
-        
+        int ret;
+
         YASSERT(fileid->type);
 
         ANALYSIS_BEGIN(0);
         
-        int ret =  __redis_request(fileid_hash(fileid), "hget", __hget,
+#if ENABLE_REDIS_PIPELINE
+        ret = pipeline_hget(fileid, name, value, size);
+#else
+        ret =  __redis_request(fileid_hash(fileid), "hget", __hget,
                                fileid, name, value, size);
+#endif        
+        
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return ret;
 }
 
-
+#if !ENABLE_REDIS_PIPELINE
 static int __hset__(const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
 {
         int ret, retry = 0;
@@ -161,6 +166,7 @@ err_ret:
         return ret;
 }
 
+
 static int __hset(va_list ap)
 {
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
@@ -173,24 +179,27 @@ static int __hset(va_list ap)
 
         return __hset__(fileid, name, value, size, flag);
 }
-
+#endif
 
 int hset(const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
 {
-#if ENABLE_REDIS_PIPELINE
-        return pipeline_hset(fileid, name, value, size, flag);
-#endif
+        int ret;
         
         ANALYSIS_BEGIN(0);
         
-        int ret = __redis_request(fileid_hash(fileid), "hset", __hset,
+#if ENABLE_REDIS_PIPELINE
+        ret = pipeline_hset(fileid, name, value, size, flag);
+#else        
+        ret = __redis_request(fileid_hash(fileid), "hset", __hset,
                                fileid, name, value, size, flag);
+#endif
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return ret;
 }
 
+#if !ENABLE_REDIS_PIPELINE
 static int __hlen__(const fileid_t *fileid, uint64_t *count)
 {
         int ret, retry = 0;
@@ -233,15 +242,22 @@ static int __hlen(va_list ap)
 
         return __hlen__(fileid, count);
 }
-
+#endif
 
 int hlen(const fileid_t *fileid, uint64_t *count)
 {
+        int ret;
+
+        ANALYSIS_BEGIN(0);
 #if ENABLE_REDIS_PIPELINE
-        return pipeline_hlen(fileid, count);
-#endif
-        return __redis_request(fileid_hash(fileid), "hlen", __hlen,
+        ret = pipeline_hlen(fileid, count);
+#else
+        ret = __redis_request(fileid_hash(fileid), "hlen", __hlen,
                                fileid, count);
+#endif
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        return ret;
 }
 
 redisReply *__hscan__(const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
@@ -351,6 +367,7 @@ int hdel(const fileid_t *fileid, const char *name)
                                fileid, name);
 }
 
+#if !ENABLE_REDIS_PIPELINE
 static int __kget__(const fileid_t *fileid, void *value, size_t *size)
 {
         int ret, retry = 0;
@@ -395,18 +412,23 @@ static int __kget(va_list ap)
 
         return __kget__(fileid, value, size);
 }
-
+#endif
 
 int kget(const fileid_t *fileid, void *value, size_t *size)
 {
+        int ret;
+
 #if ENABLE_REDIS_PIPELINE
-        return pipeline_kget(fileid, value, size);
+        ret = pipeline_kget(fileid, value, size);
+#else
+        ret = __redis_request(fileid_hash(fileid), "kget", __kget,
+                               fileid, value, size);
 #endif
 
-        return __redis_request(fileid_hash(fileid), "kget", __kget,
-                               fileid, value, size);
+        return ret;
 }
 
+#if !ENABLE_REDIS_PIPELINE
 static int __kset__(const fileid_t *fileid, const void *value, size_t size, int flag)
 {
         int ret, retry = 0;
@@ -452,16 +474,20 @@ static int __kset(va_list ap)
 
         return __kset__(fileid, value, size, flag);
 }
-
+#endif
 
 int kset(const fileid_t *fileid, const void *value, size_t size, int flag)
 {
-#if ENABLE_REDIS_PIPELINE
-        return pipeline_kset(fileid, value, size, flag, -1);
-#endif
+        int ret;
         
-        return __redis_request(fileid_hash(fileid), "kset", __kset,
+#if ENABLE_REDIS_PIPELINE
+        ret = pipeline_kset(fileid, value, size, flag, -1);
+#else
+        ret = __redis_request(fileid_hash(fileid), "kset", __kset,
                                fileid, value, size, flag);
+#endif
+
+        return ret;
 }
 
 static int __kdel__(const fileid_t *fileid)
@@ -517,6 +543,7 @@ int kdel(const fileid_t *fileid)
                                fileid);
 }
 
+#if !ENABLE_REDIS_PIPELINE
 static int __klock1(const fileid_t *fileid, int ttl)
 {
         int ret, retry = 0;
@@ -583,16 +610,24 @@ inline static int __klock(va_list ap)
 
         return __klock__(fileid, ttl, block);
 }
+#endif
 
 int klock(const fileid_t *fileid, int ttl, int block)
 {
 #if ENABLE_KLOCK
+        int ret;
+        
+        ANALYSIS_BEGIN(0);
 #if ENABLE_REDIS_PIPELINE
-        return pipeline_klock(fileid, ttl, block);
+        ret = pipeline_klock(fileid, ttl, block);
+#else
+        ret = __redis_request(fileid_hash(fileid), "klock", __klock,
+                               fileid, ttl, block);
 #endif
 
-        return __redis_request(fileid_hash(fileid), "klock", __klock,
-                               fileid, ttl, block);
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        return ret;
 #else
         (void) fileid;
         (void) ttl;
@@ -601,6 +636,7 @@ int klock(const fileid_t *fileid, int ttl, int block)
 #endif
 }
 
+#if !ENABLE_REDIS_PIPELINE
 static int __kunlock__(const fileid_t *fileid)
 {
         int ret, retry = 0;
@@ -642,17 +678,23 @@ inline static int __kunlock(va_list ap)
 
         return __kunlock__(fileid);
 }
-
+#endif
 
 int kunlock(const fileid_t *fileid)
 {
 #if ENABLE_KLOCK
+        int ret;
+
+        ANALYSIS_BEGIN(0);
 #if ENABLE_REDIS_PIPELINE
-        return pipeline_kunlock(fileid);
-#endif
-        
-        return __redis_request(fileid_hash(fileid), "kunlock", __kunlock,
+        ret = pipeline_kunlock(fileid);
+#else        
+        ret = __redis_request(fileid_hash(fileid), "kunlock", __kunlock,
                                fileid);
+
+#endif
+        ANALYSIS_END(0, IO_WARN, NULL);
+        return ret;
 #else
         (void) fileid;
         return 0;

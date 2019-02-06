@@ -71,6 +71,7 @@ int redis_pipeline_init()
         count = ng.daemon ? gloconf.polling_core : 1;
 #else
         count = __redis_conn_pool__;
+        //count = 1;
 #endif
         ret = ymalloc((void **)&__pipeline_array__, sizeof(*__pipeline_array__) * count);
         if (ret)
@@ -269,6 +270,8 @@ static int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
+        ANALYSIS_BEGIN(0);
+        
         list_for_each_safe(pos, n, list) {
                 ctx = (redis_pipline_ctx_t *)pos;
 
@@ -297,6 +300,8 @@ static int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
                 schedule_resume(&ctx->task, ret, NULL);
         }
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         sy_rwlock_unlock(&conn->rwlock);
 
         return 0;
@@ -406,9 +411,9 @@ static int __redis_pipline_run(pipeline_t *pipeline)
                         YASSERT(ctx->fileid.type);
                 }
 
-                DBUG("submit count %u\n", count);
+                DINFO("submit count %u\n", count);
 
-#if 0
+#if 1
                 ret = redis_exec(&arg->fileid, __redis_exec, arg);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
