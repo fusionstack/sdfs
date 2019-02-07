@@ -299,7 +299,7 @@ static int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
         
         list_for_each_safe(pos, n, list) {
                 ctx = (redis_pipline_ctx_t *)pos;
-
+ 
 #if 0
                 const char *hash = va_arg(ctx->ap, const char *);
                 const char *key = va_arg(ctx->ap, const char *);

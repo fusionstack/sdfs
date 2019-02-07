@@ -104,8 +104,9 @@ static seg_t *__seg_alloc(uint32_t size)
                 YASSERT(seg->handler.idx != -1);
                 YASSERT(seg->len == size);
         } else {
-                ret = ymalloc((void **)&seg->base_ptr, size);
-                if (unlikely(ret)) {
+                ret = posix_memalign((void **)&seg->base_ptr, 4096, size);
+                if (ret < 0) {
+                        ret = errno;
                         mem_cache_free(MEM_CACHE_64, seg);
                         return NULL;
                 }
@@ -624,7 +625,6 @@ err_ret:
         return ret;
 }
 
-#if 1
 void mbuffer_clone(buffer_t *newbuf, const buffer_t *buf)
 {
         int ret;
@@ -649,7 +649,6 @@ void mbuffer_clone(buffer_t *newbuf, const buffer_t *buf)
         BUFFER_CHECK(buf);
 }
 
-#else
 inline static void __mbuffer_iov_copy(seg_t *seg, struct iovec **_iov, int *_iov_count)
 {
         int iov_count, left, count;
@@ -681,18 +680,21 @@ inline static void __mbuffer_iov_copy(seg_t *seg, struct iovec **_iov, int *_iov
         *_iov_count = iov_count;
 }
 
-void mbuffer_clone(buffer_t *newbuf, const buffer_t *buf)
+#define SDFS_IO_MAX  (524288 * 2)
+#define SDFS_IOV_MAX (SDFS_IO_MAX / BUFFER_SEG_SIZE + 1)
+
+void mbuffer_clone1(buffer_t *newbuf, const buffer_t *buf)
 {
         int ret, iov_count;
         uint32_t len;
         struct list_head *pos;
         seg_t *seg;
-        struct iovec iov_array[LICH_IOV_MAX * 2], *iov_buf = NULL, *iov;
+        struct iovec iov_array[SDFS_IOV_MAX * 2], *iov_buf = NULL, *iov;
 
-        //YASSERT(buf->len % LICH_BLOCK_SIZE == 0);
+        //YASSERT(buf->len % SDFS_BLOCK_SIZE == 0);
         BUFFER_CHECK(buf);
 
-        iov_count = LICH_IOV_MAX * 2;
+        iov_count = SDFS_IOV_MAX * 2;
         ret = mbuffer_trans(iov_array, &iov_count, buf);
         if (ret != (int)buf->len) {
                 ret = ymalloc((void **)&iov_buf, BUF_SIZE_16K);
@@ -736,7 +738,6 @@ void mbuffer_clone(buffer_t *newbuf, const buffer_t *buf)
         uint32_t crc2 = mbuffer_crc(newbuf, 0, newbuf->len);
         YASSERT(crc1 == crc2);
 }
-#endif
 
 int mbuffer_part_clone(const buffer_t *buf, uint32_t offset, int size, buffer_t *dist)
 {

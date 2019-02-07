@@ -1,5 +1,3 @@
-
-
 #include <limits.h>
 #include <time.h>
 #include <string.h>
@@ -80,6 +78,8 @@ static int __aio_getevent(aio_t *aio, uint64_t left)
         DBUG("vm aio event %ju\n", left);
         YASSERT(left <= AIO_EVENT_MAX);
 
+        memset(events, 0x0, sizeof(events));
+        
 retry:
         r = io_getevents(aio->ioctx, left, left, events, NULL);
         if (likely(r > 0)) {

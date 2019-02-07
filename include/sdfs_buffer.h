@@ -99,6 +99,7 @@ int mbuffer_pop(buffer_t *buf, buffer_t *newbuf, uint32_t len);
 
 void mbuffer_merge(buffer_t *dist, buffer_t *src);
 void mbuffer_reference(buffer_t *dist, const buffer_t *src);
+void mbuffer_clone1(buffer_t *newbuf, const buffer_t *buf);
 void mbuffer_clone(buffer_t *dist, const buffer_t *src);
 int mbuffer_append(buffer_t *dist, const buffer_t *src);
 

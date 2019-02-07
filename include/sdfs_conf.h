@@ -226,7 +226,7 @@ typedef struct {
 #define ENABLE_NEWMD 1
 #define ENABLE_CORENET 1
 #define ENABLE_CORERPC 0
-#define ENABLE_COREAIO 0
+#define ENABLE_COREAIO 1
 
 #define ENABLE_QUOTA 0
 #define ENABLE_MD_POSIX 1

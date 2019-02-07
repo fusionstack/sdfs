@@ -13,6 +13,7 @@
 #include "md_lib.h"
 #include "diskio.h"
 #include "io_analysis.h"
+#include "sdfs_aio.h"
 #include "core.h"
 #include "dbg.h"
 
@@ -47,6 +48,8 @@ static int __replica_getfd__(va_list ap)
         if (ret)
                 GOTO(err_ret, ret);
 
+        DBUG("path %s\n", path);
+        
         fd = open(path, flag);
         if (fd < 0) {
                 ret = errno;
@@ -86,25 +89,15 @@ static void __callback(void *_iocb, void *_retval)
         schedule_resume(task, *retval, NULL);
 }
 
-int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
+#define SECTOR_SIZE 512
+
+static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
 {
-        int ret, iov_count;
-        int fd;
+        int ret, fd, iov_count;
         task_t task;
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
-
-        ret = io_analysis(ANALYSIS_IO_WRITE, io->size);
-        if (ret)
-                GOTO(err_ret, ret);
         
-        ANALYSIS_BEGIN(0);
-        CORE_ANALYSIS_BEGIN(1);
-        
-        YASSERT(schedule_running());
-
-        DBUG("write "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
-
         ret = __replica_getfd(&io->id, &fd, O_CREAT | O_SYNC | O_RDWR);
         if (ret)
                 GOTO(err_ret, ret);
@@ -130,17 +123,12 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
                 GOTO(err_fd, ret);
         }
 
+        __replica_release(fd);
+        
         if (ret != (int)buf->len) {
                 ret = EIO;
-                GOTO(err_fd, ret);
+                GOTO(err_ret, ret);
         }
-        
-        DBUG("write "CHKID_FORMAT" finish\n", CHKID_ARG(&io->id));
-        
-        __replica_release(fd);
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-        CORE_ANALYSIS_UPDATE(1, IO_WARN, "write");       
         
         return 0;
 err_fd:
@@ -149,15 +137,74 @@ err_ret:
         return ret;
 }
 
-int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
+static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
 {
-        int ret, iov_count;
-        int fd;
+        int ret, fd, iov_count;
         task_t task;
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
+        buffer_t tmp;
 
-        ret = io_analysis(ANALYSIS_IO_READ, io->size);
+        mbuffer_init(&tmp, 0);
+        mbuffer_clone1(&tmp, buf);
+        
+        ret = __replica_getfd(&io->id, &fd, O_CREAT | O_DIRECT | O_RDWR);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        iov_count = Y_MSG_MAX / BUFFER_SEG_SIZE + 1;
+        ret = mbuffer_trans(iov, &iov_count, &tmp);
+        //DBUG("ret %u %u\n", ret, buf->len);
+        YASSERT(ret == (int)buf->len);
+
+        for (int i=0; i < iov_count; i++) {
+                YASSERT(iov[i].iov_len % PAGE_SIZE == 0);
+                YASSERT((uint64_t)iov[i].iov_base % PAGE_SIZE == 0);
+        }
+        
+        io_prep_pwritev(&iocb, fd, iov, iov_count, io->offset);
+
+        iocb.aio_reqprio = 0;
+        task = schedule_task_get();
+        iocb.data = &task;
+
+#if 1
+        ret = aio_commit(&iocb, 0, AIO_MODE_DIRECT);
+        if (ret)
+                GOTO(err_fd, ret);
+#else
+        ret = diskio_submit(&iocb, __callback);
+        if (ret)
+                GOTO(err_fd, ret);
+#endif
+
+        ret = schedule_yield("aio_commit", NULL, NULL);
+        if (ret < 0) {
+                ret = -ret;
+                GOTO(err_fd, ret);
+        }
+        
+        mbuffer_free(&tmp);
+        __replica_release(fd);
+
+        if (ret != (int)buf->len) {
+                ret = EIO;
+                GOTO(err_ret, ret);
+        }
+        
+        return 0;
+err_fd:
+        __replica_release(fd);
+err_ret:
+        mbuffer_free(&tmp);
+        return ret;
+}
+
+int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
+{
+        int ret;
+
+        ret = io_analysis(ANALYSIS_IO_WRITE, io->size);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -167,6 +214,89 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
         YASSERT(schedule_running());
 
         DBUG("write "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
+
+        if (io->offset % SECTOR_SIZE == 0 &&
+            io->size % SECTOR_SIZE == 0 && 0) {
+                ret = __replica_write_direct(io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        } else {
+                ret = __replica_write_sync(io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
+
+        DBUG("write "CHKID_FORMAT" finish\n", CHKID_ARG(&io->id));
+        
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        CORE_ANALYSIS_UPDATE(1, IO_WARN, "write");       
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
+{
+        int ret, iov_count;
+        int fd;
+        task_t task;
+        struct iocb iocb;
+        struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
+
+        DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
+        
+        ret = __replica_getfd(&io->id, &fd, O_RDONLY | O_DIRECT);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        YASSERT(buf->len == 0);
+        mbuffer_init(buf, io->size);
+        iov_count = Y_MSG_MAX / BUFFER_SEG_SIZE + 1;
+        ret = mbuffer_trans(iov, &iov_count, buf);
+        DBUG("ret %u %u\n", ret, buf->len);
+        YASSERT(ret == (int)buf->len);
+
+        io_prep_preadv(&iocb, fd, iov, iov_count, io->offset);
+
+        iocb.aio_reqprio = 0;
+        task = schedule_task_get();
+        iocb.data = &task;
+
+#if 1
+        ret = aio_commit(&iocb, 0, AIO_MODE_DIRECT);
+        if (ret)
+                GOTO(err_fd, ret);
+#else 
+        ret = diskio_submit(&iocb, __callback);
+        if (ret)
+                GOTO(err_fd, ret);
+#endif
+
+        ret = schedule_yield("aio_commit", NULL, NULL);
+        if (ret < 0) {
+                ret = -ret;
+                GOTO(err_fd, ret);
+        }
+
+        __replica_release(fd);
+
+        return 0;
+err_fd:
+        __replica_release(fd);
+err_ret:
+        return ret;
+}
+
+static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
+{
+        int ret, iov_count;
+        int fd;
+        task_t task;
+        struct iocb iocb;
+        struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
+
+        DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
         
         ret = __replica_getfd(&io->id, &fd, O_RDONLY);
         if (ret)
@@ -194,21 +324,50 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
                 ret = -ret;
                 GOTO(err_fd, ret);
         }
+        
+        __replica_release(fd);
+        
+        return 0;
+err_fd:
+        __replica_release(fd);
+err_ret:
+        return ret;
+}
+
+int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
+{
+        int ret;
+
+        ret = io_analysis(ANALYSIS_IO_READ, io->size);
+        if (ret)
+                GOTO(err_ret, ret);
+        
+        ANALYSIS_BEGIN(0);
+        CORE_ANALYSIS_BEGIN(1);
+        
+        YASSERT(schedule_running());
+
+        DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
+
+        if (io->offset % SECTOR_SIZE == 0 &&
+            io->size % SECTOR_SIZE == 0 && 0) {
+                ret = __replica_read_direct(io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        } else {
+                ret = __replica_read_sync(io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
 
         if (ret < (int)buf->len) {
                 mbuffer_droptail(buf, buf->len - ret);
         }
 
-        DBUG("read "CHKID_FORMAT" finish\n", CHKID_ARG(&io->id));
-        
-        __replica_release(fd);
-
         ANALYSIS_QUEUE(0, IO_WARN, NULL); 
         CORE_ANALYSIS_UPDATE(1, IO_WARN, "read");       
         
         return 0;
-err_fd:
-        __replica_release(fd);
 err_ret:
         return ret;
 }
