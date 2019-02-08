@@ -18,7 +18,7 @@
 #ifndef __NLM_EVENTS_H__
 #define __NLM_EVENTS_H__
 
-#include <aio.h>
+
 #include "job.h"
 extern int nlm_event_handler(job_t *);
 #endif

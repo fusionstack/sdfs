@@ -310,7 +310,7 @@ static int __system_check()
         close(fd);
 
 #ifdef __CYGWIN__
-		return 0;
+        return 0;
 #endif
 
         if (memcmp("Linux version 3", buf, strlen("Linux version 3")) == 0) {
@@ -634,9 +634,11 @@ int init_stage2(const char *name, int noroot, int redis_conn)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        ret = conn_init();
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ng.daemon) {
+                ret = conn_init();
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
  
         DINFO("stage2 inited\n");
         

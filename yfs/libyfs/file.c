@@ -4,7 +4,7 @@
 
 #define DBG_SUBSYS S_YFSLIB
 
-#include "aiocb.h"
+
 #include "md_lib.h"
 #include "chk_proto.h"
 #include "chk_proto.h"
@@ -69,12 +69,6 @@ err_ret:
         return ret;
 }
 
-void __ly_pread_callback(union sigval foo)
-{
-        sem_post((sem_t *)foo.sival_ptr);
-}
-
-
 int ly_read(const char *path, char *buf, size_t size, yfs_off_t offset)
 {
         int ret;
@@ -103,6 +97,12 @@ err_free:
         mbuffer_free(&pack);
 err_ret:
         return -ret;
+}
+
+#if 0
+void __ly_pread_callback(union sigval foo)
+{
+        sem_post((sem_t *)foo.sival_ptr);
 }
 
 int ly_pread(int fd, char *buf, size_t size, yfs_off_t offset)
@@ -155,6 +155,7 @@ int ly_pread(int fd, char *buf, size_t size, yfs_off_t offset)
 err_ret:
         return -ret;
 }
+#endif
 
 int ly_create(const char *path, mode_t mode)
 {
@@ -216,6 +217,7 @@ err_ret:
         return ret;
 }
 
+#if 0
 int ly_pwrite(int fd, const char *buf, size_t size, yfs_off_t offset)
 {
         int ret;
@@ -268,6 +270,7 @@ int ly_pwrite(int fd, const char *buf, size_t size, yfs_off_t offset)
 err_ret:
         return -ret;
 }
+#endif
 
 int ly_release(int fd)
 {

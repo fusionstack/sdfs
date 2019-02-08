@@ -1018,6 +1018,9 @@ def _init_minio_c7(home):
     os.system(cmd)
 
 def _install_init_ussd(home):
+    dwarn("systemd disable\n")
+    return
+    
     (distro, release, codename) = lsb_release()
     if (distro == 'Ubuntu'):
         src = os.path.join(home, "app/admin/ussd_init_ubuntu")

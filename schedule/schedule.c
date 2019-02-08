@@ -611,7 +611,7 @@ retry:
         taskctx->wait_name = NULL;
         taskctx->wait_opaque = NULL;
         YASSERT(schedule->running_task != -1);
-
+        
         __schedule_fingerprint_new(schedule, taskctx);
 
         if (taskctx->buf.len) {
@@ -1676,6 +1676,7 @@ void schedule_post(schedule_t *schedule)
         int ret;
         uint64_t e = 1;
 
+        DBUG("eventfd %d\n", schedule->eventfd);
         if (unlikely(schedule->eventfd != -1)) {
                 ret = write(schedule->eventfd, &e, sizeof(e));
                 if (ret < 0) {

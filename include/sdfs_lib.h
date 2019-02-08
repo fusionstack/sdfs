@@ -1,9 +1,6 @@
 #ifndef __LIBYFS_H__
 #define __LIBYFS_H__
 
-#ifndef __CYGWIN__
-#include <aio.h>
-#endif
 #include <sys/types.h>
 #include <sys/statvfs.h>
 #include <sys/stat.h>

@@ -179,9 +179,11 @@ static void *__main_loop_worker(void *_args)
                 schedule_run(NULL);
                 schedule_scan(NULL);
 
+#if 0
                 if (ng.daemon) {
                         aio_submit();
                 }
+#endif
 
                 worker->busy = 0;
         }

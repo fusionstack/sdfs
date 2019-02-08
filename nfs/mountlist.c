@@ -1,6 +1,5 @@
 
 
-#include <aio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <rpc/rpc.h>
@@ -20,7 +19,6 @@
 #include "yfs_conf.h"
 #include "ynfs_conf.h"
 #include "net_proto.h"
-#include "aiocb.h"
 #include "attr.h"
 #include "error.h"
 #include "dbg.h"

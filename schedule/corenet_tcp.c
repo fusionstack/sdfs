@@ -1073,12 +1073,15 @@ int corenet_tcp_poll(int tmo)
         corenet_node_t *node;
         corenet_tcp_t *__corenet__ = __corenet_get();
 
+        DBUG("polling %d begin\n", tmo);
         YASSERT(tmo >= 0 && tmo < gloconf.rpc_timeout * 2);
         nfds = _epoll_wait(__corenet__->corenet.epoll_fd, events, 512, tmo * 1000);
         if (unlikely(nfds < 0)) {
                 UNIMPLEMENTED(__DUMP__);
         }
 
+        DBUG("polling %d return\n", nfds);
+        
         for (i = 0; i < nfds; i++) {
                 //ANALYSIS_BEGIN(0);
                 ev = &events[i];

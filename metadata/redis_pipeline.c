@@ -43,6 +43,7 @@ typedef struct {
         schedule_t *schedule;
         sy_spinlock_t lock;
         struct list_head list;
+        sem_t sem;
 } pipeline_t;
 
 static pipeline_t *__pipeline_array__ = NULL;
@@ -73,7 +74,6 @@ int redis_pipeline_init()
         count = ng.daemon ? gloconf.polling_core : 1;
 #else
         count = __redis_conn_pool__;
-        //count = 1;
 #endif
         ret = ymalloc((void **)&__pipeline_array__, sizeof(*__pipeline_array__) * count);
         if (ret)
@@ -87,10 +87,21 @@ int redis_pipeline_init()
                         GOTO(err_ret, ret);
 
                 INIT_LIST_HEAD(&pipeline->list);
-        
+
+                ret = sem_init(&pipeline->sem, 0, 0);
+                if (ret < 0) {
+                        ret = errno;
+                        GOTO(err_ret, ret);
+                }
+                
                 ret = sy_thread_create2(__redis_schedule, pipeline, "redis_schedule");
                 if(ret)
                         GOTO(err_ret, ret);
+
+                ret = _sem_wait(&pipeline->sem);
+                if(ret) {
+                        GOTO(err_ret, ret);
+                }
         }
 
         __count__ = count;
@@ -202,6 +213,8 @@ static void *__redis_schedule(void *arg)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
+        sem_post(&pipeline->sem);
+        
         while (1) {
                 ret = __redis_poll(interrupt_eventfd);
                 if (unlikely(ret))

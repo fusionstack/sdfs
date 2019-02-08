@@ -7,7 +7,7 @@
 
 #define DBG_SUBSYS S_YWEB
 
-#include "aiocb.h"
+
 #include "http_state_machine.h"
 #include "http_ops.h"
 #include "job_tracker.h"

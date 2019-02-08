@@ -13,7 +13,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <signal.h>
-#include <aio.h>
+
 
 #define DBG_SUBSYS S_YFSLIB
 

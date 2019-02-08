@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <time.h>
 #include <string.h>
+#include <libaio.h> 
 #include <sys/epoll.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -11,27 +12,17 @@
 #define DBG_SUBSYS S_LIBSCHEDULE
 
 #include "sysutil.h"
-#include "net_proto.h"
 #include "ylib.h"
-#include "sdevent.h"
-#include "../net/xnect.h"
-#include "net_table.h"
-#include "mem_cache.h"
-#include "rpc_table.h"
+#include "variable.h"
 #include "configure.h"
 #include "schedule.h"
-#include "bh.h"
-#include "aio.h"
-#include "core.h"
 #include "sdfs_aio.h"
-#include "net_global.h"
 #include "cpuset.h"
-#include "variable.h"
-#include "adt.h"
+#include "core.h"
 #include "dbg.h"
 
 #define AIO_EVENT_MAX 1024
-#define AIO_THREAD 2
+#define AIO_THREAD 1
 
 typedef struct {
         /*aio cb*/
@@ -74,9 +65,10 @@ static int __aio_getevent(aio_t *aio, uint64_t left)
         struct io_event events[AIO_EVENT_MAX], *ev;
         task_t *task;
 
-        DBUG("vm aio event %ju\n", left);
-        YASSERT(left <= AIO_EVENT_MAX);
+        YASSERT(aio);
 
+        DBUG("aio event %ju   \n", left);
+        YASSERT(left <= AIO_EVENT_MAX);
 retry:
         r = io_getevents(aio->ioctx, left, left, events, NULL);
         if (likely(r > 0)) {

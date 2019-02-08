@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <semaphore.h>
 #ifndef __CYGWIN__
-#include <aio.h>
+
 #endif
 
 #include "ytime.h"

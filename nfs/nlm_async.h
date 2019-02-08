@@ -1,7 +1,7 @@
 #ifndef __NLM4_ASYNC_H__
 #define __NLM4_ASYNC_H__
 
-#include <aio.h>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <rpc/rpc.h>

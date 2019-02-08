@@ -7,7 +7,7 @@
 #define DBG_SUBSYS S_YFSLIB
 
 #include "sdfs_id.h"
-#include "aiocb.h"
+
 #include "md_lib.h"
 #include "chk_proto.h"
 #include "network.h"

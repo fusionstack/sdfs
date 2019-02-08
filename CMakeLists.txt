@@ -159,8 +159,9 @@ add_library(ylib SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/variable.c
     #${CMAKE_CURRENT_SOURCE_DIR}/schedule/vm.c
 )
-SET_TARGET_PROPERTIES(ylib
-    PROPERTIES COMPILE_FLAGS "-lparser -laio -lm -lhiredis")
+
+#SET_TARGET_PROPERTIES(ylib
+#    PROPERTIES COMPILE_FLAGS "-lparser -lm -lhiredis")
 
 add_library(ynet SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/net/nodeid.c
@@ -198,7 +199,7 @@ add_library(ynet SHARED
 	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_table.c
 )
 SET_TARGET_PROPERTIES(ynet
-    PROPERTIES COMPILE_FLAGS "-lparser -laio")
+    PROPERTIES COMPILE_FLAGS "-lparser")
 
 add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/license/src/aes.c
@@ -249,7 +250,7 @@ add_library(sdfs SHARED
 	#${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/flock.c
 )
 SET_TARGET_PROPERTIES(sdfs
-    PROPERTIES COMPILE_FLAGS "-lparser -laio")
+    PROPERTIES COMPILE_FLAGS "-lparser")
 
 add_library(cds SHARED
 	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds.c
@@ -264,7 +265,7 @@ add_library(cds SHARED
 )
 
 SET_TARGET_PROPERTIES(cds
-    PROPERTIES COMPILE_FLAGS "-lparser -laio")
+    PROPERTIES COMPILE_FLAGS "-lparser")
 
 #aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/ MDS_SRC_LIST)
 #file(GLOB to_remove ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds_newrep1.c)
@@ -283,7 +284,7 @@ add_library(mond SHARED
 )
 
 SET_TARGET_PROPERTIES(mond
-    PROPERTIES COMPILE_FLAGS "-lparser -laio")
+    PROPERTIES COMPILE_FLAGS "-lparser")
 
 set (MDS_SRC_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/main.c
@@ -641,6 +642,8 @@ install(TARGETS sdfs.quota RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.share RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.user RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.group RUNTIME DESTINATION app/bin)
+
+install(TARGETS test_aio RUNTIME DESTINATION app/test)
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/admin DESTINATION app/ FILE_PERMISSIONS OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include DESTINATION app/ FILE_PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)

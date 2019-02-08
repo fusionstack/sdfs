@@ -11,7 +11,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <aio.h>
+
 
 #define DBG_SUBSYS S_YWEB
 
