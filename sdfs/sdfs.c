@@ -126,6 +126,9 @@ retry:
         ec.m = md->m;
         ec.k = md->k;
 
+        DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
+              CHKID_ARG(fileid), offset, size);
+        
         while (size) {
                 chkno = offset / md->split;
                 fid2cid(&chkid, fileid, chkno);
@@ -653,7 +656,7 @@ int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
                                   const fileid_t *file2, const sdfs_lock_t *lock2)
 {
         if (file1 && file2 && chkid_cmp(file1, file2)) {
-                DINFO("fileid "CHKID_FORMAT","CHKID_FORMAT"\n",
+                DBUG("fileid "CHKID_FORMAT","CHKID_FORMAT"\n",
                       CHKID_ARG(file1), CHKID_ARG(file2));
                 return 0;
         }

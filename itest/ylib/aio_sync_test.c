@@ -2,7 +2,7 @@
 
 #define _GNU_SOURCE
 
-#include <libaio.h>
+#include <linux/aio_abi.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -20,7 +20,7 @@
 struct io_event events[MAX_REQ];
 struct iocb *ioarray[MAX_REQ], queue[MAX_REQ];
 char buf[BUFLEN];
-io_context_t ctx;
+aio_context_t ctx;
 
 int write_async(int fd)
 {

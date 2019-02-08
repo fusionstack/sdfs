@@ -28,9 +28,6 @@ configure_file (
 
 execute_process(COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/get_version.sh ${CMAKE_CURRENT_SOURCE_DIR})
 
-#list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules/")
-
-#find_package(aio)
 find_package(BISON)
 find_package(FLEX)
 BISON_TARGET(MyBison ${CMAKE_CURRENT_SOURCE_DIR}/parser/lib/confy.y ${CMAKE_CURRENT_BINARY_DIR}/confy.c)
@@ -41,7 +38,7 @@ FLEX_TARGET(MyFlex ${CMAKE_CURRENT_SOURCE_DIR}/parser/lib/confl.l ${CMAKE_CURREN
 set(CMAKE_C_FLAGS_PARSER "-W -Wall -DDEBUG -g -fPIC -Werror=return-type -D_GNU_SOURCE -D_REENTRANT")
 
 set(CMAKE_C_FLAGS "-W -Wall -DDEBUG -g  -fPIC -Werror -Wno-implicit-fallthrough -Werror=return-type -Wno-format-truncation -Wno-format-overflow -Wno-misleading-indentation -Wno-deprecated-declarations -Wno-cast-function-type -Wno-int-in-bool-context -Wno-pointer-compare -D_GNU_SOURCE -D_REENTRANT -D_FILE_OFFSET_BITS=64 -std=c99 -fms-extensions -gsplit-dwarf")
-set(CMAKE_C_LIBS sdfs pthread crypt crypto uuid aio ssl isal z jemalloc m curl yajl attr hiredis tirpc)
+set(CMAKE_C_LIBS sdfs pthread crypt crypto uuid ssl isal z jemalloc m curl yajl attr hiredis tirpc)
 
 include_directories(
     /usr/local/include

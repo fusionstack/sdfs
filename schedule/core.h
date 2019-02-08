@@ -3,7 +3,7 @@
 
 #include <sys/epoll.h>
 #include <semaphore.h>
-#include <libaio.h>
+#include <linux/aio_abi.h>         /* Defines needed types */
 #include <pthread.h>
 
 #if ENABLE_RDMA

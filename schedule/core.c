@@ -1110,7 +1110,7 @@ typedef struct __vm {
         struct list_head forward_list;
 
         /*aio cb*/
-        //io_context_t  ioctx;
+        //aio_context_t  ioctx;
         int iocb_count;
         struct iocb *iocb[TASK_MAX];
 } vm_t;

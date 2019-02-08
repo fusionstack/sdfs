@@ -3,7 +3,7 @@
 
 #include <sys/epoll.h>
 #include <semaphore.h>
-#include <libaio.h> 
+#include <linux/aio_abi.h> 
 #include <pthread.h>
 
 #include "net_proto.h"
@@ -48,7 +48,7 @@ typedef struct __vm {
         struct list_head forward_list;
 
         /*aio cb*/
-        //io_context_t  ioctx;
+        //aio_context_t  ioctx;
         int iocb_count;
         struct iocb *iocb[TASK_MAX];
 } vm_t;

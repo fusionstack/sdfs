@@ -1,7 +1,7 @@
 #ifndef __CHKINFO_H__
 #define __CHKINFO_H__
 
-#include <libaio.h>
+#include <linux/aio_abi.h>
 
 #include "chk_meta.h"
 #include "yfscds_conf.h"

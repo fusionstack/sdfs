@@ -83,7 +83,7 @@ static void __replica_release(int fd)
 static void __callback(void *_iocb, void *_retval)
 {
         struct iocb *iocb = _iocb;      
-        task_t *task = iocb->data;
+        task_t *task = (void *)iocb->aio_data;
         int *retval = _retval;
   
         schedule_resume(task, *retval, NULL);
@@ -111,7 +111,7 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
 
         iocb.aio_reqprio = 0;
         task = schedule_task_get();
-        iocb.data = &task;
+        iocb.aio_data = (__u64)&task;
 
         ret = diskio_submit(&iocb, __callback);
         if (ret)
@@ -130,11 +130,11 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
                 GOTO(err_ret, ret);
         }
         
-        return 0;
+        return ret;
 err_fd:
         __replica_release(fd);
 err_ret:
-        return ret;
+        return -ret;
 }
 
 static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
@@ -166,24 +166,22 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
 
         iocb.aio_reqprio = 0;
         task = schedule_task_get();
-        iocb.data = &task;
+        iocb.aio_data = (__u64)&task;
 
 #if 1
         ret = aio_commit(&iocb, buf->len, 0, AIO_MODE_DIRECT);
-        if (ret)
-                GOTO(err_fd, ret);
 #else
         ret = diskio_submit(&iocb, __callback);
         if (ret)
                 GOTO(err_fd, ret);
-#endif
 
         ret = schedule_yield("aio_commit", NULL, NULL);
+#endif
         if (ret < 0) {
                 ret = -ret;
                 GOTO(err_fd, ret);
         }
-        
+
         mbuffer_free(&tmp);
         __replica_release(fd);
 
@@ -192,12 +190,12 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
                 GOTO(err_ret, ret);
         }
         
-        return 0;
+        return ret;
 err_fd:
         __replica_release(fd);
 err_ret:
         mbuffer_free(&tmp);
-        return ret;
+        return -ret;
 }
 
 int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
@@ -216,14 +214,18 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
         DBUG("write "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
 
         if (io->offset % SECTOR_SIZE == 0 &&
-            io->size % SECTOR_SIZE == 0 && 0) {
+            io->size % SECTOR_SIZE == 0) {
                 ret = __replica_write_direct(io, buf);
-                if (ret)
+                if (ret < 0) {
+                        ret = -ret;
                         GOTO(err_ret, ret);
+                }
         } else {
                 ret = __replica_write_sync(io, buf);
-                if (ret)
+                if (ret < 0) {
+                        ret = -ret;
                         GOTO(err_ret, ret);
+                }
         }
 
         DBUG("write "CHKID_FORMAT" finish\n", CHKID_ARG(&io->id));
@@ -244,7 +246,8 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
 
-        DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
+        DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
+              CHKID_ARG(&io->id), io->offset, io->size);
         
         ret = __replica_getfd(&io->id, &fd, O_RDONLY | O_DIRECT);
         if (ret)
@@ -261,31 +264,31 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
 
         iocb.aio_reqprio = 0;
         task = schedule_task_get();
-        iocb.data = &task;
+        iocb.aio_data = (__u64)&task;
 
 #if 1
         ret = aio_commit(&iocb, buf->len, 0, AIO_MODE_DIRECT);
-        if (ret)
-                GOTO(err_fd, ret);
 #else 
         ret = diskio_submit(&iocb, __callback);
         if (ret)
                 GOTO(err_fd, ret);
-#endif
 
         ret = schedule_yield("aio_commit", NULL, NULL);
+#endif
         if (ret < 0) {
                 ret = -ret;
                 GOTO(err_fd, ret);
         }
 
+        YASSERT(ret);
+        
         __replica_release(fd);
 
-        return 0;
+        return ret;
 err_fd:
         __replica_release(fd);
 err_ret:
-        return ret;
+        return -ret;
 }
 
 static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
@@ -313,7 +316,7 @@ static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
 
         iocb.aio_reqprio = 0;
         task = schedule_task_get();
-        iocb.data = &task;
+        iocb.aio_data = (__u64)&task;
 
         ret = diskio_submit(&iocb, __callback);
         if (ret)
@@ -327,11 +330,11 @@ static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
         
         __replica_release(fd);
         
-        return 0;
+        return ret;
 err_fd:
         __replica_release(fd);
 err_ret:
-        return ret;
+        return -ret;
 }
 
 int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
@@ -347,23 +350,26 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
         
         YASSERT(schedule_running());
 
-        DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
+        DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
+              CHKID_ARG(&io->id), io->offset, io->size);
 
         if (io->offset % SECTOR_SIZE == 0 &&
-            io->size % SECTOR_SIZE == 0 && 0) {
+            io->size % SECTOR_SIZE == 0) {
                 ret = __replica_read_direct(io, buf);
-                if (ret)
-                        GOTO(err_ret, ret);
         } else {
                 ret = __replica_read_sync(io, buf);
-                if (ret)
-                        GOTO(err_ret, ret);
+        }
+        if (ret < 0) {
+                ret = -ret;
+                GOTO(err_ret, ret);
         }
 
         if (ret < (int)buf->len) {
                 mbuffer_droptail(buf, buf->len - ret);
         }
 
+        YASSERT(buf->len);
+        
         ANALYSIS_QUEUE(0, IO_WARN, NULL); 
         CORE_ANALYSIS_UPDATE(1, IO_WARN, "read");       
         
@@ -389,6 +395,8 @@ int IO_FUNC replica_read(const io_t *io, buffer_t *buf)
         if (ret)
                 GOTO(err_ret, ret);
 
+        YASSERT(buf->len);
+        
         return 0;
 err_ret:
         return ret;

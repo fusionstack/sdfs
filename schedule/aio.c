@@ -1,7 +1,7 @@
 #include <limits.h>
 #include <time.h>
 #include <string.h>
-#include <libaio.h> 
+#include <linux/aio_abi.h> 
 #include <sys/epoll.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -36,7 +36,7 @@ typedef struct {
         int prio_max;
         int idx;
         int mode;
-        io_context_t ioctx;
+        aio_context_t ioctx;
         int out_eventfd;
         int in_eventfd;
 
@@ -67,7 +67,7 @@ static int __aio_getevent(aio_t *aio, uint64_t left)
 
         YASSERT(aio);
 
-        DBUG("aio event %ju   \n", left);
+        DBUG("aio event %ju\n", left);
         YASSERT(left <= AIO_EVENT_MAX);
 retry:
         r = io_getevents(aio->ioctx, left, left, events, NULL);
@@ -75,7 +75,7 @@ retry:
                 idx = 0;
                 for (i = 0; i < r; i++) {
                         ev = &events[i];
-                        task = ev->data;
+                        task = (void *)ev->data;
 
                         YASSERT(task);
 
@@ -93,6 +93,7 @@ retry:
                                 YASSERT(ev->res != 0);
                         }
 
+                        DBUG("aio return %d\n", retval);
                         schedule_resume(task, retval, NULL);
                         idx++;
                 }
@@ -136,7 +137,7 @@ void aio_submit()
         }
 }
 
-static int __aio_submit__(io_context_t ioctx, int total, struct iocb **iocb)
+static int __aio_submit__(aio_context_t ioctx, int total, struct iocb **iocb)
 {
         int ret, count, offset, left;
         struct iocb **_iocb;
@@ -184,7 +185,7 @@ static int __aio_submit__(io_context_t ioctx, int total, struct iocb **iocb)
 
                         _iocb = iocb + offset;
                         for (int i = 0; i < count; i++) {
-                                schedule_resume(_iocb[i]->data, ret, NULL);
+                                schedule_resume((void *)_iocb[i]->aio_data, ret, NULL);
                         }
                 } else if (unlikely(ret < count)){
                         /* sbumit successful iocbs, maybe less than expectation */
@@ -236,6 +237,8 @@ int aio_commit(struct iocb *iocb, size_t size, int prio, int mode)
         int ret;
         aio_t *__aio__ = __aio_self(), *aio;
 
+        (void) size;
+        
         if (unlikely(!__aio__)) {
                 ret = ENOSYS;
                 GOTO(err_ret, ret);
@@ -267,22 +270,28 @@ int aio_commit(struct iocb *iocb, size_t size, int prio, int mode)
         CORE_ANALYSIS_BEGIN(1);
 
         // 由调用者task向iocb.data注册自己,以便被唤醒
+        DBUG("aio yield\n");
         ret = schedule_yield("aio_commit", NULL, iocb);
         if (unlikely(ret < 0)) {
                 ret = -ret;
                 GOTO(err_ret, ret);
         }
 
+        DBUG("aio return %d\n", ret);
+        
+#if 0
         if ((size_t)ret != size) {
+                DWARN("size %d %d\n", ret, size);
                 ret = EIO;
                 GOTO(err_ret, ret);
         }
+#endif
         
         CORE_ANALYSIS_UPDATE(1, IO_WARN, "aio_commit");
 
-        return 0;
-err_ret:
         return ret;
+err_ret:
+        return -ret;
 }
 
 #define POLL_SD 2

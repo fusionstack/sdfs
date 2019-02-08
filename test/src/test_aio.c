@@ -30,7 +30,7 @@
 #include "adt.h"
 #include "dbg.h"
 
-#define AIO_LOCAL 1
+#define AIO_LOCAL 0
 
 #if AIO_LOCAL
 extern int test_aio_create(const char *name, int cpu);
@@ -81,7 +81,7 @@ int test_aio_basic()
         io_prep_pwritev(&iocb, fd, &iov, 1, 0);
 
         iocb.aio_reqprio = 0;
-        iocb.data = &sem;
+        iocb.aio_data = (__u64)&sem;
 
         ret = test_aio_commit(&iocb, 4096, 0, AIO_MODE_DIRECT);
         if (ret)
@@ -134,7 +134,7 @@ static int __test_aio(va_list ap)
 
         task = schedule_task_get();
         iocb.aio_reqprio = 0;
-        iocb.data = &task;
+        iocb.aio_data = (__u64)&task;
 
         DINFO("----------aio test commit---------\n");
 
@@ -381,6 +381,8 @@ int test_aio_schedule()
         if(ret) {
                 GOTO(err_ret, ret);
         }
+
+        sleep(5);
         
         int testing = 1;
 

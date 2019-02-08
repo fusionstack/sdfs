@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/eventfd.h>
+#include <linux/aio_abi.h>         /* Defines needed types */
 #include <errno.h>
 
 #define DBG_SUBSYS S_LIBSCHEDULE
@@ -19,6 +20,11 @@
 #include "cpuset.h"
 #include "core.h"
 #include "dbg.h"
+
+#define AIO_MODE_SYNC 0
+#define AIO_MODE_DIRECT 1
+#define AIO_MODE_SIZE 2
+
 
 #define AIO_EVENT_MAX 1024
 #define AIO_THREAD 1
@@ -35,7 +41,7 @@ typedef struct {
         int prio_max;
         int idx;
         int mode;
-        io_context_t ioctx;
+        aio_context_t ioctx;
         int out_eventfd;
         int in_eventfd;
 
@@ -101,11 +107,11 @@ retry:
                         YASSERT(ev->data);
                         if (__aio_sche__) {
                                 task_t *task;
-                                task = ev->data;
+                                task = (void *)ev->data;
                                 schedule_resume(task, retval, NULL);
                         } else {
                                 sem_t *sem;
-                                sem = ev->data;
+                                sem = (void *)ev->data;
                                 sem_post(sem);
                         }
                         idx++;
@@ -153,7 +159,7 @@ void test_aio_submit()
         }
 }
 
-static int __aio_submit__(io_context_t ioctx, int total, struct iocb **iocb)
+static int __aio_submit__(aio_context_t ioctx, int total, struct iocb **iocb)
 {
         int ret, count, offset, left, i;
         struct iocb **_iocb;
@@ -201,7 +207,7 @@ static int __aio_submit__(io_context_t ioctx, int total, struct iocb **iocb)
 
                         _iocb = iocb + offset;
                         for (i = 0; i < count; i++) {
-                                schedule_resume(_iocb[i]->data, ret, NULL);
+                                schedule_resume((void *)_iocb[i]->aio_data, ret, NULL);
                         }
                 } else if (unlikely(ret < count)){
                         /* sbumit successful iocbs, maybe less than expectation */

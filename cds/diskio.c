@@ -25,6 +25,7 @@
 #include "cd_proto.h"
 #include "job_dock.h"
 #include "job_tracker.h"
+#include "sdfs_aio.h"
 #include "md_lib.h"
 #include "diskio.h"
 #include "../yfs/cds/disk.h"
@@ -34,7 +35,7 @@
 
 typedef struct {
         sem_t sem;
-        io_context_t  ctx;
+        aio_context_t  ctx;
         sy_spinlock_t lock;
         struct list_head list;
 } diskio_mt_t;
@@ -68,14 +69,14 @@ static int __diskio_submit()
         iocb = iocb_mt->iocb;
         
         if (iocb->aio_lio_opcode == IO_CMD_PWRITEV) {
-                ret = pwritev(iocb->aio_fildes, iocb->u.c.buf, iocb->u.c.nbytes, iocb->u.c.offset);
+                ret = pwritev(iocb->aio_fildes, (void *)iocb->aio_buf, iocb->aio_nbytes, iocb->aio_offset);
                 if (ret < 0) {
                         ret = errno;
                         GOTO(err_ret, ret);
                 }
         } else {
                 YASSERT(iocb->aio_lio_opcode == IO_CMD_PREADV);
-                ret = preadv(iocb->aio_fildes, iocb->u.c.buf, iocb->u.c.nbytes, iocb->u.c.offset);
+                ret = preadv(iocb->aio_fildes, (void *)iocb->aio_buf, iocb->aio_nbytes, iocb->aio_offset);
                 if (ret < 0) {
                         ret = errno;
                         GOTO(err_ret, ret);

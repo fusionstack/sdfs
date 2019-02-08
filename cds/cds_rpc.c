@@ -151,6 +151,9 @@ static int __cds_srv_read(const sockid_t *sockid, const msgid_t *msgid, buffer_t
 
         mbuffer_init(&reply, 0);
 
+        DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
+              CHKID_ARG(&io->id), io->offset, io->size);
+        
         ret = replica_read(io, &reply);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -187,6 +190,9 @@ int cds_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
 
         //YASSERT(io->offset <= YFS_CHK_LEN_MAX);
 
+        DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
+              CHKID_ARG(&io->id), io->offset, io->size);
+        
         req = (void *)buf;
         req->op = CDS_READ;
         req->chkid = io->id;

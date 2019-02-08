@@ -215,8 +215,6 @@ static int __chunk_read(const chkid_t *chkid, buffer_t *buf, int count, int offs
         diskid_t array[YFS_CHK_REP_MAX];
         uint32_t i;
 
-        DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(chkid));
-        
         chkinfo = (void *)_chkinfo;
         
         ret = __chunk_load(NULL, chkid, chkinfo, 1, NULL);
@@ -225,6 +223,9 @@ static int __chunk_read(const chkid_t *chkid, buffer_t *buf, int count, int offs
 
         io_init(&io, chkid, count, offset, 0);
 
+        DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
+              CHKID_ARG(&io.id), io.offset, io.size);
+        
         memcpy(array, chkinfo->diskid, sizeof(diskid_t) * chkinfo->repnum);
 
         netable_sort(array, chkinfo->repnum);

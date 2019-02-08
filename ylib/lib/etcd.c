@@ -18,7 +18,7 @@
 #include <ctype.h>
 #include <sys/wait.h>
 #include <dirent.h>
-#include <libaio.h>
+#include <linux/aio_abi.h>
 #include <sys/file.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

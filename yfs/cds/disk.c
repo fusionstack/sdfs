@@ -27,6 +27,7 @@
 #include "ynet_rpc.h"
 #include "yfs_chunk.h"
 #include "sdfs_lib.h"
+#include "sdfs_aio.h"
 #include "cd_proto.h"
 #include "job_dock.h"
 #include "job_tracker.h"
@@ -52,7 +53,7 @@ typedef struct {
 } level_t;
 
 typedef struct {
-        io_context_t ctx[DISK_WORKER_MAX];
+        aio_context_t ctx[DISK_WORKER_MAX];
         sy_spinlock_t big_lock[DISK_WORKER_MAX];
 
         sy_spinlock_t level_lock;
