@@ -21,7 +21,7 @@
 
 int aio_create(const char *name, int cpu);
 void aio_destroy();
-int aio_commit(struct iocb *iocb, int prio, int mode);
+int aio_commit(struct iocb *iocb, size_t size, int prio, int mode);
 
 /**
  * @brief 相当于flush或sync操作,在一次调度器循环中,提交剩余的iocb

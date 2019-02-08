@@ -169,7 +169,7 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
         iocb.data = &task;
 
 #if 1
-        ret = aio_commit(&iocb, 0, AIO_MODE_DIRECT);
+        ret = aio_commit(&iocb, buf->len, 0, AIO_MODE_DIRECT);
         if (ret)
                 GOTO(err_fd, ret);
 #else
@@ -264,7 +264,7 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
         iocb.data = &task;
 
 #if 1
-        ret = aio_commit(&iocb, 0, AIO_MODE_DIRECT);
+        ret = aio_commit(&iocb, buf->len, 0, AIO_MODE_DIRECT);
         if (ret)
                 GOTO(err_fd, ret);
 #else 
@@ -400,7 +400,6 @@ int IO_FUNC __replica_write(va_list ap)
         const buffer_t*buf = va_arg(ap, buffer_t *);
 
         return __replica_write__(io, buf);
-        
 }
 
 int IO_FUNC replica_write(const io_t *io, const buffer_t *buf)
