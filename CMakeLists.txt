@@ -462,7 +462,7 @@ target_link_libraries(sdfs.touch ${CMAKE_C_LIBS})
 add_executable(sdfs.perf ${CMAKE_CURRENT_SOURCE_DIR}/yfs/utils/uss.perf.c)
 target_link_libraries(sdfs.perf ${CMAKE_C_LIBS})
 
-add_executable(test_aio ${CMAKE_CURRENT_SOURCE_DIR}/test/src/test_aio.c)
+add_executable(test_aio ${CMAKE_CURRENT_SOURCE_DIR}/test/src/test_aio.c ${CMAKE_CURRENT_SOURCE_DIR}/test/src/test_aio_lib.c)
 target_link_libraries(test_aio ${CMAKE_C_LIBS})
 
 set (MDS_SRC_PERF_LIST
