@@ -734,9 +734,11 @@ void mbuffer_clone1(buffer_t *newbuf, const buffer_t *buf)
                 yfree((void **)&iov_buf);
 
 
+#if 0
         uint32_t crc1 = mbuffer_crc(buf, 0, buf->len);
         uint32_t crc2 = mbuffer_crc(newbuf, 0, newbuf->len);
         YASSERT(crc1 == crc2);
+#endif
 }
 
 int mbuffer_part_clone(const buffer_t *buf, uint32_t offset, int size, buffer_t *dist)

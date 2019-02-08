@@ -36,6 +36,7 @@ static int __replica_getfd__(va_list ap)
         char path[MAX_PATH_LEN];
         const chkid_t *chkid = va_arg(ap, const chkid_t *);
         int *_fd = va_arg(ap, int *);
+        char *_path = va_arg(ap, char *);
         int flag = va_arg(ap, int);
 
         va_end(ap);
@@ -50,7 +51,7 @@ static int __replica_getfd__(va_list ap)
 
         DBUG("path %s\n", path);
         
-        fd = open(path, flag);
+        fd = open(path, flag, 0600);
         if (fd < 0) {
                 ret = errno;
                 DWARN("open %s fail\n", path);
@@ -60,6 +61,9 @@ static int __replica_getfd__(va_list ap)
         ANALYSIS_QUEUE(1, IO_WARN, NULL);
         
         *_fd = fd;
+        if (_path) {
+                strcpy(_path, path);
+        }
         
         return 0;
 err_ret:
@@ -67,11 +71,11 @@ err_ret:
 }
 
 
-static int __replica_getfd(const chkid_t *chkid, int *_fd, int flag)
+static int __replica_getfd(const chkid_t *chkid, int *_fd, char *path, int flag)
 {
         return schedule_newthread(SCHE_THREAD_REPLICA, ++__seq__, FALSE,
                                   "getfd", -1, __replica_getfd__,
-                                  chkid, _fd, flag);
+                                  chkid, _fd, path, flag);
 }
 
 
@@ -97,8 +101,9 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
         task_t task;
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
-        
-        ret = __replica_getfd(&io->id, &fd, O_CREAT | O_SYNC | O_RDWR);
+
+        char path[MAX_PATH_LEN];
+        ret = __replica_getfd(&io->id, &fd, path, O_CREAT | O_SYNC | O_RDWR);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -147,8 +152,9 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
 
         mbuffer_init(&tmp, 0);
         mbuffer_clone1(&tmp, buf);
-        
-        ret = __replica_getfd(&io->id, &fd, O_CREAT | O_DIRECT | O_RDWR);
+
+        char path[MAX_PATH_LEN];
+        ret = __replica_getfd(&io->id, &fd, path, O_CREAT | O_DIRECT | O_RDWR);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -186,6 +192,7 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
         __replica_release(fd);
 
         if (ret != (int)buf->len) {
+                DWARN("%s, ret %u buflen %u\n", path, ret, buf->len);
                 ret = EIO;
                 GOTO(err_ret, ret);
         }
@@ -249,7 +256,7 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
         DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
               CHKID_ARG(&io->id), io->offset, io->size);
         
-        ret = __replica_getfd(&io->id, &fd, O_RDONLY | O_DIRECT);
+        ret = __replica_getfd(&io->id, &fd, NULL, O_RDONLY | O_DIRECT);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -301,7 +308,7 @@ static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
 
         DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
         
-        ret = __replica_getfd(&io->id, &fd, O_RDONLY);
+        ret = __replica_getfd(&io->id, &fd, NULL, O_RDONLY);
         if (ret)
                 GOTO(err_ret, ret);
 
