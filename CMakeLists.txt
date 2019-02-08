@@ -33,7 +33,7 @@ set(CMAKE_C_FLAGS_PARSER "-W -Wall -DDEBUG -g -fPIC -Werror=return-type -D_GNU_S
 set(CMAKE_C_FLAGS "-W -Wall -DDEBUG -g  -fPIC -Werror -Wno-implicit-fallthrough -Werror=return-type -Wno-format-truncation -Wno-format-overflow -Wno-misleading-indentation -Wno-deprecated-declarations -Wno-cast-function-type -Wno-int-in-bool-context -Wno-pointer-compare -D_GNU_SOURCE -D_REENTRANT -D_FILE_OFFSET_BITS=64 -std=c99 -fms-extensions -gsplit-dwarf")
 #set(CMAKE_CXX_FLAGS "-W -Wall -g -Werror -D_GNU_SOURCE -D_REENTRANT")
 
-set(CMAKE_C_LIBS sdfs cds mond ynet ylib yparser pthread crypt crypto uuid aio ssl isal z jemalloc m curl yajl attr hiredis tirpc)
+set(CMAKE_C_LIBS sdfs pthread crypt crypto uuid aio ssl isal z jemalloc m curl yajl attr hiredis tirpc)
 
 #conf_list = sdfs ynet ylib ynfs yftp yiscsi yfuse mds parser yfuse3 yweb
 #foreach (get_version_dir sdfs ynet ylib ynfs yftp yfuse mds parser yfuse3 yweb)
@@ -81,72 +81,68 @@ include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}/
 )
 
-add_library(yparser SHARED
+add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/parser/lib/configure.c
     ${CMAKE_CURRENT_BINARY_DIR}/confy.c
     ${CMAKE_CURRENT_BINARY_DIR}/confl.c
     ${CMAKE_CURRENT_BINARY_DIR}/confy.h
-)
-SET_TARGET_PROPERTIES(yparser
-    PROPERTIES COMPILE_FLAGS "")
 
-add_library(ylib SHARED
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/timer.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/redis_util.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/worker.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/job_dock.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/config.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/auth.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/array_table.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/buffer.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ec_isa_l.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bitmap.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/cmp.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/atomic_id.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crc32.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crcrs.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/daemon.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/dbg.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/hash.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/hash_table.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/htable.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/cache.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/job_tracker.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/journal.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/lock.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem_hugepage.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls/nls_cp936.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/path.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/pipe_pool.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/skiplist.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/stat.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/str.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/sysutil.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/timer.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ylog.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/plock.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/tpool.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ytime.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bmap.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/dynarray.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/privilege.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/md5.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/squeue.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/analysis.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mini_hashtb.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bh.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/fnotify.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nodectl.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/removed.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/etcd.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/etcd-api.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/base64_urlsafe.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/base64.c
+    #------ylib------
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/timer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/redis_util.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/worker.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/job_dock.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/config.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/auth.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/array_table.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/buffer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ec_isa_l.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bitmap.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/cmp.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/atomic_id.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crc32.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crcrs.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/daemon.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/dbg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/hash.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/hash_table.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/htable.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/cache.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/job_tracker.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/journal.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/lock.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem_hugepage.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls/nls_cp936.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/path.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/pipe_pool.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/skiplist.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/stat.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/str.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/sysutil.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/timer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ylog.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/plock.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/tpool.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ytime.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bmap.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/dynarray.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/privilege.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/md5.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/squeue.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/analysis.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mini_hashtb.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bh.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/fnotify.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nodectl.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/removed.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/etcd.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/etcd-api.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/base64_urlsafe.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/base64.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/cJSON.c
-
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/aio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/core.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/corenet_tcp.c
@@ -158,15 +154,12 @@ add_library(ylib SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/schedule_thread.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/variable.c
     #${CMAKE_CURRENT_SOURCE_DIR}/schedule/vm.c
-)
 
-#SET_TARGET_PROPERTIES(ylib
-#    PROPERTIES COMPILE_FLAGS "-lparser -lm -lhiredis")
+    #------ynet------
 
-add_library(ynet SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/net/nodeid.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/sock/sock_buffer.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/sock/sock_passive.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/sock/sock_buffer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/sock/sock_passive.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/sock/sock_tcp.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/sock/sock_udp.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/sock/sock_xnect.c
@@ -186,22 +179,20 @@ add_library(ynet SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/net/net_rpc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/net/conn.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ynet/net/main_loop.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_lib.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/msgqueue.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_proto.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_passive.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_reply.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_xnect.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_request.c
-        #${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_request_old.c
-        #${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_reply_old.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_xmit.c
-	${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_table.c
-)
-SET_TARGET_PROPERTIES(ynet
-    PROPERTIES COMPILE_FLAGS "-lparser")
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_lib.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/msgqueue.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_proto.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_passive.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_reply.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_xnect.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_request.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_request_old.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_reply_old.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_xmit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ynet/rpc/rpc_table.c
 
-add_library(sdfs SHARED
+    #------sdfs------
+
     ${CMAKE_CURRENT_SOURCE_DIR}/license/src/aes.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_pipeline.c
@@ -221,57 +212,47 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/cds/cds_rpc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_chunk.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_chunk_recovery.c
-	${CMAKE_CURRENT_SOURCE_DIR}/license/src/license_helper.c
-	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_dir.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_vol.c
-	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_node.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_super.c
-	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_chunk.c
-	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_file.c
-	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_user.c
-	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_group.c
-	${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_quota.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_root.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_share.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_lvm_qos.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/dir.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/file.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/node.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/super.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/raw.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/file_table.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/yfs_lib.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/worm_cli_lib.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/quota.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/user.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/group.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/posix_acl.c
-	#${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/flock.c
-)
-SET_TARGET_PROPERTIES(sdfs
-    PROPERTIES COMPILE_FLAGS "-lparser")
+    ${CMAKE_CURRENT_SOURCE_DIR}/license/src/license_helper.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_dir.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_vol.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_node.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_super.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_chunk.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_file.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_user.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_group.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_quota.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_root.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_share.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_lvm_qos.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/dir.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/file.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/node.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/super.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/raw.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/file_table.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/yfs_lib.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/worm_cli_lib.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/quota.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/user.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/group.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/posix_acl.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/yfs/libyfs/flock.c
 
-add_library(cds SHARED
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds_volume.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds_hb.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds_lib.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/disk.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/chkinfo.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/dpool.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/cds/replica.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/cds/diskio.c
-)
+    #------cds------
 
-SET_TARGET_PROPERTIES(cds
-    PROPERTIES COMPILE_FLAGS "-lparser")
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds_volume.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds_hb.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/cds_lib.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/disk.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/chkinfo.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/yfs/cds/dpool.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cds/replica.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cds/diskio.c
 
-#aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/ MDS_SRC_LIST)
-#file(GLOB to_remove ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds_newrep1.c)
-#list(REMOVE_ITEM MDS_SRC_LIST ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds_newrep1.c)
-
-add_library(mond SHARED
+    #------mond------
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds_main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/disk.c
@@ -282,9 +263,6 @@ add_library(mond SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/mond/mond_rpc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mond/mond_kv.c
 )
-
-SET_TARGET_PROPERTIES(mond
-    PROPERTIES COMPILE_FLAGS "-lparser")
 
 set (MDS_SRC_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/main.c
@@ -581,12 +559,7 @@ set (USS_ADMIN_SRC
 add_executable(sdfs.admin ${USS_ADMIN_SRC})
 target_link_libraries(sdfs.admin ${CMAKE_C_LIBS} attr hiredis)
 
-install(TARGETS ylib LIBRARY DESTINATION app/lib)
-install(TARGETS ynet LIBRARY DESTINATION app/lib)
 install(TARGETS sdfs LIBRARY DESTINATION app/lib)
-install(TARGETS cds LIBRARY DESTINATION app/lib)
-install(TARGETS mond LIBRARY DESTINATION app/lib)
-install(TARGETS yparser LIBRARY DESTINATION app/lib)
 
 install(TARGETS sdfs.mond RUNTIME DESTINATION app/sbin)
 install(TARGETS sdfs.cds RUNTIME DESTINATION app/sbin)

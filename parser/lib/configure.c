@@ -32,8 +32,8 @@ struct logconf_t logconf;
 struct yftp_conf_t yftp_conf;
 netconf_t netconf;
 
-uint32_t ylib_dbg = 0;
-uint32_t ylib_sub = 0;
+extern uint32_t ylib_dbg;
+extern uint32_t ylib_sub;
 
 /*注意随机的种子是 time(NULL)*/
 void _rand_str(char *dest, size_t length) {
