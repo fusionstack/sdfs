@@ -30,7 +30,7 @@
 #include "adt.h"
 #include "dbg.h"
 
-#define AIO_LOCAL 0
+#define AIO_LOCAL 1
 
 #if AIO_LOCAL
 extern int test_aio_create(const char *name, int cpu);
@@ -126,6 +126,7 @@ static int __test_aio(va_list ap)
                 GOTO(err_ret, ret);
         }
 
+        memset(ptr, 0x0, 4096);
         iov.iov_base = ptr;
         iov.iov_len = 4096;
         

@@ -285,7 +285,7 @@ int test_aio_commit(struct iocb *iocb, size_t size, int prio, int mode)
 
         //CORE_ANALYSIS_BEGIN(1);
 
-#if 0
+#if 1
         // 由调用者task向iocb.data注册自己,以便被唤醒
         ret = schedule_yield("aio_commit", NULL, iocb);
         if (unlikely(ret)) {

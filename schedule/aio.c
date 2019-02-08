@@ -54,7 +54,7 @@ typedef struct {
 
 #define AIO_SUBMIT_MAX 16
 
-aio_t *aio_self()
+static aio_t *__aio_self()
 {
         return variable_get(VARIABLE_AIO);
 }
@@ -121,7 +121,7 @@ void aio_submit()
 {
         int ret, i;
         uint64_t e = 1;
-        aio_t *__aio__ = aio_self();
+        aio_t *__aio__ = __aio_self();
         aio_t *aio;
 
         for (i = 0; i < AIO_THREAD * AIO_MODE_SIZE; i++) {
@@ -234,7 +234,7 @@ err_ret:
 int aio_commit(struct iocb *iocb, size_t size, int prio, int mode)
 {
         int ret;
-        aio_t *__aio__ = aio_self(), *aio;
+        aio_t *__aio__ = __aio_self(), *aio;
 
         if (unlikely(!__aio__)) {
                 ret = ENOSYS;
@@ -515,7 +515,7 @@ static void __aio_destroy(aio_t *aio)
 void aio_destroy()
 {
         int i;
-        aio_t *__aio__ = aio_self();
+        aio_t *__aio__ = __aio_self();
 
         YASSERT(__aio__);
         for (i = 0; i < AIO_THREAD * AIO_MODE_SIZE; i++) {

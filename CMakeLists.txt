@@ -7,7 +7,7 @@ set (USS_VERSION_MAJOR 1)
 set (USS_VERSION_MINOR 0)
 
 set(CMAKE_INSTALL_PREFIX "/opt/sdfs")
-set(SDFS_HOME "/opt/sdfs") #不能以斜线结尾
+set(SDFS_HOME "/opt/sdfs")
 set(USE_EPOLL 1)
 
 if(VALGRIND)
@@ -26,30 +26,22 @@ configure_file (
     "${CMAKE_CURRENT_SOURCE_DIR}/include/cmakeconfig.h"
 )
 
-#set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_C_FLAGS_PARSER "-W -Wall -DDEBUG -g -fPIC -Werror=return-type -D_GNU_SOURCE -D_REENTRANT")
-
-#set(CMAKE_C_FLAGS "-W -Wall -DDEBUG -g  -fPIC -Werror -D_GNU_SOURCE -D_REENTRANT -D_FILE_OFFSET_BITS=64")
-set(CMAKE_C_FLAGS "-W -Wall -DDEBUG -g  -fPIC -Werror -Wno-implicit-fallthrough -Werror=return-type -Wno-format-truncation -Wno-format-overflow -Wno-misleading-indentation -Wno-deprecated-declarations -Wno-cast-function-type -Wno-int-in-bool-context -Wno-pointer-compare -D_GNU_SOURCE -D_REENTRANT -D_FILE_OFFSET_BITS=64 -std=c99 -fms-extensions -gsplit-dwarf")
-#set(CMAKE_CXX_FLAGS "-W -Wall -g -Werror -D_GNU_SOURCE -D_REENTRANT")
-
-set(CMAKE_C_LIBS sdfs pthread crypt crypto uuid aio ssl isal z jemalloc m curl yajl attr hiredis tirpc)
-
-#conf_list = sdfs ynet ylib ynfs yftp yiscsi yfuse mds parser yfuse3 yweb
-#foreach (get_version_dir sdfs ynet ylib ynfs yftp yfuse mds parser yfuse3 yweb)
-#foreach (get_version_dir include)
-    #message(${CMAKE_CURRENT_SOURCE_DIR}/${get_version_dir})
-#    execute_process(COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/get_version.sh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${get_version_dir})
-#endforeach(get_version_dir)
 execute_process(COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/get_version.sh ${CMAKE_CURRENT_SOURCE_DIR})
 
+#list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules/")
 
+#find_package(aio)
 find_package(BISON)
 find_package(FLEX)
 BISON_TARGET(MyBison ${CMAKE_CURRENT_SOURCE_DIR}/parser/lib/confy.y ${CMAKE_CURRENT_BINARY_DIR}/confy.c)
 FLEX_TARGET(MyFlex ${CMAKE_CURRENT_SOURCE_DIR}/parser/lib/confl.l ${CMAKE_CURRENT_BINARY_DIR}/confl.c)
 #add_executable(Foo main.cpp ${BISON_MyParser_OUTPUTS})
 #ADD_FLEX_BISON_DEPENDENCY(MyBison MyFlex)
+#set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_C_FLAGS_PARSER "-W -Wall -DDEBUG -g -fPIC -Werror=return-type -D_GNU_SOURCE -D_REENTRANT")
+
+set(CMAKE_C_FLAGS "-W -Wall -DDEBUG -g  -fPIC -Werror -Wno-implicit-fallthrough -Werror=return-type -Wno-format-truncation -Wno-format-overflow -Wno-misleading-indentation -Wno-deprecated-declarations -Wno-cast-function-type -Wno-int-in-bool-context -Wno-pointer-compare -D_GNU_SOURCE -D_REENTRANT -D_FILE_OFFSET_BITS=64 -std=c99 -fms-extensions -gsplit-dwarf")
+set(CMAKE_C_LIBS sdfs pthread crypt crypto uuid aio ssl isal z jemalloc m curl yajl attr hiredis tirpc)
 
 include_directories(
     /usr/local/include
