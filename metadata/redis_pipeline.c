@@ -79,6 +79,8 @@ int redis_pipeline_init()
         if (ret)
                 GOTO(err_ret, ret);
 
+        memset(__pipeline_array__, 0x0, sizeof(*__pipeline_array__) * count);
+
         for (int i = 0; i < count; i++) {
                 pipeline = &__pipeline_array__[i];
                 

@@ -102,7 +102,7 @@ static int __attr_queue(const fileid_t *fileid, int op, const void *arg)
         attr_queue_t *attr_queue = &__attr_queue__[fileid_hash(fileid) % __count__];
         wait_t wait;
 
-        DINFO("queue "CHKID_FORMAT"\n", CHKID_ARG(fileid));
+        DBUG("queue "CHKID_FORMAT"\n", CHKID_ARG(fileid));
         
 retry:
         ret = sy_spin_lock(&attr_queue->lock);
@@ -114,15 +114,15 @@ retry:
                 list_add_tail(&wait.hook, &attr_queue->wait_list);
                 sy_spin_unlock(&attr_queue->lock);
 
-                DINFO("attr queue wait\n");
+                DBUG("attr queue wait\n");
                 ret = schedule_yield1("attr_queue_wait", NULL, NULL, NULL, -1);
                 if (ret) {
                         GOTO(err_ret, ret);
                 }
 
-                DINFO("attr queue wait return\n");
+                DBUG("attr queue wait return\n");
                 
-                if (retry > 2) {
+                if (retry > 10) {
                         DWARN("retry %u\n", retry);
                 }
 
@@ -130,11 +130,11 @@ retry:
                 goto retry;
         }
 
-        if (retry) {
+        if (retry > 5) {
                 DINFO("retry %u success\n", retry);
         }
 
-        DINFO("attr queue len %u\n", attr_queue->len);
+        DBUG("attr queue len %u\n", attr_queue->len);
         attr_op_t *attr_op = &attr_queue->queue[(attr_queue->begin + attr_queue->len)
                                                 % ATTR_OP_MAX];
         __attr_queue_set(attr_op, fileid, op, arg);
@@ -201,7 +201,7 @@ int attr_queue_update(const fileid_t *fileid, md_proto_t *md)
                 if (attr_op->op == ATTR_OP_EXTERN) {
                         md->at_size = (md->at_size > attr_op->size)
                                 ? md->at_size : attr_op->size;
-                        DINFO("update "CHKID_FORMAT" size\n", CHKID_ARG(&attr_op->fileid));
+                        DBUG("update "CHKID_FORMAT" size\n", CHKID_ARG(&attr_op->fileid));
                 } else if (attr_op->op == ATTR_OP_SETTIME) {
                         setattr_t setattr;
                         setattr_init(&setattr, -1, -1, NULL, -1, -1, -1);
@@ -210,7 +210,7 @@ int attr_queue_update(const fileid_t *fileid, md_proto_t *md)
                         setattr.ctime = attr_op->ctime;
                         setattr.mtime = attr_op->mtime;
                         md_attr_update(md, &setattr);
-                        DINFO("update "CHKID_FORMAT" time\n", CHKID_ARG(&attr_op->fileid));
+                        DBUG("update "CHKID_FORMAT" time\n", CHKID_ARG(&attr_op->fileid));
                 } else if (attr_op->op == ATTR_OP_TRUNCATE) {
                         md->at_size = attr_op->size;
                 } else {
@@ -254,7 +254,7 @@ static int __attr_queue_poll(int fd)
                         }
                 }
 
-                DINFO("attr queue events\n");
+                DBUG("attr queue events\n");
                 
                 break;
         }
@@ -313,7 +313,7 @@ static int __attr_queue_run(attr_queue_t *attr_queue)
         begin = attr_queue->begin;
         count = attr_queue->len;
 
-        DINFO("run[%d, %d]\n", begin, begin + count);
+        DBUG("run[%d, %d]\n", begin, begin + count);
         
         for (int i = 0; i < count; i++) {
                 attr_op = &attr_queue->queue[(i + begin) % ATTR_OP_MAX];
@@ -332,7 +332,7 @@ static int __attr_queue_run(attr_queue_t *attr_queue)
                 if (ret)
                         GOTO(err_ret, ret);
 
-                DINFO("set "CHKID_FORMAT" success\n", CHKID_ARG(&attr_op->fileid));
+                DBUG("set "CHKID_FORMAT" success\n", CHKID_ARG(&attr_op->fileid));
                 
                 __attr_queue_unset(attr_op);
 
@@ -370,7 +370,9 @@ static void *__attr_queue_worker(void *arg)
         while (1) {
                 __attr_queue_poll(attr_queue->eventfd);
 
-                __attr_queue_run(attr_queue);
+                while (attr_queue->len) {
+                        __attr_queue_run(attr_queue);
+                }
         }
 
         pthread_exit(NULL);
@@ -424,7 +426,7 @@ err_ret:
 
 int attr_queue_init()
 {
-        int ret, count = gloconf.polling_core;
+        int ret, count = gloconf.polling_core * 4;
         attr_queue_t *attr_queue;
 
         ret = ymalloc((void **)&__attr_queue__, sizeof(*__attr_queue__) * count);
