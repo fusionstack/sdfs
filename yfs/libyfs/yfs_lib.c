@@ -24,6 +24,7 @@
 #include "redis.h"
 #include "bh.h"
 #include "core.h"
+#include "attr_queue.h"
 #include "io_analysis.h"
 #include "../../cds/cds_rpc.h"
 #include "net_global.h"
@@ -956,6 +957,11 @@ int sdfs_init_verbose(const char *name, int redis_conn)
                         CORE_FLAG_ACTIVE);
         if (ret)
                 GOTO(err_ret, ret);
+
+        ret = attr_queue_init();
+        if (ret)
+                GOTO(err_ret, ret);
+        
 retry:
         ret = network_connect_mond(0);
         if (ret) {

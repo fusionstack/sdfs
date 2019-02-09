@@ -1,4 +1,3 @@
-
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -6,26 +5,15 @@
 
 #define DBG_SUBSYS S_YFSLIB
 
-#include "sdfs_id.h"
-
-#include "md_lib.h"
-#include "chk_proto.h"
-#include "network.h"
-#include "net_global.h"
-#include "chk_proto.h"
-#include "file_table.h"
-#include "job_dock.h"
 #include "ylib.h"
 #include "net_global.h"
-#include "yfs_file.h"
-#include "cache.h"
+#include "network.h"
+#include "main_loop.h"
+#include "schedule.h"
+#include "md_lib.h"
 #include "sdfs_lib.h"
 #include "sdfs_chunk.h"
-#include "network.h"
-#include "yfs_limit.h"
-#include "schedule.h"
 #include "worm_cli_lib.h"
-#include "main_loop.h"
 #include "posix_acl.h"
 #include "io_analysis.h"
 #include "flock.h"
@@ -282,7 +270,7 @@ static int __sdfs_read_sync0(const fileid_t *fileid, buffer_t *buf, uint32_t siz
 {
         int ret;
         
-        ret = core_request(fileid->id, -1, "sdfs_read_sync",
+        ret = core_request(fileid_hash(fileid), -1, "sdfs_read_sync",
                            __sdfs_read_sync__, fileid, buf, size, off);
         if (ret < 0) {
                 ret = -ret;
@@ -563,7 +551,7 @@ static int __sdfs_write_sync0(const fileid_t *fileid, const buffer_t *buf,
 {
         int ret;
         
-        ret = core_request(fileid->id, -1, "sdfs_write_sync",
+        ret = core_request(fileid_hash(fileid), -1, "sdfs_write_sync",
                            __sdfs_write_sync__, fileid, buf, size, off);
         if (ret < 0) {
                 ret = -ret;

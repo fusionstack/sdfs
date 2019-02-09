@@ -13,6 +13,7 @@
 #include "md_db.h"
 #include "redis.h"
 #include "schedule.h"
+#include "attr_queue.h"
 #include "dbg.h"
 
 static dirop_t *dirop = &__dirop__;
@@ -25,11 +26,17 @@ int md_getattr(md_proto_t *md, const fileid_t *fileid)
         int ret;
 
         ANALYSIS_BEGIN(0);
-        
+
         ret = inodeop->getattr(fileid, md);
         if (ret)
                 GOTO(err_ret, ret);
 
+#if 0
+        if (ng.daemon) {
+                attr_queue_update(fileid, md);
+        }
+#endif
+        
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;

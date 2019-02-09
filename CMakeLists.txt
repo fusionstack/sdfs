@@ -193,6 +193,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/chunk_redis.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/inode_redis.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/kv_redis.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/attr_queue.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/allocator.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/io_analysis.c

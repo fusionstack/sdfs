@@ -5,7 +5,7 @@ Simple Distributed File System
 Dependencies:
 ===========================================================
     yum install -y epel-release \
-    cmake libtool automake gcc gcc-g++ redhat-lsb \
+    cmake libtool automake gcc gcc-c++ redhat-lsb \
     libuuid-devel libaio-devel flex bison python2-futurist \
     jemalloc-devel libtirpc-devel libattr libattr-devel \
     etcd yajl-devel curl-devel redis hiredis-devel \
