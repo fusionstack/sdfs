@@ -29,6 +29,7 @@
 #include "posix_acl.h"
 #include "io_analysis.h"
 #include "flock.h"
+#include "core.h"
 #include "xattr.h"
 #include "dbg.h"
 
@@ -233,7 +234,7 @@ static int __resume_sem(void *obj, int retval)
         return 0;
 }
 
-int sdfs_read_sync(fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
+static int __sdfs_read_sync1(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
 {
         int ret;
         __block_t blk;
@@ -260,6 +261,58 @@ int sdfs_read_sync(fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
         }
 
         return blk.ret;
+err_ret:
+        return -ret;
+}
+
+
+int IO_FUNC __sdfs_read_sync__(va_list ap)
+{
+        const fileid_t *fileid = va_arg(ap, const fileid_t *);
+        buffer_t *buf = va_arg(ap, buffer_t *);
+        uint32_t size = va_arg(ap, uint32_t);
+        uint64_t off = va_arg(ap, uint64_t);
+
+        va_end(ap);
+
+        return sdfs_read(fileid, buf, size, off);
+}
+
+static int __sdfs_read_sync0(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
+{
+        int ret;
+        
+        ret = core_request(fileid->id, -1, "sdfs_read_sync",
+                           __sdfs_read_sync__, fileid, buf, size, off);
+        if (ret < 0) {
+                ret = -ret;
+                GOTO(err_ret, ret);
+        }
+
+        return ret;
+err_ret:
+        return -ret;
+}
+
+
+int sdfs_read_sync(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
+{
+        int ret;
+
+        ret = __sdfs_read_sync0(fileid, buf, size, off);
+        if (ret < 0) {
+                ret = -ret;
+                if (ret == ENOSYS) {
+                        ret = __sdfs_read_sync1(fileid, buf, size, off);
+                        if (ret < 0) {
+                                ret = -ret;
+                                GOTO(err_ret, ret);
+                        }
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        return ret;
 err_ret:
         return -ret;
 }
@@ -462,7 +515,8 @@ err_ret:
         return ret;
 }
 
-int sdfs_write_sync(fileid_t *fileid, const buffer_t *buf, uint32_t size, uint64_t off)
+static int __sdfs_write_sync1(const fileid_t *fileid, const buffer_t *buf,
+                              uint32_t size, uint64_t off)
 {
         int ret;
         __block_t blk;
@@ -488,6 +542,59 @@ int sdfs_write_sync(fileid_t *fileid, const buffer_t *buf, uint32_t size, uint64
         }
 
         return blk.ret;
+err_ret:
+        return -ret;
+}
+
+int IO_FUNC __sdfs_write_sync__(va_list ap)
+{
+        const fileid_t *fileid = va_arg(ap, const fileid_t *);
+        const buffer_t *buf = va_arg(ap, const buffer_t *);
+        uint32_t size = va_arg(ap, uint32_t);
+        uint64_t off = va_arg(ap, uint64_t);
+
+        va_end(ap);
+
+        return sdfs_write(fileid, buf, size, off);
+}
+
+static int __sdfs_write_sync0(const fileid_t *fileid, const buffer_t *buf,
+                              uint32_t size, uint64_t off)
+{
+        int ret;
+        
+        ret = core_request(fileid->id, -1, "sdfs_write_sync",
+                           __sdfs_write_sync__, fileid, buf, size, off);
+        if (ret < 0) {
+                ret = -ret;
+                GOTO(err_ret, ret);
+        }
+
+        DINFO("write core\n");
+        
+        return ret;
+err_ret:
+        return -ret;
+}
+
+int sdfs_write_sync(const fileid_t *fileid, const buffer_t *buf, uint32_t size, uint64_t off)
+{
+        int ret;
+
+        ret = __sdfs_write_sync0(fileid, buf, size, off);
+        if (ret < 0) {
+                ret = -ret;
+                if (ret == ENOSYS) {
+                        ret = __sdfs_write_sync1(fileid, buf, size, off);
+                        if (ret < 0) {
+                                ret = -ret;
+                                GOTO(err_ret, ret);
+                        }
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        return ret;
 err_ret:
         return -ret;
 }

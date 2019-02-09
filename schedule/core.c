@@ -686,10 +686,15 @@ int core_request(int hash, int priority, const char *name, func_va_t exec, ...)
         schedule_t *schedule;
         arg1_t ctx;
 
+        if (unlikely(__core_array__ == NULL)) {
+                ret = ENOSYS;
+                GOTO(err_ret, ret);
+        }
+        
         core = __core_array__[hash % cpuset_useable()];
         schedule = core->schedule;
-        if (schedule == NULL) {
-                ret = EAGAIN;
+        if (unlikely(schedule == NULL)) {
+                ret = ENOSYS;
                 GOTO(err_ret, ret);
         }
 

@@ -974,5 +974,19 @@ err_ret:
 
 int sdfs_init(const char *name)
 {
-        return sdfs_init_verbose(name, gloconf.polling_core);
+        int ret;
+
+        ret = ly_prep(0, name, -1);
+        if(ret)
+                GOTO(err_ret, ret);
+
+        ly_set_daemon();
+        
+        ret = sdfs_init_verbose(name, gloconf.polling_core);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
+err_ret:
+        return ret;
 }

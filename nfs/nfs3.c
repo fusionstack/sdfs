@@ -1745,7 +1745,6 @@ static int __nfs3_write_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         _memcpy(res.u.ok.verf, wverf, NFS3_WRITEVERFSIZE);
 
         DBUG("write %u\n", res.u.ok.count);
-
 #if ENABLE_MD_POSIX
         sattr_utime(fileid, 0, 1, 1);
 #endif

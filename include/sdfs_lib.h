@@ -87,9 +87,6 @@ typedef struct {
 
 /* return negative number on error */
 
-/* yfs_lib.c */
-int sdfs_init_verbose(const char *name, int redis_conn);
-int sdfs_init(const char *name);
 extern int ly_prep(int daemon, const char *name, int64_t maxopenfile);
 extern int ly_init(int daemon, const char *name, int64_t maxopenfile);
 extern int ly_run(char *home, int (*server)(void *args), void *args);
@@ -297,6 +294,8 @@ typedef struct {
 
 #define SDFS_LOCK_SIZE(__lock__) (sizeof(*__lock__) + __lock__->opaquelen)
 
+/* yfs_lib.c */
+int sdfs_init_verbose(const char *name, int redis_conn);
 int sdfs_init(const char *name);
 
 //dir
@@ -331,12 +330,13 @@ int sdfs_rmdir(const fileid_t *parent, const char *name);
 int sdfs_read(const fileid_t *fileid, buffer_t *_buf, uint32_t size, uint64_t offset);//coroutine
 int sdfs_read_async(const fileid_t *fileid, buffer_t *buf, uint32_t size,
                     uint64_t off, int (*callback)(void *, int), void *obj); // async io
-int sdfs_read_sync(fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off); //sync io
+int sdfs_read_sync(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off); //sync io
 
 int sdfs_write(const fileid_t *fileid, const buffer_t *_buf, uint32_t size, uint64_t offset);//coroutine
 int sdfs_write_async(const fileid_t *fileid, const buffer_t *buf, uint32_t size,
                      uint64_t off, int (*callback)(void *, int), void *obj);//async io
-int sdfs_write_sync(fileid_t *fileid, const buffer_t *buf, uint32_t size, uint64_t off);// sync io
+int sdfs_write_sync(const fileid_t *fileid, const buffer_t *buf, uint32_t size,
+                    uint64_t off);// sync io
 int sdfs_truncate(const fileid_t *fileid, uint64_t length);
 int sdfs_link2node(const fileid_t *old, const fileid_t *, const char *);
 int sdfs_unlink(const fileid_t *parent, const char *name);
