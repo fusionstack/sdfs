@@ -143,6 +143,24 @@ STATIC int __sy_rwlock_trylock__(sy_rwlock_t *rwlock, char type, task_t *task)
         return ret;
 }
 
+STATIC int __sy_rwlock_trylock0(sy_rwlock_t *rwlock, char type)
+{
+        int ret;
+
+        if (list_empty(&rwlock->queue)) {
+                ret =  __sy_rwlock_trylock__(rwlock, type, NULL);
+                if (unlikely(ret))
+                        goto err_ret;
+        } else {
+                ret = EBUSY;
+                GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
+}
+
 STATIC int __sy_rwlock_trylock(sy_rwlock_t *rwlock, char type)
 {
         int ret;
@@ -252,6 +270,11 @@ STATIC int __sy_rwlock_lock(sy_rwlock_t *rwlock, char type, int tmo)
         
         ANALYSIS_BEGIN(0);
 
+        ret = __sy_rwlock_trylock0(rwlock, type);
+        if (likely(ret == 0)) {
+                goto success;
+        }
+        
 retry:
         ret = sy_spin_lock(&rwlock->spin);
         if (unlikely(ret))
@@ -305,6 +328,7 @@ retry:
                 sy_spin_unlock(&rwlock->spin);
         }
 
+success:
         ANALYSIS_END(0, 1000 * 50, rwlock->name);
 
         return 0;

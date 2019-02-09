@@ -419,7 +419,7 @@ def t_io(mount_point, remount):
         t_read(mount_point, i)
 
     for i in lst:
-        fn = os.path.join(mount_point, uid)
+        fn = os.path.join(mount_point, i)
         os.unlink(fn)
         
 def t_unlink(mount_point):
