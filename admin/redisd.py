@@ -1044,6 +1044,9 @@ class RedisDisk(Daemon):
             s.append(i.status())
 
         return s
+
+    def restart(self):
+        pass
     
 def usage():
     print ("usage:")

@@ -524,35 +524,86 @@ err_ret:
 
 int sdfs_getxattr(const fileid_t *fileid, const char *name, void *value, size_t *size)
 {
+        int ret, retry = 0;
+        
         io_analysis(ANALYSIS_OP_READ, 0);
-        return md_getxattr(fileid, name, value, size);
+
+retry:
+        ret = md_getxattr(fileid, name, value, size);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
 }
 
 int sdfs_removexattr(const fileid_t *fileid, const char *name)
 {
+        int ret, retry = 0;
+        
         io_analysis(ANALYSIS_OP_WRITE, 0);
-        return md_removexattr(fileid, name);
+
+retry:
+        ret = md_removexattr(fileid, name);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
 }
 
 int sdfs_listxattr(const fileid_t *fileid, char *list, size_t *size)
 {
+        int ret, retry = 0;
+        
         io_analysis(ANALYSIS_OP_READ, 0);
-        return md_listxattr(fileid, list, size);
+
+retry:
+        ret = md_listxattr(fileid, list, size);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
 }
 
 int sdfs_setxattr(const fileid_t *fileid, const char *name, const void *value,
                  size_t size, int flags)
 {
-        int ret;
+        int ret, retry = 0;
         md_proto_t *md;
         char buf[MAX_BUF_LEN];
 
         io_analysis(ANALYSIS_OP_WRITE, 0);
         md = (void *)buf;
 
+retry:
         ret = md_getattr(md, fileid);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
 
         if ((!S_ISREG(md->at_mode)) && (!S_ISDIR(md->at_mode))) {
                 ret = EOPNOTSUPP;
@@ -602,8 +653,13 @@ int sdfs_setxattr(const fileid_t *fileid, const char *name, const void *value,
         }
 
         ret = md_setxattr(fileid, name, value, size, flags);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
 
         return 0;
 err_ret:
@@ -687,11 +743,17 @@ int sdfs_lock_equal(const fileid_t *file1, const sdfs_lock_t *lock1,
 
 int sdfs_share_list(int prot, shareinfo_t **shareinfo, int *count)
 {
-        int ret;
+        int ret, retry = 0;
 
+retry:
         ret = md_share_list_byprotocal(prot, shareinfo, count);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
 
         return 0;
 err_ret:
@@ -700,11 +762,17 @@ err_ret:
 
 int sdfs_share_get(const char *key, shareinfo_t *shareinfo)
 {
-        int ret;
+        int ret, retry = 0;
 
+retry:
         ret = md_share_get(key, shareinfo);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
 
         return 0;
 err_ret:
@@ -713,11 +781,17 @@ err_ret:
 
 int sdfs_share_set(const char *key, const shareinfo_t *shareinfo)
 {
-        int ret;
+        int ret, retry = 0;
 
+retry:
         ret = md_share_set(key, shareinfo);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                ret = _errno(ret);
+                if (ret == EAGAIN) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (1000 * 1000));
+                } else
+                        GOTO(err_ret, ret);
+        }
 
         return 0;
 err_ret:

@@ -109,6 +109,14 @@ class Node:
             cmd = "python2 %s --start %s/%s" % (self.config.uss_redisd, self.config.redis_dir, i)
             os.system(cmd)
 
+    def _restart_redis(self):
+        lst = os.listdir(self.config.redis_dir)
+
+        for i in lst:
+            cmd = "python2 %s --restart %s/%s" % (self.config.uss_redisd, self.config.redis_dir, i)
+            os.system(cmd)
+
+            
     def _stop_redis(self):
         lst = os.listdir(self.config.redis_dir)
 
@@ -150,6 +158,47 @@ class Node:
 
         os.system("rm " + lfile)
 
+    def restart(self, role=None, service=None, op="all"):
+        lfile = "/var/run/uss.start.lock"
+        lock = lock_file(lfile)
+
+        self._restart_redis()
+
+        #stop 
+        if (service is not None) and (role is not None):
+            i = Instence(role, service, self.config)
+            return i.stop(self.ttyonly)
+
+        #first stop minio srevice
+        #minio = Minio()
+        #minio.stop()
+
+        def instance_stop_warp(i):
+            i.stop(self.ttyonly)
+
+        instences = self._get_instences()
+        args = [[x] for x in instences]
+        mutil_exec(instance_stop_warp, args)
+        unset_crontab()
+
+        #start
+        if (service is not None) and (role is not None):
+            i = Instence(role, service, self.config)
+            return i.start(self.ttyonly)
+
+        def instance_start_warp(i):
+            i.start(self.ttyonly)
+
+        instences = self._get_instences()
+        args = [[x] for x in instences]
+        mutil_exec(instance_start_warp, args, timeout=30, timeout_args=[])
+        check_crontab(self.config)
+
+        if op == "all":
+            self._start_service()
+
+        os.system("rm " + lfile)
+        
     def stop(self, role=None, service=None):
         lfile = "/var/run/uss.stop.lock"
         lock = lock_file(lfile)
@@ -1471,6 +1520,15 @@ if __name__ == "__main__":
     parser_start.add_argument("--op", default="all", help="simple or all")
     parser_start.set_defaults(func=_start)
 
+    def _restart(args):
+        node = Node()
+        node.restart(args.role, args.service, args.op)
+    parser_restart = subparsers.add_parser('restart', help='restart services')
+    parser_restart.add_argument("--role", default=None, help="", choices=["cds", "mond"])
+    parser_restart.add_argument("--service", default=None, type=int, help="the id of service")
+    parser_restart.add_argument("--op", default="all", help="simple or all")
+    parser_restart.set_defaults(func=_restart)
+    
     def _stop(args):
         node = Node()
         node.stop(args.role, args.service)

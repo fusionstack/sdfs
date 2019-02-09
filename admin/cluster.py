@@ -396,6 +396,20 @@ class Cluster(object):
         args = [[self.config.uss_node, x] for x in self.config.cluster.keys()]
         mutil_exec(_cluster_stop, args)
 
+    def restart(self):
+        def _warp(h):
+            cmd = "python2 %s restart" % (self.config.uss_node)
+            x, y = exec_remote(h, cmd)
+            print "restart host: %s \n%s" % (h, x)
+            if y:
+                print y
+
+        args = [[x] for x in self.config.cluster.keys()]
+        mutil_exec(_warp, args)
+
+        cmd = "python %s/app/admin/check_domain.py check" % (self.config.home)
+        exec_shell(cmd)
+        
     def stat(self):
         def _warp(h):
             cmd = "python2 %s stat" % (self.config.uss_node)
@@ -1108,8 +1122,7 @@ if __name__ == "__main__":
     parser_stop.set_defaults(func=_stop)
 
     def _restart(args, cluster):
-        cluster.stop()
-        cluster.start()
+        cluster.restart()
     parser_restart = subparsers.add_parser('restart', help='restart services')
     parser_restart.set_defaults(func=_restart)
 

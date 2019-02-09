@@ -317,7 +317,7 @@ int cds_init(const char *home, int *cds_sd, int servicenum, int diskno, uint64_t
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = core_init(1, 1, CORE_FLAG_PASSIVE | CORE_FLAG_AIO);
+        ret = core_init(4, 1, CORE_FLAG_PASSIVE | CORE_FLAG_AIO);
         if (ret)
                 GOTO(err_ret, ret);
         

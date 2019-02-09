@@ -889,7 +889,7 @@ err_ret:
 
 int ly_init_simple(const char *name)
 {
-        int ret;
+        int ret, retry = 0;
 
         ret = ly_prep(0, name, -1);
         if (ret)
@@ -902,9 +902,11 @@ int ly_init_simple(const char *name)
         ng.live = 0;
         is_daemon = 0;
 
+retry:
         ret = network_connect_mond(0);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                USLEEP_RETRY(err_ret, ret, retry, retry, 10, (1000 * 1000));
+        }
 
         ret = ly_license_init(name);
         if (ret)

@@ -102,6 +102,8 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
 
+        ANALYSIS_BEGIN(0);
+        
         char path[MAX_PATH_LEN];
         ret = __replica_getfd(&io->id, &fd, path, O_CREAT | O_SYNC | O_RDWR);
         if (ret)
@@ -134,6 +136,8 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
                 ret = EIO;
                 GOTO(err_ret, ret);
         }
+
+        ANALYSIS_QUEUE(0, IO_INFO, NULL);
         
         return ret;
 err_fd:
@@ -150,6 +154,8 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
         buffer_t tmp;
 
+        ANALYSIS_BEGIN(0);
+        
         mbuffer_init(&tmp, 0);
         mbuffer_clone1(&tmp, buf);
 
@@ -196,6 +202,8 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
                 ret = EIO;
                 GOTO(err_ret, ret);
         }
+
+        ANALYSIS_QUEUE(0, IO_INFO, NULL);
         
         return ret;
 err_fd:
@@ -213,7 +221,6 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
         if (ret)
                 GOTO(err_ret, ret);
         
-        ANALYSIS_BEGIN(0);
         CORE_ANALYSIS_BEGIN(1);
         
         YASSERT(schedule_running());
@@ -237,7 +244,6 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
 
         DBUG("write "CHKID_FORMAT" finish\n", CHKID_ARG(&io->id));
         
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         CORE_ANALYSIS_UPDATE(1, IO_WARN, "write");       
         
         return 0;
@@ -253,6 +259,8 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
 
+        ANALYSIS_BEGIN(0);
+        
         DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
               CHKID_ARG(&io->id), io->offset, io->size);
         
@@ -291,6 +299,8 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
         
         __replica_release(fd);
 
+        ANALYSIS_QUEUE(0, IO_INFO, NULL);
+        
         return ret;
 err_fd:
         __replica_release(fd);
@@ -306,6 +316,8 @@ static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
 
+        ANALYSIS_BEGIN(0);
+        
         DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
         
         ret = __replica_getfd(&io->id, &fd, NULL, O_RDONLY);
@@ -336,6 +348,8 @@ static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
         }
         
         __replica_release(fd);
+
+        ANALYSIS_QUEUE(0, IO_INFO, NULL);
         
         return ret;
 err_fd:
@@ -352,7 +366,6 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
         if (ret)
                 GOTO(err_ret, ret);
         
-        ANALYSIS_BEGIN(0);
         CORE_ANALYSIS_BEGIN(1);
         
         YASSERT(schedule_running());
@@ -377,7 +390,6 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
 
         YASSERT(buf->len);
         
-        ANALYSIS_QUEUE(0, IO_WARN, NULL); 
         CORE_ANALYSIS_UPDATE(1, IO_WARN, "read");       
         
         return 0;
