@@ -184,7 +184,7 @@ static int __md_redirplus(void *buf, int buflen)
                 pos = (void *)de + de->d_reclen - sizeof(md_proto_t);
                 YASSERT(de->d_reclen < MAX_NAME_LEN * 2 + sizeof(md_proto_t));
                 
-                ret = md_getattr(md, &pos->fileid);
+                ret = md_getattr(&pos->fileid, md);
                 if (ret) {
                         DWARN("load file "CHKID_FORMAT " not found \n",
                               CHKID_ARG(&pos->fileid));

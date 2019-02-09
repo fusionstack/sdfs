@@ -21,7 +21,7 @@ static inodeop_t *inodeop = &__inodeop__;
 
 static uint64_t __systemvolid__ = -1;
 
-int md_getattr(md_proto_t *md, const fileid_t *fileid)
+int md_getattr(const fileid_t *fileid, md_proto_t *md)
 {
         int ret;
 

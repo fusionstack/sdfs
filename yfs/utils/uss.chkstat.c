@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 
 	cid2fid(&fileid, &chkid);
         md = (void *)buf;
-        ret = md_getattr((void *)md, &fileid);
+        ret = md_getattr(&fileid, (void *)md);
         if (ret)
                 GOTO(err_ret, ret);
 

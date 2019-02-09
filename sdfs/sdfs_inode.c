@@ -50,7 +50,7 @@ int sdfs_getattr(const fileid_t *fileid, struct stat *stbuf)
         }
         
 retry:
-        ret = md_getattr(md, fileid);
+        ret = md_getattr(fileid, md);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {

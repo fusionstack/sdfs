@@ -232,7 +232,7 @@ inline static int __etcd_getattr(const char *name, md_proto_t *md)
         if (ret)
                 GOTO(err_ret, ret);
         
-        ret = md_getattr(md, &fileid);
+        ret = md_getattr(&fileid, md);
         if (ret)
                 GOTO(err_ret, ret);
 

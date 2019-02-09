@@ -183,7 +183,7 @@ int raw_printfile(fileid_t *fileid, uint32_t _chkno)
         md = (void *)buf;
         chkinfo = (void *)buf1;
 
-        ret = md_getattr((void *)md, fileid);
+        ret = md_getattr(fileid, (void *)md);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -273,7 +273,7 @@ int raw_printfile1(fileid_t *fileid)
         md = (void *)buf;
         chkinfo = (void *)buf1;
 
-        ret = md_getattr((void *)md, fileid);
+        ret = md_getattr(fileid, (void *)md);
         if (ret)
                 GOTO(err_ret, ret);
 

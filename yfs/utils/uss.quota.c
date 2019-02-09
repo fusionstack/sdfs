@@ -68,7 +68,7 @@ static int __get_quotaid(const fileid_t *fileid, fileid_t *quotaid)
 
         md = (void *)buf;
 
-        ret = md_getattr(md, fileid);
+        ret = md_getattr(fileid, md);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -317,7 +317,7 @@ int quota_create()
                 }
 
                 if (!exist) {
-			ret = md_getattr(md, &fileid);
+			ret = md_getattr(&fileid, md);
 			if (ret) {
 				GOTO(err_ret, ret);
 			}

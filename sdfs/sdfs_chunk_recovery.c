@@ -497,7 +497,7 @@ int sdfs_chunk_recovery(const chkid_t *chkid)
         
         chkinfo = (void *)_chkinfo;
         cid2fid(&fileid, chkid);
-        ret = md_getattr((void *)&md, &fileid);
+        ret = md_getattr(&fileid, (void *)&md);
         if (ret)
                 GOTO(err_ret, ret);
 

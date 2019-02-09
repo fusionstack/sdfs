@@ -89,7 +89,7 @@ static int __inode_create(const fileid_t *parent, const setattr_t *setattr,
         ANALYSIS_BEGIN(0);
         
         md_parent = (md_proto_t *)buf;
-        ret = md_getattr(md_parent, parent);
+        ret = md_getattr(parent, md_parent);
         if (ret)
                 GOTO(err_ret, ret);
 

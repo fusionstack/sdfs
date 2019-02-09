@@ -52,7 +52,7 @@ int md_chkget(const fileinfo_t *_md, chkinfo_t *chkinfo, const chkid_t *chkid,
 
                 fileid_t fileid;
                 cid2fid(&fileid, chkid);
-                ret = md_getattr((void *)md, &fileid);
+                ret = md_getattr(&fileid, (void *)md);
                 if (ret)
                         GOTO(err_ret, ret);
         }

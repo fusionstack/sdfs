@@ -302,7 +302,7 @@ again:
         /*
         *BABY
         */
-        ret = md_getattr(md, &fileid);
+        ret = md_getattr(&fileid, md);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
                         ret = network_connect_mond(0);

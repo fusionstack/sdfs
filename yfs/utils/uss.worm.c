@@ -342,7 +342,7 @@ int worm_create()
         }
 
         md = (void *)buf;
-        ret = md_getattr(md, &fileid);
+        ret = md_getattr(&fileid, md);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -480,7 +480,7 @@ int worm_get()
                 GOTO(err_ret, ret);
 
         md = (void *)buf;
-        ret = md_getattr(md, &fileid);
+        ret = md_getattr(&fileid, md);
         if(ret)
                 GOTO(err_ret, ret);
 

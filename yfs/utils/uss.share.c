@@ -491,7 +491,7 @@ int main(int argc, char *argv[])
                         GOTO(err_ret, ret);
 
                 md = (void *)buf;
-                ret = md_getattr((void *)md, &dirid);
+                ret = md_getattr(&dirid, (void *)md);
                 if (ret)
                         GOTO(err_ret, ret);
 

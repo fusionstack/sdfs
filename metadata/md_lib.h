@@ -83,7 +83,7 @@ int md_symlink(const fileid_t *parent, const char *link_name, const char *link_t
                uint32_t mode, uint32_t uid, uint32_t gid);
 int md_readlink(const fileid_t *fileid, char *_buf);
 int md_lookup(fileid_t *fileid, const fileid_t *parent, const char *name);
-int md_getattr(md_proto_t *md, const fileid_t *fileid);
+int md_getattr(const fileid_t *fileid, md_proto_t *md);
 int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid);
 int md_rmvol(const char *name);
 int md_dirlist(const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist);

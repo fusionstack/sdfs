@@ -89,7 +89,7 @@ int sdfs_read(const fileid_t *fileid, buffer_t *_buf, uint32_t size, uint64_t of
               (LLU)md->at_size, (LLU)offset, size);
 
 retry:
-        ret = md_getattr((void *)md, fileid);
+        ret = md_getattr(fileid, (void *)md);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -375,7 +375,7 @@ int sdfs_write(const fileid_t *fileid, const buffer_t *_buf, uint32_t size, uint
         mbuffer_reference(&newbuf, _buf);
         
 retry:
-        ret = md_getattr((void *)md, fileid);
+        ret = md_getattr(fileid, (void *)md);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -691,7 +691,7 @@ int sdfs_setxattr(const fileid_t *fileid, const char *name, const void *value,
         md = (void *)buf;
 
 retry:
-        ret = md_getattr(md, fileid);
+        ret = md_getattr(fileid, md);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {

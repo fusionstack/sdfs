@@ -68,7 +68,7 @@ int md_truncate(const fileid_t *fileid, uint64_t length)
         char buf[MAX_BUF_LEN] = {0};
 
         md = (md_proto_t *)buf;
-        ret = md_getattr(md, fileid);
+        ret = md_getattr(fileid, md);
         if (ret)
                 GOTO(err_ret, ret);
 

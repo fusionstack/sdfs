@@ -655,7 +655,6 @@ static int __nfs3_create(const fileid_t *parent, const char *name, uint32_t cmod
                                 GOTO(err_ret, ret);
 
                         if (cmode == EXCLUSIVE) {
-#if 1
                                 struct stat stbuf;
                                 ret = sdfs_getattr(fileid, &stbuf);
                                 if (ret)
@@ -677,32 +676,6 @@ static int __nfs3_create(const fileid_t *parent, const char *name, uint32_t cmod
                                         ret = EEXIST;
                                         GOTO(err_ret, ret);
                                 }
-#else
-                                fileinfo_t *md;
-                                char buf[MAX_BUF_LEN];
-                                
-                                md = (void *)buf;
-                                ret = md_getattr((md_proto_t*)md, fileid);
-                                if (ret)
-                                        GOTO(err_ret, ret);
-
-                                if (cmode == EXCLUSIVE) {
-                                        YASSERT((md->at_mode & 01777) == EXCLUSIVE);
-                                }
-                                
-                                if ((md->at_mode & 01777) == EXCLUSIVE
-                                    &&md->at_mtime == mtime && md->at_atime == atime) {
-                                        DBUG("EXCLUSIVE resume "FID_FORMAT"\n",
-                                              FID_ARG(&md->fileid));
-                                } else {
-                                        DWARN("EXCLUSIVE "FID_FORMAT" mtime"
-                                              " %u:%u atime %u:%u mode %u\n", FID_ARG(&md->fileid),
-                                              md->at_mtime, mtime, md->at_atime, atime,
-                                              md->at_mode & 01777);
-                                        ret = EEXIST;
-                                        GOTO(err_ret, ret);
-                                }
-#endif
                         } else {
                                 DBUG("file "FID_FORMAT"/%s exist\n", FID_ARG(parent), name);
 
