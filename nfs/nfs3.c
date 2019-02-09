@@ -934,12 +934,6 @@ static int __nfs3_mkdir_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         if (ret)
                 GOTO(err_rep, ret);
 
-#if 0
-        ret = sattr_set(&fileid, &args->attr, NULL);
-        if (ret)
-                GOTO(err_rep, ret);
-#endif
-
         pfh = &res.u.ok.obj;
         pfh->handle.val = (void *)&fileid;
         pfh->handle.len = sizeof(fileid_t);

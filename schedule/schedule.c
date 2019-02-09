@@ -1701,7 +1701,7 @@ void schedule_task_given(task_t *task)
         }
 }
 
-int schedule_request(schedule_t *schedule, int priority, void (*exec)(void *buf), void *buf, const char *name)
+int schedule_request(schedule_t *schedule, int priority, func_t exec, void *buf, const char *name)
 {
         int ret;
         request_queue_t *request_queue = &schedule->request_queue;

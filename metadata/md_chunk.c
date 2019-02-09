@@ -31,41 +31,6 @@ typedef struct {
 
 static chunkop_t *chunkop = &__chunkop__;
 
-/** allocate new chunk
- * @param chkrep
- * @param path
- * @param chk[in,out]
- */
-int md_chkget(const fileinfo_t *_md, chkinfo_t *chkinfo, const chkid_t *chkid,
-              const nid_t *_peer)
-{
-        int ret;
-        char buf[MAX_BUF_LEN];
-        fileinfo_t *md;
-        
-        (void) _peer;
-
-        if (_md) {
-                md = (void *)_md;
-        } else {
-                md = (void *)buf;
-
-                fileid_t fileid;
-                cid2fid(&fileid, chkid);
-                ret = md_getattr(&fileid, (void *)md);
-                if (ret)
-                        GOTO(err_ret, ret);
-        }
-        
-        ret = md_chunk_create(md, chkid->idx, chkinfo);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        return 0;
-err_ret:
-        return ret;
-}
-
 int md_chkload(chkinfo_t *chk, const chkid_t *chkid, const nid_t *_peer)
 {
         (void) _peer;

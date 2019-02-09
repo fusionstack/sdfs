@@ -67,9 +67,6 @@ int md_chunk_create(const fileinfo_t *md, uint64_t idx, chkinfo_t *chkinfo);
 int md_chunk_load(const chkid_t *chkid, chkinfo_t *chkinfo);
 int md_chunk_load_check(const chkid_t *chkid, chkinfo_t *chkinfo, int repmin);
 
-int md_chkget_prep(job_t *job, const chkid_t *chkid);
-int md_chkget(const fileinfo_t *md, chkinfo_t *chk, const chkid_t *chkid,
-              const nid_t *owner);
 int md_chkload(chkinfo_t *chk, const chkid_t *chkid, const nid_t *nid);
 int md_chkupdate(const chkinfo_t *chkinfo, const nid_t *nid);
 

@@ -453,67 +453,6 @@ typedef struct {
 #define REQUEST_SEM 1
 #define REQUEST_TASK 2
 
-static void __core_request0(void *_ctx)
-{
-        arg_t *ctx = _ctx;
-
-        ctx->exec(ctx->ctx);
-
-        if (ctx->type == REQUEST_SEM) {
-                sem_post(&ctx->sem);
-        } else {
-                schedule_resume(&ctx->task, 0, NULL);
-        }
-}
-
-int core_request0(int hash, func_t exec, void *_ctx, const char *name)
-{
-        int ret;
-        core_t *core;
-        schedule_t *schedule;
-        arg_t ctx;
-
-        core = __core_array__[hash % cpuset_useable()];
-        schedule = core->schedule;
-        if (unlikely(schedule == NULL)) {
-                ret = EAGAIN;
-                GOTO(err_ret, ret);
-        }
-
-        ctx.exec = exec;
-        ctx.ctx = _ctx;
-
-        if (schedule_self() == NULL) {
-                ctx.type = REQUEST_SEM;
-                ret = sem_init(&ctx.sem, 0, 0);
-                if (unlikely(ret))
-                        UNIMPLEMENTED(__DUMP__);
-        } else {
-                ctx.type = REQUEST_TASK;
-                ctx.task = schedule_task_get();
-        }
-
-        ret = schedule_request(schedule, -1, __core_request0, &ctx, name);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        if (schedule_self() == NULL) {
-                ret = _sem_wait(&ctx.sem);
-                if (unlikely(ret)) {
-                        GOTO(err_ret, ret);
-                }
-        } else {
-                ret = schedule_yield(name, NULL, _ctx);
-                if (unlikely(ret)) {
-                        GOTO(err_ret, ret);
-                }
-        }
-
-        return 0;
-err_ret:
-        return ret;
-}
-
 static int __core_create__(core_t **_core, int hash, int flag)
 {
         int ret;
@@ -1226,6 +1165,33 @@ static int __core_pipeline_create()
         INIT_LIST_HEAD(&vm->forward_list);
 
         __vm__ = vm;
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+int core_request_async(int hash, int priority, const char *name, func_t exec, void *arg)
+{
+        int ret;
+        core_t *core;
+        schedule_t *schedule;
+
+        if (unlikely(__core_array__ == NULL)) {
+                ret = ENOSYS;
+                GOTO(err_ret, ret);
+        }
+        
+        core = __core_array__[hash % cpuset_useable()];
+        schedule = core->schedule;
+        if (unlikely(schedule == NULL)) {
+                ret = ENOSYS;
+                GOTO(err_ret, ret);
+        }
+
+        ret = schedule_request(schedule, priority, exec, arg, name);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
 
         return 0;
 err_ret:

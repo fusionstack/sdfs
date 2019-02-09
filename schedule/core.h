@@ -105,7 +105,7 @@ int core_attach(int hash, const sockid_t *sockid, const char *name, void *ctx,
 core_t *core_get(int hash);
 core_t *core_self();
 
-int core_request0(int hash, func_t exec, void *_ctx, const char *name);
+int core_request_async(int hash, int priority, const char *name, func_t exec, void *arg);
 int core_request(int hash, int priority, const char *name, func_va_t exec, ...);
 void core_check_dereg(const char *name, void *opaque);
 void core_register_tls(int type, void *ptr);

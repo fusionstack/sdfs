@@ -241,10 +241,9 @@ int schedule_stat(int *sid, int *taskid, int *rq, int *runable, int *wait_task, 
 
 
 // task/coroutine相关, 切换task状态
-int schedule_request(schedule_t *schedule, int priority, void (*exec)(void *buf), void *buf, const char *name);
+int schedule_request(schedule_t *schedule, int priority, func_t exec, void *buf, const char *name);
 
 void schedule_task_new(const char *name, func_t func, void *arg, int priority);
-void schedule_task_new1(const char *name, func_t func, void *arg, int priority);
 
 /** 有副作用，两次schedule_task_get调用之间，必须有schedule_yield
  *

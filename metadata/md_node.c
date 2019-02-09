@@ -31,7 +31,7 @@ int md_getattr(const fileid_t *fileid, md_proto_t *md)
         if (ret)
                 GOTO(err_ret, ret);
 
-#if 0
+#if ENABLE_ATTR_QUEUE
         if (ng.daemon) {
                 attr_queue_update(fileid, md);
         }

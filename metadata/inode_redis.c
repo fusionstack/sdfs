@@ -18,6 +18,8 @@
 #include "md_db.h"
 #include "dbg.h"
 
+static inodeop_t *inodeop = &__inodeop__;
+
 static int __inode_childcount(const fileid_t *fid, uint64_t *_count);
 static int __inode_remove(const fileid_t *fileid, md_proto_t *_md);
 
@@ -89,7 +91,7 @@ static int __inode_create(const fileid_t *parent, const setattr_t *setattr,
         ANALYSIS_BEGIN(0);
         
         md_parent = (md_proto_t *)buf;
-        ret = md_getattr(parent, md_parent);
+        ret = inodeop->getattr(parent, md_parent);
         if (ret)
                 GOTO(err_ret, ret);
 

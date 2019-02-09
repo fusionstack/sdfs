@@ -17,6 +17,7 @@
 #include "posix_acl.h"
 #include "io_analysis.h"
 #include "flock.h"
+#include "attr_queue.h"
 #include "core.h"
 #include "xattr.h"
 #include "dbg.h"
@@ -419,7 +420,24 @@ retry:
                 seg = &seg_array[i];
                 mbuffer_free(&seg->buf);
         }
-        
+
+#if ENABLE_ATTR_QUEUE
+        if (ng.daemon) {
+                ret = attr_queue_extern(fileid, size + offset);
+                if (ret)
+                        GOTO(err_ret, ret);
+        } else {
+        retry1:
+                ret = md_extend(fileid, size + offset);
+                if (ret) {
+                        ret = _errno(ret);
+                        if (ret == EAGAIN) {
+                                USLEEP_RETRY(err_ret, ret, retry1, retry, 100, (1000 * 1000));
+                        } else
+                                GOTO(err_ret, ret);
+                }
+        }
+#else
 retry1:
         ret = md_extend(fileid, size + offset);
         if (ret) {
@@ -429,6 +447,7 @@ retry1:
                 } else
                         GOTO(err_ret, ret);
         }
+#endif
 
         mbuffer_free(&newbuf);
 
@@ -589,7 +608,7 @@ err_ret:
 
 int sdfs_truncate(const fileid_t *fileid, uint64_t length)
 {
-        int ret, retry = 0;
+        int ret;
 
 #if ENABLE_WORM
         worm_status_t worm_status;
@@ -602,6 +621,12 @@ int sdfs_truncate(const fileid_t *fileid, uint64_t length)
         }
 #endif
 
+#if ENABLE_ATTR_QUEUE
+        ret = attr_queue_truncate(fileid, length);
+        if (ret)
+                GOTO(err_ret, ret);
+#else
+        int retry = 0;
 retry:
         ret = md_truncate(fileid, length);
         if (ret) {
@@ -611,6 +636,7 @@ retry:
                 } else
                         GOTO(err_ret, ret);
         }
+#endif
 
         return 0;
 err_ret:

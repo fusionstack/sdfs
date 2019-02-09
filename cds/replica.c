@@ -170,8 +170,8 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
         YASSERT(ret == (int)buf->len);
 
         for (int i=0; i < iov_count; i++) {
-                YASSERT(iov[i].iov_len % PAGE_SIZE == 0);
-                YASSERT((uint64_t)iov[i].iov_base % PAGE_SIZE == 0);
+                YASSERT(iov[i].iov_len % SECTOR_SIZE == 0);
+                YASSERT((uint64_t)iov[i].iov_base % SECTOR_SIZE == 0);
         }
         
         io_prep_pwritev(&iocb, fd, iov, iov_count, io->offset);

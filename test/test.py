@@ -517,13 +517,13 @@ def test():
 
     #test_objmv()
     
-    exec_shell("python2 %s/test_list.py --length 10 --home %s >> %s/fileop.log 2>&1" % (CUR_PATH, TEST_PATH, LOG_PATH))
     exec_shell("python2 %s/nfs_test.py --home %s  >> %s/nfs.log 2>&1 && sync && umount /mnt/nfs" % (script_path, TEST_PATH, LOG_PATH))
+    #exec_shell("python2 %s/test_list.py --length 10 --home %s >> %s/fileop.log 2>&1" % (CUR_PATH, TEST_PATH, LOG_PATH))
     #exec_shell("python2 %s/ftp_test.py --home %s  >> %s/ftp.log 2>&1" % (script_path, TEST_PATH, LOG_PATH))
     #exec_shell("python2 %s/quota_test.py  >> %s/misc.log 2>&1" % (script_path, LOG_PATH))
-    exec_shell("python2 %s/group_test.py  >> %s/misc.log 2>&1" % (script_path, LOG_PATH))
-    exec_shell("python2 %s/user_test.py >> %s/misc.log 2>&1" % (script_path, LOG_PATH))
-    exec_shell("python2 %s/share_test.py  >> %s/misc.log 2>&1" % (script_path, LOG_PATH))
+    #exec_shell("python2 %s/group_test.py  >> %s/misc.log 2>&1" % (script_path, LOG_PATH))
+    #exec_shell("python2 %s/user_test.py >> %s/misc.log 2>&1" % (script_path, LOG_PATH))
+    #exec_shell("python2 %s/share_test.py  >> %s/misc.log 2>&1" % (script_path, LOG_PATH))
     """
     """
 

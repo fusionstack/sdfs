@@ -10,7 +10,7 @@
 #include "sdfs_lib.h"
 #include "md_attr.h"
 #include "network.h"
-#include "yfscli_conf.h"
+#include "attr_queue.h"
 #include "dbg.h"
 
 /*
@@ -29,9 +29,15 @@ int sattr_utime(const fileid_t *fileid, int at, int mt, int ct)
                             mt ? __SET_TO_SERVER_TIME : __DONT_CHANGE, NULL,
                             ct ? __SET_TO_SERVER_TIME : __DONT_CHANGE, NULL);
 
+#if ENABLE_ATTR_QUEUE
+        ret = attr_queue_settime(fileid, &setattr);
+        if (ret)
+                GOTO(err_ret, ret);
+#else
         ret = sdfs_setattr(fileid, &setattr, 0);
         if (ret)
                 GOTO(err_ret, ret);
+#endif
         
         return 0;
 err_ret:
