@@ -12,6 +12,7 @@
 #include "sunrpc_reply.h"
 #include "job_tracker.h"
 #include "ylib.h"
+#include "core.h"
 #include "ynet_net.h"
 #include "dbg.h"
 
@@ -28,6 +29,7 @@ typedef struct {
 
 #pragma pack()
 
+#if 0
 int sunrpc1_reply_prep(job_t *job, xdr_ret_t xdr_ret, void *buf, int state)
 {
         int ret;
@@ -99,6 +101,7 @@ int sunrpc1_reply_send(job_t *job, buffer_t *_buf, mbuffer_op_t op)
 err_ret:
         return ret;
 }
+#endif
 
 int sunrpc_reply(const sockid_t *sockid, const sunrpc_request_t *req,
                  int state, void *res, xdr_ret_t xdr_ret)
@@ -107,6 +110,7 @@ int sunrpc_reply(const sockid_t *sockid, const sunrpc_request_t *req,
         sunrpc_reply_t *rep;
         xdr_t xdr;
         buffer_t buf;
+        net_handle_t nh;
 
         if (sizeof(sunrpc_reply_t) > Y_PAGE_SIZE) {
                 DERROR("why we get such a request? \n");
@@ -142,14 +146,33 @@ int sunrpc_reply(const sockid_t *sockid, const sunrpc_request_t *req,
 
         DBUG("buf len %llu\n", (LLU)(buf.len - sizeof(uint32_t)));
 
-        net_handle_t nh;
+
+#if 1
+        ret = core_pipeline_send(sockid, &buf, 0);
+        if (unlikely(ret)) {
+                ret = _errno_net(ret);
+                if (ret == ENOSYS) {
+                        sock2nh(&nh, sockid);
+                        ret = sdevent_queue(&nh, &buf, 0);
+                        if (unlikely(ret)) {
+                                ret = _errno_net(ret);
+                                GOTO(err_free, ret);
+                        }
+                } else
+                        GOTO(err_free, ret);
+        }
+#else
         sock2nh(&nh, sockid);
         ret = sdevent_queue(&nh, &buf, 0);
-        if (ret) {
-                GOTO(err_ret, ret);
+        if (unlikely(ret)) {
+                ret = _errno_net(ret);
+                GOTO(err_free, ret);
         }
-        
+#endif
+
         return 0;
+err_free:
+        mbuffer_free(&buf);
 err_ret:
         return ret;
 }

@@ -52,6 +52,7 @@ def t_chmod(mount_point):
     if mode != '0111':
         logging.error('t_chmod failed, mode : %s\n' % (mode))
         sys.exit(-1)
+
     os.unlink(fn)
 
     #  目录
@@ -203,7 +204,7 @@ def t_open(mount_point):
     fn = os.path.join(mount_point, uid)
 
     try:
-        os.open(fn, os.O_CREAT|os.O_WRONLY, 0755)
+        fd = os.open(fn, os.O_CREAT|os.O_WRONLY, 0755)
     except Exception as e:
         logging.error("errno : %d, error : %s\n" % (e.errno, str(e)))
         sys.exit(e.errno)
@@ -215,6 +216,8 @@ def t_open(mount_point):
     if mode != '0755':
         logging.error('t_open failed, mode : %s\n' % (mode))
         sys.exit(-1)
+
+    os.close(fd)
     os.unlink(fn)
 
 def t_rename(mount_point):
@@ -358,10 +361,11 @@ def t_truncate(mount_point):
     if statinfo.st_size != 1234567:
         logging.error('t_truncate failed, invalid size\n')
         sys.exit(-1)
+
+    fd.close()
     os.unlink(fn)
 
-def t_write(mount_point):
-    uid = str(uuid.uuid1())
+def t_write(mount_point, uid):
     fn = os.path.join(mount_point, uid)
 
     try:
@@ -372,13 +376,52 @@ def t_write(mount_point):
         sys.exit(-1)
 
     try:
-        fd.write("1234567")
+        fd.write(uid)
     except Exception as e:
         logging.error('t_write failed\n')
         sys.exit(-1)
-    os.unlink(fn)
 
+    fd.close()
     
+def t_read(mount_point, uid):
+    fn = os.path.join(mount_point, uid)
+
+    try:
+        fd = open(fn, 'r')
+    except Exception as e:
+        logging.error('t_write failed, open failed, error : %s\n' %
+                        (str(e)))
+        sys.exit(-1)
+
+    try:
+        res = fd.read()
+        if (res != uid):
+            logging.error('t_read cmp %s failed, need %s, got %s\n' % (fn, res, uid))
+            sys.exit(-1)
+    except Exception as e:
+        logging.error('t_read %s failed\n' % (fn))
+        sys.exit(-1)
+
+    fd.close()
+
+def t_io(mount_point, remount):
+    lst = []
+    for i in range(10):
+        lst.append(str(uuid.uuid1()))
+
+    for i in lst:
+        t_write(mount_point, i)
+
+    print(remount)
+    os.system(remount)
+        
+    for i in lst:
+        t_read(mount_point, i)
+
+    for i in lst:
+        fn = os.path.join(mount_point, uid)
+        os.unlink(fn)
+        
 def t_unlink(mount_point):
     uid = str(uuid.uuid1())
     fn = os.path.join(mount_point, uid)
@@ -404,10 +447,12 @@ def nfs_test(mount_point='/mnt/nfs'):
     os.system(cmd)
     cmd = "sdfs share -p nfs -m rw -n nfs_test -s /nfs_test -H 0.0.0.0"
     os.system(cmd)
-    cmd = "mkdir -p /mnt/nfs"
+    cmd = "mkdir -p " + mount_point
     os.system(cmd)
-    cmd = "mount -o nfsvers=3,noacl,nolock 127.0.0.1:/nfs_test /mnt/nfs"
+    cmd = "mount -o nfsvers=3,noacl,nolock 127.0.0.1:/nfs_test " + mount_point
     os.system(cmd)
+
+    remount = "sync && umount -f %s && %s " % (mount_point, cmd)
     
     t_chmod(mount_point)
     logging.info('!!!t_chmod succ!!!')
@@ -427,12 +472,12 @@ def nfs_test(mount_point='/mnt/nfs'):
     logging.info('!!!t_symlink succ!!!')
     t_truncate(mount_point)
     logging.info('!!!t_truncate succ!!!')
-    t_write(mount_point)
-    logging.info('!!!t_write succ!!!')
-    
     t_unlink(mount_point)
     logging.info('!!!t_unlink succ!!!')
-
+    t_io(mount_point, remount)
+    logging.info('!!!t_io succ!!!')
+    
+    
 if __name__ == '__main__':
     #  --home 参数先保留
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)

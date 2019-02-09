@@ -1145,7 +1145,7 @@ int core_pipeline_send(const sockid_t *sockid, buffer_t *buf, int flag)
 
         YASSERT(flag == 0);
 
-        DBUG("vm_fwd\n");
+        DBUG("core_pipeline_send\n");
 
         list_for_each(pos, &__vm__->forward_list) {
                 vm_fwd = (void *)pos;

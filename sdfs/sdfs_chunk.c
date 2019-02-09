@@ -63,6 +63,8 @@ static int __chunk_load(const fileinfo_t *md, const chkid_t *chkid,
         nid_t *nid;
         uint32_t i;
 
+        ANALYSIS_BEGIN(0);
+        
         (void) retry;
 retry:
         ret = md_chunk_load_check(chkid, chkinfo, repmin);
@@ -101,13 +103,15 @@ retry:
         if (_intect) {
                 *_intect = intect;
         }
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 err_ret:
         return ret;
 }
 
-static void __objs_ec_read_strip(ec_arg_t *ec_arg, int count, int offset, const ec_t *ec)
+static void __chunk_ec_read_strip(ec_arg_t *ec_arg, int count, int offset, const ec_t *ec)
 {
         int i;
         int m, k;
@@ -157,7 +161,7 @@ static int __chunk_read_ec(const chkid_t *chkid, buffer_t *buf, int count,
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
-        __objs_ec_read_strip(&ec_arg, count, offset, ec);
+        __chunk_ec_read_strip(&ec_arg, count, offset, ec);
 
         for (i = 0; i < ec_arg.strip_count; i++) {
                 strip = &ec_arg.strips[i];
@@ -215,6 +219,8 @@ static int __chunk_read(const chkid_t *chkid, buffer_t *buf, int count, int offs
         diskid_t array[YFS_CHK_REP_MAX];
         uint32_t i;
 
+        ANALYSIS_BEGIN(0);
+        
         chkinfo = (void *)_chkinfo;
         
         ret = __chunk_load(NULL, chkid, chkinfo, 1, NULL);
@@ -250,6 +256,8 @@ static int __chunk_read(const chkid_t *chkid, buffer_t *buf, int count, int offs
         }
 
         DBUG("read "CHKID_FORMAT" success\n", CHKID_ARG(chkid));
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 err_ret:
@@ -298,6 +306,8 @@ static int __chunk_write__(const chkinfo_t *chkinfo, const buffer_t *buf, int si
         const nid_t *nid;
         nid_t array[YFS_CHK_REP_MAX];
 
+        ANALYSIS_BEGIN(0);
+        
         online = 0;
         for (i = 0; i < (int)chkinfo->repnum; i++) {
                 nid = &chkinfo->diskid[i];
@@ -338,6 +348,8 @@ static int __chunk_write__(const chkinfo_t *chkinfo, const buffer_t *buf, int si
                 GOTO(err_ret, ret);
         }
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return 0;
 err_ret:
         return ret;
@@ -351,6 +363,8 @@ static int __chunk_write__(const chkinfo_t *chkinfo, const buffer_t *buf, int co
         uint32_t i;
         io_t io;
         const nid_t *nid;
+
+        ANALYSIS_BEGIN(0);
         
         io_init(&io, &chkinfo->chkid, count, offset, 0);
 
@@ -367,6 +381,8 @@ static int __chunk_write__(const chkinfo_t *chkinfo, const buffer_t *buf, int co
         }
 
         YASSERT(i <= chkinfo->repnum);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 err_ret:
@@ -382,6 +398,8 @@ static int __chunk_write(const fileinfo_t *md, const chkid_t *chkid,
         char _chkinfo[CHK_SIZE(YFS_CHK_REP_MAX)];
         chkinfo_t *chkinfo;
 
+        ANALYSIS_BEGIN(0);
+        
         DBUG("write "CHKID_FORMAT"\n", CHKID_ARG(chkid));
         
         chkinfo = (void *)_chkinfo;
@@ -407,6 +425,8 @@ static int __chunk_write(const fileinfo_t *md, const chkid_t *chkid,
         }
 
         DBUG("write "CHKID_FORMAT" success\n", CHKID_ARG(chkid));
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 err_lock:
