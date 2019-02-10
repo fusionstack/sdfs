@@ -36,8 +36,7 @@
 extern int is_daemon;
 extern jobtracker_t *jobtracker;
 
-extern mpool_t head_pool;
-extern analysis_t default_analysis;
+extern analysis_t *default_analysis;
 
 /*If more than Max_reboot number of restarts occur in the last Max_date seconds,*/
 /*then the supervisor terminates all the child processes and then itself.*/
@@ -541,6 +540,10 @@ int init_stage1()
         fnotify_init();
         dmsg_init();
 
+        ret = mem_cache_init();
+        if (ret)
+                GOTO(err_ret, ret);
+        
         ret = mem_hugepage_init();
         if (ret)
                 GOTO(err_ret, ret);

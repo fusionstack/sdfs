@@ -25,7 +25,6 @@ typedef struct {
         int size;
         int running;
         char name[MAX_NAME_LEN];
-        analysis_t ana;
         job_head_t array[0];
 } jobtracker_t;
 

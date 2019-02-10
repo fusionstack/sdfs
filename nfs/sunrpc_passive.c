@@ -14,6 +14,7 @@
 #include "sunrpc_passive.h"
 #include "sunrpc_proto.h"
 #include "configure.h"
+#include "main_loop.h"
 #include "dbg.h"
 
 static void *__sunrpc_tcp_passive__(void *_arg)
@@ -24,6 +25,8 @@ static void *__sunrpc_tcp_passive__(void *_arg)
         sd = *_sd;
 
         yfree((void**)&_sd);
+
+        main_loop_hold();        
         
         DINFO("--------------start listen %d--------\n", sd);
 

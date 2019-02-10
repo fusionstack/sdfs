@@ -9,8 +9,8 @@
 #include "nfs_state_machine.h"
 #include "sdfs_lib.h"
 #include "md_attr.h"
-#include "network.h"
 #include "attr_queue.h"
+#include "schedule.h"
 #include "dbg.h"
 
 /*
@@ -219,7 +219,7 @@ retry:
         ret = sdfs_getattr(fileid, &stbuf);
         if (ret) {
                 if (NEED_EAGAIN(ret)) {
-                        SLEEP_RETRY3(err_ret, ret, retry, retry, 100);
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
                 } else {
                         GOTO(err_ret, ret);
                 }
@@ -246,8 +246,8 @@ void get_preopattr1(const fileid_t *fileid, preop_attr *attr)
 retry:
         ret = sdfs_getattr(fileid, &stbuf);
         if (ret) {
-                if NEED_EAGAIN(ret) {
-                        SLEEP_RETRY3(err_ret, ret, retry, retry, 100);
+                if (NEED_EAGAIN(ret)) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
                 } else {
                         GOTO(err_ret, ret);
                 }

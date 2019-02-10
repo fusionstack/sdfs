@@ -49,7 +49,7 @@ typedef struct {
 static pipeline_t *__pipeline_array__ = NULL;
 static int __count__ = 0;
 
-static int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd);
+STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd);
 
 typedef struct {
         task_t task;
@@ -63,7 +63,7 @@ typedef struct {
 #define REQUEST_SEM 1
 #define REQUEST_TASK 2
 
-static void *__redis_schedule(void *arg);
+STATIC void *__redis_schedule(void *arg);
 
 int redis_pipeline_init()
 {
@@ -114,7 +114,7 @@ err_ret:
 }
 
 
-static void __redis_pipeline_request__(void *_ctx)
+STATIC void __redis_pipeline_request__(void *_ctx)
 {
         arg1_t *ctx = _ctx;
 
@@ -127,7 +127,7 @@ static void __redis_pipeline_request__(void *_ctx)
         }
 }
 
-static int __redis_pipeline_request(pipeline_t *pipeline, func_va_t exec, ...)
+STATIC int __redis_pipeline_request(pipeline_t *pipeline, func_va_t exec, ...)
 {
         int ret;
         schedule_t *schedule = pipeline->schedule;
@@ -167,7 +167,7 @@ err_ret:
         return ret;
 }
 
-static int __redis_poll(int fd)
+STATIC int __redis_poll(int fd)
 {
         int ret;
         struct pollfd pfd;
@@ -204,7 +204,7 @@ err_ret:
         return ret;
 }
 
-static void *__redis_schedule(void *arg)
+STATIC void *__redis_schedule(void *arg)
 {
         int ret, interrupt_eventfd;
         char name[MAX_NAME_LEN];
@@ -245,7 +245,7 @@ err_ret:
         pthread_exit(NULL);
 }
 
-static int __redis_pipeline(va_list ap)
+STATIC int __redis_pipeline(va_list ap)
 {
         int ret;
         redis_pipline_ctx_t *ctx = va_arg(ap, redis_pipline_ctx_t *);
@@ -300,7 +300,7 @@ err_ret:
         return ret;
 }
 
-static int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
+STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
 {
         int ret;
         struct list_head *pos, *n;
@@ -357,7 +357,7 @@ typedef struct {
         int finished;
 } arg2_t;
 
-static int __redis_exec(va_list ap)
+STATIC int __redis_exec(va_list ap)
 {
         arg2_t *arg2 = va_arg(ap, arg2_t *);
 
@@ -397,7 +397,7 @@ err_ret:
         return ret;
 }
 
-inline static void __redis_pipline_run__(void *_arg)
+inline STATIC void __redis_pipline_run__(void *_arg)
 {
         int ret;
         arg2_t *arg = _arg;
@@ -413,7 +413,7 @@ inline static void __redis_pipline_run__(void *_arg)
         //yfree((void **)&arg);
 }
 
-static int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd)
+STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd)
 {
         int ret, count = 0;
         struct list_head list, *pos, *n;
@@ -628,7 +628,7 @@ err_ret:
         return ret;
 }
 
-static int __pipeline_kget(const fileid_t *fileid, const char *key, void *buf, size_t *len)
+STATIC int __pipeline_kget(const fileid_t *fileid, const char *key, void *buf, size_t *len)
 {
         int ret;
         redisReply *reply;
@@ -668,7 +668,7 @@ err_ret:
         return ret;
 }
 
-static int __pipeline_kset(const fileid_t *fileid, const char *key, const void *value,
+STATIC int __pipeline_kset(const fileid_t *fileid, const char *key, const void *value,
                   size_t size, int flag, int _ttl)
 {
         int ret;
@@ -723,7 +723,7 @@ err_ret:
         return ret;
 }
 
-static int __pipeline_kdel(const fileid_t *fileid, const char *key)
+STATIC int __pipeline_kdel(const fileid_t *fileid, const char *key)
 {
         int ret;
         redisReply *reply;
@@ -789,7 +789,7 @@ err_ret:
         return ret;
 }
 
-static int __pipeline_klock(const fileid_t *fileid, int ttl)
+STATIC int __pipeline_klock(const fileid_t *fileid, int ttl)
 {
         int ret;
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];

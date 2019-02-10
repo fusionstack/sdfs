@@ -9,8 +9,8 @@
 
 #include "configure.h"
 #include "ylib.h"
+#include "schedule.h"
 #include "sdfs_lib.h"
-//#include "leveldb_util.h"
 
 static void usage(const char *prog)
 {
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
                 if (ret < 0) {
                         ret = -ret;
                         if (NEED_EAGAIN(ret)) {
-                                SLEEP_RETRY(err_ret, ret, retry2, retry);
+                                USLEEP_RETRY(err_ret, ret, retry2, retry, 10, (1000 * 1000));
                         } else
                                 GOTO(err_ret, ret);
                 }

@@ -270,6 +270,11 @@ int mem_hugepage_deref(mem_handler_t *mem_handler)
 
 int mem_hugepage_init()
 {
+        if (use_memcache == 0) {
+                DINFO("disable memcache\n");
+                return 0;
+        }
+        
         YASSERT(__mem_hugepage__ == NULL);
         return __mem_hugepage_init(&__mem_hugepage__);
 }
@@ -279,6 +284,11 @@ int mem_hugepage_private_init()
         int ret;
         mem_hugepage_t *__mem_hugepage_private__ = mem_self();
 
+        if (use_memcache == 0) {
+                DINFO("disable memcache\n");
+                return 0;
+        }
+        
         YASSERT(__mem_hugepage_private__ == NULL);
         ret = __mem_hugepage_init(&__mem_hugepage_private__);
         if (unlikely(ret)) {

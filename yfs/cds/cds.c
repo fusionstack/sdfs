@@ -39,6 +39,7 @@
 #include "bh.h"
 #include "dbg.h"
 
+extern int use_memcache;
 cds_info_t cds_info;
 uint32_t num_cds_read;
 uint32_t num_cds_read_done;
@@ -163,7 +164,7 @@ void cds_signal_handler(int sig)
 
         jobdock_iterator();
 
-        analysis_dump();
+        analysis_dumpall();
 }
 
 int cds_destroy(int cds_sd, int servicenum)
@@ -477,6 +478,7 @@ int cds_run(void *args)
 
         max_object = (LLU)fsbuf.f_blocks * fsbuf.f_bsize / YFS_CHK_LEN_DEF;
 
+        use_memcache = 1;
         ret = ly_init(daemon, name, max_object * 2 + MAX_OPEN_FILE);
         if (ret)
                 GOTO(err_ret, ret);

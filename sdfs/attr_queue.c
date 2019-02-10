@@ -193,7 +193,7 @@ int attr_queue_update(const fileid_t *fileid, md_proto_t *md)
                         GOTO(err_ret, ret);
 
                 if (fileid_cmp(fileid, &attr_op->fileid) != 0) {
-                        DWARN("update "CHKID_FORMAT" skiped\n", CHKID_ARG(&attr_op->fileid));
+                        DBUG("update "CHKID_FORMAT" skiped\n", CHKID_ARG(&attr_op->fileid));
                         sy_spin_unlock(&attr_op->lock);
                         continue;
                 }

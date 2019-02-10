@@ -102,6 +102,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/journal.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/lock.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem_cache.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/mem_hugepage.c
     #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls.c
     #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls/nls_cp936.c
@@ -299,30 +300,6 @@ set (YNLM_SRC_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/nfs/hostcache.c
 )
 
-set (YISCSI_SRC_LIST
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/main.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/event.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/mem_cache.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/digest.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/ua.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/md5.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/tio.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/config.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/yfs_io.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/sha1.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/conn.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/chap.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/session.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/target_disk.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/iscsi.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/param.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/target.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/volume.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/worker.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/debug.c
-	${CMAKE_CURRENT_SOURCE_DIR}/yiscsi/src/cmds.c
-)
-
 set (YFTP_SRC_LIST
 	${CMAKE_CURRENT_SOURCE_DIR}/yftp/src/main.c
 	${CMAKE_CURRENT_SOURCE_DIR}/yftp/src/ftpfeatures.c
@@ -373,11 +350,6 @@ target_link_libraries(sdfs.nfs ${CMAKE_C_LIBS})
 
 #add_executable(sdfs.nlm ${YNLM_SRC_LIST})
 #target_link_libraries(sdfs.nlm ${CMAKE_C_LIBS})
-
-if(${USE_EPOLL})
-#add_executable(sdfs.iscsi ${YISCSI_SRC_LIST})
-#target_link_libraries(sdfs.iscsi ${CMAKE_C_LIBS})
-endif(${USE_EPOLL})
 
 if(${USE_EPOLL})
 add_executable(sdfs.ftp ${YFTP_SRC_LIST})

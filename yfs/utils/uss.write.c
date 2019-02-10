@@ -7,6 +7,7 @@
 
 #include "configure.h"
 #include "ylib.h"
+#include "schedule.h"
 #include "sdfs_lib.h"
 
 int main(int argc, char *argv[])
@@ -69,7 +70,7 @@ retry:
         if (ret < 0) {
                 ret = -ret;
                 if (NEED_EAGAIN(ret)) {
-                        SLEEP_RETRY(err_ret, ret, retry, retry);
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
                 } else
                         GOTO(err_ret, ret);
         }

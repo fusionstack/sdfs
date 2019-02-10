@@ -55,8 +55,6 @@ typedef struct {
         int retval;
 } job_resume_arg_t;
 
-analysis_t ana;
-
 extern jobtracker_t *jobtracker;
 static job_dock_t *jobdock;
 
@@ -174,8 +172,6 @@ void __job_destroy(job_t *job)
 
         if (time_used > UINT64_MAX / 2)
                 time_used = UINT64_MAX / 10;
-
-        analysis_queue(&ana, job->name, _time_used(&job->timer.create, &now));
 
         sy_spin_lock(&jobdock->lock);
 
@@ -388,11 +384,6 @@ int jobdock_init(net_print_func net_print)
         if (ret)
                 GOTO(err_ret, ret);
 
-        if (gloconf.performance_analysis) {
-                ret = analysis_create(&ana, "jobdock");
-                if (ret)
-                        GOTO(err_ret, ret);
-        }
 
         return 0;
 err_ret:
@@ -1059,7 +1050,6 @@ int job_timermark(job_t *job, const char *stage)
 #endif
 
         snprintf(name, MAX_NAME_LEN, "%s.%s", job->name, stage);
-        analysis_queue(&ana, name, used);
 
         if (used > 1000 * 1000)
                 DWARN("job %s.%s used %u\n", job->name, stage, used);

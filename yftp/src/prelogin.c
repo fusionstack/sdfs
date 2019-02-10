@@ -20,6 +20,7 @@
 #include "cJSON.h"
 #include "xattr.h"
 #include "sdfs_share.h"
+#include "schedule.h"
 #include "md_lib.h"
 
 int emit_greeting(struct yftp_session *ys)
@@ -62,7 +63,7 @@ err_ret:
 static int handle_login_internal(const char *username, const char *passwd,
                 uint32_t *mode, char *fakedir)
 {
-        int ret, retry, retry_max;
+        int ret, retry;
         user_t user_info;
         fileid_t dirid;
         share_ftp_t *share_info = NULL;
@@ -72,13 +73,12 @@ static int handle_login_internal(const char *username, const char *passwd,
 
         /* 根据用户名获取Password */
         retry = 0;
-        retry_max = 30;
 retry:
         ret = user_get(username, &user_info);
         if(ret){
                 if (NEED_EAGAIN(ret)) {
                         network_connect_mond(0);
-                        SLEEP_RETRY3(err_ret, ret, retry, retry, retry_max);
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
                 } else {
                         ret = EINVAL;
                         GOTO(err_ret, ret);

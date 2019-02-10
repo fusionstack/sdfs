@@ -5,7 +5,7 @@
 #include "job.h"
 #include "ylock.h"
 
-#define ANALYSIS_QUEUE_MAX (8192 * 10)
+#define ANALYSIS_QUEUE_MAX (8192 * 100)
 
 typedef struct {
         int count;
@@ -25,11 +25,18 @@ typedef struct {
         sy_spinlock_t tab_lock;
 } analysis_t;
 
-extern analysis_t default_analysis;
+typedef struct {
+        char name[MAX_NAME_LEN];
+} analysis_entry_t;
 
-int analysis_create(analysis_t *ana, const char *name);
-int analysis_dump();
-int analysis_queue(analysis_t *ana, const char *name, uint64_t _time);
-int analysis_init();
+extern analysis_t *default_analysis;
+
+int analysis_create(analysis_t **_ana, const char *_name);
+int analysis_dumpall(void);
+int analysis_queue(analysis_t *ana, const char *name, const char *type, uint64_t _time);
+int analysis_private_create(const char *_name);
+int analysis_init(void);
+int analysis_dump(const char *tab, const char *name,  char *buf);
+int analysis_private_queue(const char *_name, const char *type, uint64_t _time);
 
 #endif

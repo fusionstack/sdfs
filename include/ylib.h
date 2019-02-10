@@ -123,7 +123,7 @@ extern void sy_rwlock_unlock(sy_rwlock_t *rwlock);
 #define ypadsize(size) \
 ((size) + ((size) % 8))
 
-#if 1
+#if 0
 typedef struct {
         sy_spinlock_t lock;
         struct list_head list;

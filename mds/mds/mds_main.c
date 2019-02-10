@@ -51,7 +51,7 @@ void mds_signal_handler(int sig)
 
         jobdock_iterator();
         //nodepool_hash_print();
-        analysis_dump();
+        analysis_dumpall();
 }
 
 static int __mds_exit__(int ret)

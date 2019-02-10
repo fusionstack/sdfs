@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#if 0
+#define ENABLE_MEM_CACHE 1
 
 #include "sdfs_conf.h"
 #include "sdfs_list.h"
@@ -87,30 +87,7 @@ int mem_cache_private_destroy();
 int mem_cache_inited();
 
 void *mem_cache_calloc(mem_cache_type_t type, uint8_t flag);
-void mem_cache_free(mem_cache_type_t type, void *ptr);
-
-#endif
-
-typedef enum {            
-        MEM_CACHE_64,     
-        MEM_CACHE_128,    
-        MEM_CACHE_4K,     
-        MEM_CACHE_8K,
-        MEM_CACHE_NR,
-} mem_cache_type_t;
-
-#define MEM_CACHE_SIZE64 64
-#define MEM_CACHE_SIZE128 128
-#define MEM_CACHE_SIZE4K 4096
-#define MEM_CACHE_SIZE8K 8192
-
-//为schedule添加的
-void *mem_cache_alloc(mem_cache_type_t type, uint8_t flag);
-void *mem_cache_calloc(mem_cache_type_t type, uint8_t flag);
 void *mem_cache_calloc1(mem_cache_type_t type, int size);
-int mem_cache_free(mem_cache_type_t type, void *ptr);
-int mem_cache_private_init();
-int mem_cache_private_destroy();
-int mem_hugepage_private_init();
+void mem_cache_free(mem_cache_type_t, void *);
 
 #endif /* MEM_CACHE_H */

@@ -108,7 +108,7 @@ void *__jobtracker_worker(void *arg)
                 (void) job->state_machine(job, name);
 
                 snprintf(wname, MAX_NAME_LEN, "%s.wait", name);
-                analysis_queue(&tracker->ana, wname, used);
+                //analysis_queue(&tracker->ana, wname, used);
 
                 if (used > 1000 * 2000) {
                         DBUG("job %s time used %u queue len %u at %s\n",
@@ -117,8 +117,6 @@ void *__jobtracker_worker(void *arg)
 
                 _gettimeofday(&t2, NULL);
                 used = _time_used(&t1, &t2);
-                analysis_queue(&tracker->ana, name, used);
-
 #if 0
                 if (used > 100 * 1000) {
                         DINFO("job %s time used %u queue len %u at %s\n",
@@ -204,12 +202,6 @@ int jobtracker_create(jobtracker_t **jobtracker, int size, const char *name)
 
         strcpy(tracker->name, name);
         snprintf(newname, MAX_NAME_LEN, "jobtracker.%s", name);
-
-        if (gloconf.performance_analysis) {
-                ret = analysis_create(&tracker->ana, newname);
-                if (ret)
-                        GOTO(err_ret, ret);
-        }
 
         *jobtracker = tracker;
 

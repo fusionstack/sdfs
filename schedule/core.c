@@ -22,6 +22,7 @@
 #include "nodectl.h"
 #include "timer.h"
 #include "mem_cache.h"
+#include "mem_hugepage.h"
 #include "rpc_table.h"
 #include "configure.h"
 #include "core.h"
@@ -41,10 +42,6 @@
 #include "adt.h"
 #include "dbg.h"
 #include "mem_pool.h"
-
-#ifdef NVMF
-#include "nvmf.h"
-#endif
 
 #define CORE_MAX 256
 
@@ -261,12 +258,6 @@ static int __core_worker_init(core_t *core)
 
         DINFO("core[%u] init begin\n", core->hash);
 
-#if 0
-        ret = gettime_private_init();
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-#endif
-        
         if (ng.daemon && __polling_timeout__ == 0) {
                 cpuset_getcpu(&core->main_core, &core->aio_core);
                 if (core->main_core) {
@@ -284,32 +275,10 @@ static int __core_worker_init(core_t *core)
                 core->main_core = NULL;
         }
         
-#if 0
-        ret = variable_newthread();
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        DINFO("core[%u] variable inited\n", core->hash);
-        
-        void *private_mem;
-        private_mem = core_private_mem_init(core->main_core->cpu_id, core->hash);
-        if (unlikely(!private_mem)){
-                ret = ENOMEM;
-                GOTO(err_ret, ret);
-        }
-
-        ret = mem_cache_private_init();
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-#endif
-
-        DINFO("core[%u] mem inited\n", core->hash);
-        
-        snprintf(name, sizeof(name), "core");
-
 #if ENABLE_CORENET
         int *interrupt = !core->main_core ? &core->interrupt_eventfd : NULL;
 
+        snprintf(name, sizeof(name), "core");
         ret = schedule_create(interrupt, name, &core->idx, &core->schedule, NULL);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
@@ -334,6 +303,7 @@ static int __core_worker_init(core_t *core)
                         GOTO(err_ret, ret);
         }
 #else 
+        snprintf(name, sizeof(name), "core");
         ret = schedule_create(NULL, name, &core->idx, &core->schedule, NULL);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
@@ -348,23 +318,34 @@ static int __core_worker_init(core_t *core)
 
         DINFO("core[%u] timer inited\n", core->hash);
         
-#if 0
+#if 1
+        ret = mem_cache_private_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        ret = mem_hugepage_private_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        DINFO("core[%u] mem inited\n", core->hash);
+
+        snprintf(name, sizeof(name), "core[%u]", core->idx);
         ret = analysis_private_create(name);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
-#endif
 
         DINFO("core[%u] analysis inited\n", core->hash);
+#endif
 
 #if 0
         ret = fastrandom_private_init();
         if (unlikely(ret)) {
                 UNIMPLEMENTED(__DUMP__);
         }
-#endif
 
         DINFO("core[%u] fastrandom inited\n", core->hash);
+#endif
 
 #if ENABLE_CORERPC
         ret = corerpc_init(name, core);

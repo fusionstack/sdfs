@@ -50,7 +50,7 @@ static void signal_handler(int sig)
         //inode_proto_dump();
         jobdock_iterator();
         netable_iterate();
-        analysis_dump();
+        analysis_dumpall();
 }
 
 void ftp_exit_handler(int sig)

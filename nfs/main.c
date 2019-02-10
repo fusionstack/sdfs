@@ -63,7 +63,7 @@ static void nfs_signal_handler(int sig)
         DINFO("got signal %d\n", sig);
         //inode_proto_dump();
         netable_iterate();
-        analysis_dump();
+        analysis_dumpall();
 }
 
 static void nfs_exit_handler(int sig)
