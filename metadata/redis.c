@@ -37,7 +37,7 @@ typedef struct {
         int idx;
         sy_spinlock_t lock;
         struct list_head list;
-        //sem_t sem;
+        sem_t sem;
         int eventfd;
 } redis_worker_t;
 
@@ -922,6 +922,7 @@ int rm_pop(const nid_t *nid, int _hash, chkid_t *array, int *count)
         return __redis_request(++__seq__, "rm_pop", __rm_pop,
                                nid, _hash, array, count);
 }
+
 static int __redis_worker_run(redis_worker_t *worker)
 {
         int ret;
@@ -966,16 +967,13 @@ static void *__redis_worker(void *arg)
 {
         int ret;
         redis_worker_t *worker = arg;
-        uint64_t left;
 
         __redis_workerid__ = worker->idx;
+
+        sem_post(&worker->sem);
         
         while (1) {
-                ret = read(worker->eventfd, &left, sizeof(left));
-                if(ret < 0) {
-                        ret = errno;
-                        UNIMPLEMENTED(__DUMP__);
-                }
+                eventfd_poll(worker->eventfd, 1, NULL);
 
                 ret = __redis_worker_run(worker);
                 if(ret)
@@ -1081,6 +1079,10 @@ int redis_init(int count)
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
 
+                ret = sem_init(&worker->sem, 0, 0);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+
                 ret = eventfd(0, EFD_CLOEXEC);
                 if (unlikely(ret < 0)) {
                         ret = errno;
@@ -1092,6 +1094,10 @@ int redis_init(int count)
                 INIT_LIST_HEAD(&worker->list);
 
                 ret = sy_thread_create2(__redis_worker, worker, "redis_worker");
+                if(ret)
+                        GOTO(err_ret, ret);
+
+                ret = sem_wait(&worker->sem);
                 if(ret)
                         GOTO(err_ret, ret);
         }

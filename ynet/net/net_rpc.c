@@ -120,6 +120,7 @@ int net_rpc_heartbeat(const sockid_t *sockid, uint64_t seq)
 
         ANALYSIS_BEGIN(0);
 
+        len = MAX_BUF_LEN;
         ret = rpc_getinfo(info, &len);
         if (unlikely(ret))
                 GOTO(err_ret, ret);

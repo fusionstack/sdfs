@@ -99,21 +99,26 @@ int analysis_queue(analysis_t *ana, const char *_name, const char *type, uint64_
                 name = _name;
         }
 
-        ret = sy_spin_trylock(&ana->queue_lock);
-        if (unlikely(ret)) {
-                if (ret == EBUSY) {
-                        DBUG("queue %s %f busy\n", name, (double)_time / 1000 / 1000);
-                        return 0;
-                } else
-                        GOTO(err_ret, ret);
+        if (unlikely(!ana->private)) {
+                ret = sy_spin_trylock(&ana->queue_lock);
+                if (unlikely(ret)) {
+                        if (ret == EBUSY) {
+                                DBUG("queue %s %f busy\n", name, (double)_time / 1000 / 1000);
+                                return 0;
+                        } else
+                                GOTO(err_ret, ret);
+                }
         }
 
         YASSERT(ana->queue->count <= ANALYSIS_QUEUE_MAX);
 
         if (ana->queue->count == ANALYSIS_QUEUE_MAX) {
-                sy_spin_unlock(&ana->queue_lock);
-                DBUG("analysis queue %s busy, when %s\n", ana->name, name);
-                sem_post(&analysis_list.sem);
+                if (unlikely(!ana->private)) {
+                        sy_spin_unlock(&ana->queue_lock);
+                        sem_post(&analysis_list.sem);
+                }
+
+                DWARN("analysis queue %s busy, when %s\n", ana->name, name);
                 goto out;
         }
 
@@ -124,7 +129,9 @@ int analysis_queue(analysis_t *ana, const char *_name, const char *type, uint64_
 
         DBUG("%s, count %u\n", ana->name, ana->queue->count);
         
-        sy_spin_unlock(&ana->queue_lock);
+        if (unlikely(!ana->private)) {
+                sy_spin_unlock(&ana->queue_lock);
+        }
 
 out:
         return 0;
@@ -205,15 +212,19 @@ static int __analysis__(analysis_t *ana, int *count)
         
         ANALYSIS_BEGIN(0);
 
-        ret = sy_spin_lock(&ana->queue_lock);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (unlikely(!ana->private)) {
+                ret = sy_spin_lock(&ana->queue_lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
 
         tmp = ana->queue;
         ana->queue = ana->new_queue;
         ana->new_queue = tmp;
 
-        sy_spin_unlock(&ana->queue_lock);
+        if (unlikely(!ana->private)) {
+                sy_spin_unlock(&ana->queue_lock);
+        }
 
         DBUG("%s, count %u\n", ana->name, ana->new_queue->count);
 
@@ -224,7 +235,10 @@ static int __analysis__(analysis_t *ana, int *count)
                         GOTO(err_ret, ret);
         }
 
-        *count = ana->new_queue->count;
+        if (count) {
+                *count = ana->new_queue->count;
+        }
+
         ana->new_queue->count = 0;
 
         ANALYSIS_END(0, 1000 * 100, NULL);
@@ -249,9 +263,7 @@ static uint32_t __analysis_key(const void *i)
 
 static void *__worker(void *_args)
 {
-        int ret, count = 0, s = 0;
-        analysis_t *ana;
-        struct list_head *pos;
+        int ret;
 
         (void) _args;
 
@@ -265,44 +277,8 @@ static void *__worker(void *_args)
                 }
 
                 DBUG("analysis collect\n");
-                
-#if 1
-                (void) count;
-                (void) s;
-                ret = sy_spin_lock(&analysis_list.lock);
-                if (unlikely(ret))
-                        GOTO(err_ret, ret);
 
-                list_for_each(pos, &analysis_list.list) {
-                        ana = (void *)pos;
-
-                        __analysis__(ana, &s);
-                        count += s;
-                }
-
-                sy_spin_unlock(&analysis_list.lock);
-#else
-                while (1) {
-                        count = 0;
-                        s = 0;
-                        ret = sy_spin_lock(&analysis_list.lock);
-                        if (unlikely(ret))
-                                GOTO(err_ret, ret);
-
-                        list_for_each(pos, &analysis_list.list) {
-                                ana = (void *)pos;
-
-                                __analysis__(ana, &s);
-                                count += s;
-                        }
-
-                        sy_spin_unlock(&analysis_list.lock);
-
-                        if (count == 0)
-                                break;
-                }
-#endif
-                
+                __analysis__(default_analysis, NULL);
         }
 
         return NULL;
@@ -355,7 +331,7 @@ err_ret:
         return ret;
 }
 
-int analysis_create(analysis_t **_ana, const char *_name)
+int analysis_create(analysis_t **_ana, const char *_name, int private)
 {
         int ret;
         char name[MAX_NAME_LEN];
@@ -392,10 +368,13 @@ int analysis_create(analysis_t **_ana, const char *_name)
                 GOTO(err_ret, ret);
 
         ana->new_queue->count = 0;
+        ana->private = private;
 
-        ret = sy_spin_init(&ana->queue_lock);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (unlikely(!ana->private)) {
+                ret = sy_spin_init(&ana->queue_lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
 
         ret = sy_spin_init(&ana->tab_lock);
         if (unlikely(ret))
@@ -419,7 +398,7 @@ int analysis_private_create(const char *_name)
 
         YASSERT(__private_analysis__ == NULL);
         
-        ret = analysis_create(&ana, _name);
+        ret = analysis_create(&ana, _name, 1);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -529,4 +508,11 @@ err_lock:
         sy_spin_unlock(&analysis_list.lock);
 err_ret:
         return ret;
+}
+
+void analysis_merge()
+{
+        if (likely(__private_analysis__)) {
+                __analysis__(__private_analysis__, NULL);
+        }
 }

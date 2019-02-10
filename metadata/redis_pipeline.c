@@ -167,58 +167,27 @@ err_ret:
         return ret;
 }
 
-STATIC int __redis_poll(int fd)
-{
-        int ret;
-        struct pollfd pfd;
-        uint64_t e;
-
-        pfd.fd = fd;
-        pfd.events = POLLIN;
-        
-        while (1) { 
-                ret = poll(&pfd, 1, 1000 * 1000);
-                if (ret  < 0)  {
-                        ret = errno;
-                        if (ret == EINTR) {
-                                DBUG("poll EINTR\n");
-                                continue;
-                        } else
-                                GOTO(err_ret, ret);
-                }
-
-                ret = read(fd, &e, sizeof(e));
-                if (ret < 0)  {
-                        ret = errno;
-                        if (ret == EAGAIN) {
-                        } else {
-                                GOTO(err_ret, ret);
-                        }
-                }
-
-                break;
-        }
-
-        return 0;
-err_ret:
-        return ret;
-}
-
 STATIC void *__redis_schedule(void *arg)
 {
-        int ret, interrupt_eventfd;
+        int ret, interrupt_eventfd, idx;
         char name[MAX_NAME_LEN];
         pipeline_t *pipeline = arg;
 
         snprintf(name, sizeof(name), "redis");
-        ret = schedule_create(&interrupt_eventfd, name, NULL, &pipeline->schedule, NULL);
+        ret = schedule_create(&interrupt_eventfd, name, &idx, &pipeline->schedule, NULL);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
+        snprintf(name, sizeof(name), "redis[%u]", idx);
+        ret = analysis_private_create(name);
+        if (unlikely(ret)) {
+                GOTO(err_ret, ret);
+        }
+        
         sem_post(&pipeline->sem);
         
         while (1) {
-                ret = __redis_poll(interrupt_eventfd);
+                ret = eventfd_poll(interrupt_eventfd, 1, NULL);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
 
@@ -236,6 +205,7 @@ STATIC void *__redis_schedule(void *arg)
                 schedule_run(pipeline->schedule);
 #endif
 
+                analysis_merge();
                 schedule_scan(pipeline->schedule);
         }
 
@@ -475,7 +445,7 @@ STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd)
         while (1) {
                 schedule_run(pipeline->schedule);
                 
-                ret = __redis_poll(interrupt_eventfd);
+                ret = eventfd_poll(interrupt_eventfd, 1, NULL);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
 

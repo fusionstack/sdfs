@@ -571,7 +571,7 @@ int init_stage1()
                 GOTO(err_ret, ret);
 
         if (gloconf.performance_analysis) {
-                ret = analysis_create(&default_analysis, "default");
+                ret = analysis_create(&default_analysis, "default", 0);
                 if (unlikely(ret))             
                         GOTO(err_ret, ret);            
         }

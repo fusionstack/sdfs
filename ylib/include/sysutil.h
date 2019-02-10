@@ -172,6 +172,7 @@ int is_zero_one_char(const char *_char);
 
 void list_free(struct list_head *head, int (*free_fn)(void **));
 uint64_t fastrandom();
+int eventfd_poll(int fd, int tmo, uint64_t *event);
 
 // dir and file {{
 

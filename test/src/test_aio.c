@@ -197,43 +197,6 @@ err_ret:
         return ret;
 }
 
-static int __aio_schedule_poll(int fd)
-{
-        int ret;
-        struct pollfd pfd;
-        uint64_t e;
-
-        pfd.fd = fd;
-        pfd.events = POLLIN;
-        
-        while (1) { 
-                ret = poll(&pfd, 1, 1000 * 1000);
-                if (ret  < 0)  {
-                        ret = errno;
-                        if (ret == EINTR) {
-                                DBUG("poll EINTR\n");
-                                continue;
-                        } else
-                                GOTO(err_ret, ret);
-                }
-
-                ret = read(fd, &e, sizeof(e));
-                if (ret < 0)  {
-                        ret = errno;
-                        if (ret == EAGAIN) {
-                        } else {
-                                GOTO(err_ret, ret);
-                        }
-                }
-
-                break;
-        }
-
-        return 0;
-err_ret:
-        return ret;
-}
-
 typedef struct {
         schedule_t *schedule;
         sem_t sem;
@@ -261,7 +224,7 @@ static void *__aio_schedule(void *arg)
         sem_post(&aio_sche->sem);
         
         while (1) {
-                ret = __aio_schedule_poll(interrupt_eventfd);
+                ret = eventfd_poll(interrupt_eventfd, 1, NULL);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
 

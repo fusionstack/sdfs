@@ -33,6 +33,7 @@
 #include <sys/syscall.h>
 #include <libgen.h>
 #include <execinfo.h>
+#include <poll.h>
 #include <linux/fs.h>
 
 #define DBG_SUBSYS S_LIBYLIB
@@ -2527,4 +2528,48 @@ int chkid_generator(generator_t *gen, uint32_t *_idx)
 uint64_t fastrandom()
 {
         return _random();
+}
+
+int eventfd_poll(int fd, int tmo, uint64_t *_event)
+{
+        int ret, event;
+        struct pollfd pfd;
+        uint64_t e;
+
+        pfd.fd = fd;
+        pfd.events = POLLIN;
+        
+        while (1) { 
+                event = poll(&pfd, 1, tmo * 1000 * 1000);
+                if (event < 0)  {
+                        ret = errno;
+                        if (ret == EINTR) {
+                                DBUG("poll EINTR\n");
+                                continue;
+                        } else
+                                GOTO(err_ret, ret);
+                }
+
+                e = 0;
+                if (event) {
+                        ret = read(fd, &e, sizeof(e));
+                        if (ret < 0)  {
+                                ret = errno;
+                                if (ret == EAGAIN) {
+                                } else {
+                                        GOTO(err_ret, ret);
+                                }
+                        }
+                }
+
+                if (_event) {
+                        *_event = e;
+                }
+                
+                break;
+        }
+
+        return 0;
+err_ret:
+        return ret;
 }

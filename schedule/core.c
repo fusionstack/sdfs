@@ -210,7 +210,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 {
 #if ENABLE_CORENET
         if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
-                int tmo = core->main_core ? 0 : 10;
+                int tmo = core->main_core ? 0 : 1;
                 corenet_tcp_poll(tmo);
         }
 #endif
@@ -248,7 +248,8 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 #if 0
         gettime_refresh();
 #endif
-        timer_expire();        
+        timer_expire();
+        analysis_merge();
 }
 
 static int __core_worker_init(core_t *core)

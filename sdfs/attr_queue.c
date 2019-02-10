@@ -225,45 +225,6 @@ err_ret:
         return ret;
 }
 
-static int __attr_queue_poll(int fd)
-{
-        int ret;
-        struct pollfd pfd;
-        uint64_t e;
-
-        pfd.fd = fd;
-        pfd.events = POLLIN;
-        
-        while (1) { 
-                ret = poll(&pfd, 1, 1000 * 1000);
-                if (ret  < 0)  {
-                        ret = errno;
-                        if (ret == EINTR) {
-                                DBUG("poll EINTR\n");
-                                continue;
-                        } else
-                                GOTO(err_ret, ret);
-                }
-
-                ret = read(fd, &e, sizeof(e));
-                if (ret < 0)  {
-                        ret = errno;
-                        if (ret == EAGAIN) {
-                        } else {
-                                GOTO(err_ret, ret);
-                        }
-                }
-
-                DBUG("attr queue events\n");
-                
-                break;
-        }
-
-        return 0;
-err_ret:
-        return ret;
-}
-
 static void __attr_queue_run__(void *arg)
 {
         int ret, retry = 0;
@@ -368,7 +329,7 @@ static void *__attr_queue_worker(void *arg)
         attr_queue_t *attr_queue = arg;
 
         while (1) {
-                __attr_queue_poll(attr_queue->eventfd);
+                eventfd_poll(attr_queue->eventfd, 1, NULL);
 
                 while (attr_queue->len) {
                         __attr_queue_run(attr_queue);

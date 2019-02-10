@@ -88,7 +88,6 @@ int net_connect(net_handle_t *sock, const ynet_net_info_t *info, int timeout)
         YASSERT(!schedule_running());
 
         infolen = MAX_BUF_LEN;
-
         ret = rpc_getinfo(buf, &infolen);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
