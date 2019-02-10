@@ -261,24 +261,30 @@ int IO_FUNC __sdfs_read_sync__(va_list ap)
         buffer_t *buf = va_arg(ap, buffer_t *);
         uint32_t size = va_arg(ap, uint32_t);
         uint64_t off = va_arg(ap, uint64_t);
+        int *retval = va_arg(ap, int *);
 
         va_end(ap);
 
-        return sdfs_read(fileid, buf, size, off);
+        *retval =  sdfs_read(fileid, buf, size, off);
+        return 0;
 }
 
 static int __sdfs_read_sync0(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
 {
-        int ret;
+        int ret, retval;
         
         ret = core_request(fileid_hash(fileid), -1, "sdfs_read_sync",
-                           __sdfs_read_sync__, fileid, buf, size, off);
-        if (ret < 0) {
-                ret = -ret;
+                           __sdfs_read_sync__, fileid, buf, size, off, &retval);
+        if (ret) {
                 GOTO(err_ret, ret);
         }
 
-        return ret;
+        if (retval < 0) {
+                ret = -retval;
+                GOTO(err_ret, ret);
+        }
+        
+        return retval;
 err_ret:
         return -ret;
 }
@@ -559,27 +565,34 @@ int IO_FUNC __sdfs_write_sync__(va_list ap)
         const buffer_t *buf = va_arg(ap, const buffer_t *);
         uint32_t size = va_arg(ap, uint32_t);
         uint64_t off = va_arg(ap, uint64_t);
+        int *retval = va_arg(ap, int *);
 
         va_end(ap);
 
-        return sdfs_write(fileid, buf, size, off);
+        *retval = sdfs_write(fileid, buf, size, off);
+
+        return 0;
 }
 
 static int __sdfs_write_sync0(const fileid_t *fileid, const buffer_t *buf,
                               uint32_t size, uint64_t off)
 {
-        int ret;
+        int ret, retval;
         
         ret = core_request(fileid_hash(fileid), -1, "sdfs_write_sync",
-                           __sdfs_write_sync__, fileid, buf, size, off);
-        if (ret < 0) {
-                ret = -ret;
+                           __sdfs_write_sync__, fileid, buf, size, off, &retval);
+        if (ret) {
                 GOTO(err_ret, ret);
         }
 
+        if (retval < 0) {
+                ret = -retval;
+                GOTO(err_ret, ret);
+        }
+        
         DINFO("write core\n");
         
-        return ret;
+        return retval;
 err_ret:
         return -ret;
 }

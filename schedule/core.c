@@ -607,7 +607,7 @@ int core_request(int hash, int priority, const char *name, func_va_t exec, ...)
         schedule_t *schedule;
         arg1_t ctx;
 
-        if (unlikely(__core_array__ == NULL)) {
+        if (unlikely(__core_array__[0] == NULL)) {
                 ret = ENOSYS;
                 GOTO(err_ret, ret);
         }
