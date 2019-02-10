@@ -1262,7 +1262,7 @@ void netable_sort(nid_t *nids, int count)
 
                         DBUG("%s latency %llu\n", netable_rname_nid(&sec->nid), (LLU)net->load);
 
-                        if (net->load < 0.5)
+                        if (net->load < 0.1)
                                 sec->load = 0;
                         else
                                 sec->load = net->load;

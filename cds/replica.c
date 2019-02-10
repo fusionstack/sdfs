@@ -450,5 +450,5 @@ struct sche_thread_ops replica_ops = {
 
 int replica_init()
 {
-        return sche_thread_ops_register(&replica_ops, replica_ops.type, 8);
+        return sche_thread_ops_register(&replica_ops, replica_ops.type, 32);
 }

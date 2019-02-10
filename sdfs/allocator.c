@@ -332,11 +332,12 @@ err_ret:
 
 int allocator_new(int repnum, int hardend, int tier, nid_t *disks)
 {
+#if ENABLE_ALLOCATE_BALANCE
         int ret;
         nid_t array[16];
 
         YASSERT(repnum + 1 < 16);
-        
+
         ret = __allocator_new(repnum + 1, hardend, tier, array);
         if (ret) {
                 if (ret == ENOSPC) {
@@ -352,6 +353,9 @@ int allocator_new(int repnum, int hardend, int tier, nid_t *disks)
         return 0;
 err_ret:
         return ret;
+#else
+        return  __allocator_new(repnum, hardend, tier, disks);
+#endif
 }
 
 #if 0

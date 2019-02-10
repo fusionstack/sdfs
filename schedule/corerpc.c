@@ -669,11 +669,11 @@ void IO_FUNC corerpc_reply1(const sockid_t *sockid, const msgid_t *msgid, buffer
                         mbuffer_free(&reply_buf);
         }
 #else
-                rpc_reply_prep(msgid, &reply_buf, _buf, 1);
+        rpc_reply_prep(msgid, &reply_buf, _buf, 1);
 
-                ret = corenet_tcp_send(sockid, &reply_buf, 0);
-                if (unlikely(ret))
-                        mbuffer_free(&reply_buf);
+        ret = corenet_tcp_send(sockid, &reply_buf, 0);
+        if (unlikely(ret))
+                mbuffer_free(&reply_buf);
 #endif
 }
 
