@@ -91,6 +91,10 @@ typedef struct {
         uint64_t volid;
 } verid64_new_t;
 
+typedef struct {
+        uint64_t volid;
+        uint64_t snapvers;
+} volid_t;
 
 typedef struct {
         uint64_t id;
@@ -157,7 +161,6 @@ static inline int stype(int type)
 
 typedef chkid_t fileid_t;
 typedef chkid_t dirid_t;
-typedef chkid_t volid_t;
 typedef chkid_t poolid_t;
 
 

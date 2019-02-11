@@ -28,7 +28,7 @@ void setattr_update_time(setattr_t *setattr,
                          const struct timespec *ctime);
 
 void md_attr_inherit(md_proto_t *md, const md_proto_t *parent, const ec_t *ec, uint32_t mode);
-int md_attr_getid(fileid_t *fileid, const fileid_t *parent, uint32_t type, const uint64_t *volid);
+int md_attr_getid(fileid_t *fileid, const fileid_t *parent, uint32_t type, const volid_t *volid);
 int md_attr_init(md_proto_t *md, const setattr_t *setattr, uint32_t type,
                  const md_proto_t *parent, const fileid_t *fileid);
 void md_attr_update(md_proto_t *md, const setattr_t *setattr);

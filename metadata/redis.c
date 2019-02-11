@@ -59,9 +59,10 @@ static int __hget__(const fileid_t *fileid, const char *name, char *value, size_
         ANALYSIS_BEGIN(0);
         
         id2key(ftype(fileid), fileid, key);
-
+        volid_t volid = {fileid->volid, fileid->snapvers};
+        
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -131,9 +132,10 @@ static int __hset__(const fileid_t *fileid, const char *name, const void *value,
         ANALYSIS_BEGIN(0);
         
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -207,9 +209,10 @@ static int __hlen__(const fileid_t *fileid, uint64_t *count)
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -268,9 +271,10 @@ redisReply *__hscan__(const fileid_t *fileid, const char *match, uint64_t cursor
         redisReply *reply;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -320,9 +324,10 @@ static int __hdel__(const fileid_t *fileid, const char *name)
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -375,9 +380,10 @@ static int __kget__(const fileid_t *fileid, void *value, size_t *size)
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -436,9 +442,10 @@ static int __kset__(const fileid_t *fileid, const void *value, size_t size, int 
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -497,9 +504,10 @@ static int __kdel__(const fileid_t *fileid)
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -550,8 +558,10 @@ static int __klock1(const fileid_t *fileid, int ttl)
         redis_handler_t handler;
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
 
+        volid_t volid = {fileid->volid, fileid->snapvers};
+        
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -643,8 +653,9 @@ static int __kunlock__(const fileid_t *fileid)
         redis_handler_t handler;
         char key[MAX_PATH_LEN];
 
+        volid_t volid = {fileid->volid, fileid->snapvers};
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -708,9 +719,10 @@ static int __hiter__(const fileid_t *fileid, const char *match, func2_t func, vo
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -758,16 +770,17 @@ static int __rm_push__(const nid_t *nid, int _hash, const chkid_t *chkid)
         int ret, hash, retry = 0;
         redis_handler_t handler;
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
-        uint64_t volid;
+        uint64_t sysvolid;
 
         hash = _hash == -1 ? (int)nid->id : _hash;
 
-        ret = md_system_volid(&volid);
+        ret = md_system_volid(&sysvolid);
         if(ret)
                 GOTO(err_ret, ret);
-        
+
+        volid_t volid = {sysvolid, 0};
 retry:
-        ret = redis_conn_get(volid, hash, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, hash, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -861,16 +874,17 @@ static int __rm_pop__(const nid_t *nid, int _hash, chkid_t *array, int *count)
         redis_handler_t handler;
         char key[MAX_PATH_LEN];
         rm_pop_ctx_t ctx;
-        uint64_t volid;
+        uint64_t sysvolid;;
 
         hash = _hash == -1 ? (int)nid->id : _hash;
  
-        ret = md_system_volid(&volid);
+        ret = md_system_volid(&sysvolid);
         if(ret)
                 GOTO(err_ret, ret);
 
+        volid_t volid = {sysvolid, 0};
 retry:
-        ret = redis_conn_get(volid, hash, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, hash, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 

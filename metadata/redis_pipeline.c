@@ -339,11 +339,12 @@ STATIC int __redis_exec(va_list ap)
         fileid_t *fileid = &arg2->fileid;
 
         id2key(ftype(fileid), fileid, key);
+        volid_t volid = {fileid->volid, fileid->snapvers};
 
         DBUG(CHKID_FORMAT"\n", CHKID_ARG(fileid));
-        
+
 retry:
-        ret = redis_conn_get(fileid->volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         

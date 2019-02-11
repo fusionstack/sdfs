@@ -191,7 +191,7 @@ err_ret:
         return ret;
 }
 
-static  int __nfs_remove_getvolid(const dirid_t *_dirid, volid_t *volid)
+static  int __nfs_remove_getvolid(const dirid_t *_dirid, dirid_t *volid)
 {
         int ret;
         dirid_t dirid, parent;
@@ -223,7 +223,7 @@ err_ret:
 int nfs_remove(const fileid_t *parent, const char *name)
 {
         int ret;
-        volid_t volid;
+        dirid_t volid;
         dirid_t removed, workdir;
         time_t now;
         char tname[MAX_NAME_LEN], _uuid[MAX_NAME_LEN];

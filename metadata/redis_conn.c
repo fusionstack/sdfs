@@ -34,7 +34,7 @@ typedef struct {
         int sequence;
         int sharding;
         __conn_sharding_t *shardings;
-        uint64_t volid;
+        const volid_t *volid;
         char volume[MAX_NAME_LEN];
 } redis_vol_t;
 
@@ -42,7 +42,7 @@ typedef struct {
 static int __conn_magic__ = 0;
 extern int __redis_conn_pool__;
 
-static int __redis_vol_get(uint64_t volid, redis_vol_t **_vol, int flag);
+static int __redis_vol_get(const volid_t *volid, redis_vol_t **_vol, int flag);
 
 
 static int __redis_connect(const char *volume, int sharding, int magic, __conn_t *conn)
@@ -158,7 +158,7 @@ err_ret:
         return ret;
 }
 
-static int __redis_vol_connect(uint64_t volid, const char *volume, int sharding,
+static int __redis_vol_connect(const volid_t *volid, const char *volume, int sharding,
                                redis_vol_t **_vol)
 {
         int ret, i, retry = 0;
@@ -259,7 +259,7 @@ err_ret:
         return ret;
 }
 
-int redis_conn_get(uint64_t volid, int sharding, int worker, redis_handler_t *handler)
+int redis_conn_get(const volid_t *volid, int sharding, int worker, redis_handler_t *handler)
 {
         int ret, idx;
         redis_vol_t *vol;
@@ -280,7 +280,7 @@ int redis_conn_get(uint64_t volid, int sharding, int worker, redis_handler_t *ha
         if(ret)
                 GOTO(err_lock, ret);
 
-        handler->volid = volid;
+        handler->volid = *volid;
         
         pthread_rwlock_unlock(&vol->lock);
         redis_vol_release(volid);
@@ -336,7 +336,7 @@ int redis_conn_release(const redis_handler_t *handler)
         int ret;
         redis_vol_t *vol;
 
-        ret = __redis_vol_get(handler->volid, &vol, 0);
+        ret = __redis_vol_get(&handler->volid, &vol, 0);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -349,7 +349,7 @@ int redis_conn_release(const redis_handler_t *handler)
                 GOTO(err_lock, ret);
 
         pthread_rwlock_unlock(&vol->lock);
-        redis_vol_release(handler->volid);
+        redis_vol_release(&handler->volid);
 
         DBUG("release vol (%d,%d)\n", handler->sharding, handler->idx);
         
@@ -357,12 +357,12 @@ int redis_conn_release(const redis_handler_t *handler)
 err_lock:
         pthread_rwlock_unlock(&vol->lock);
 err_release:
-        redis_vol_release(handler->volid);
+        redis_vol_release(&handler->volid);
 err_ret:
         return ret;
 }
 
-static int __redis_conn_new__(uint64_t volid, uint8_t *idx)
+static int __redis_conn_new__(const volid_t *volid, uint8_t *idx)
 {
         int ret, seq;
         redis_vol_t *vol;
@@ -396,7 +396,7 @@ err_ret:
 
 static int __redis_conn_new(va_list ap)
 {
-        uint64_t volid = va_arg(ap, uint64_t);
+        const volid_t *volid = va_arg(ap, const volid_t *);
         uint8_t *idx = va_arg(ap, uint8_t *);
 
         va_end(ap);
@@ -405,7 +405,7 @@ static int __redis_conn_new(va_list ap)
 }
 
 
-int redis_conn_new(uint64_t volid, uint8_t *idx)
+int redis_conn_new(const volid_t *volid, uint8_t *idx)
 {
         int ret;
 
@@ -427,7 +427,6 @@ int redis_conn_new(uint64_t volid, uint8_t *idx)
 err_ret:
         return ret;
 }
-
 
 static int __redis_conn_close__(__conn_sharding_t *sharding, const redis_handler_t *handler)
 {
@@ -458,7 +457,7 @@ int redis_conn_close(const redis_handler_t *handler)
         int ret;
         redis_vol_t *vol;
  
-        ret = __redis_vol_get(handler->volid, &vol, 0);
+        ret = __redis_vol_get(&handler->volid, &vol, 0);
         if(ret)
                 GOTO(err_ret, ret);
                
@@ -471,13 +470,13 @@ int redis_conn_close(const redis_handler_t *handler)
                 GOTO(err_lock, ret);
         
         pthread_rwlock_unlock(&vol->lock);
-        redis_vol_release(handler->volid);
+        redis_vol_release(&handler->volid);
         
         return 0;
 err_lock:
         pthread_rwlock_unlock(&vol->lock);
 err_release:
-        redis_vol_release(handler->volid);
+        redis_vol_release(&handler->volid);
 err_ret:
         return ret;
 }
@@ -495,15 +494,15 @@ err_ret:
         return ret;
 }
 
-static int __redis_vol_getnamebyid(uint64_t _volid, char *volume, int *sharding)
+static int __redis_vol_getnamebyid(const volid_t *_volid,
+                                   char *volume, int *sharding)
 {
         int ret, i;
         char *name;
         char key[MAX_NAME_LEN], value[MAX_BUF_LEN], id[MAX_NAME_LEN], buf[MAX_BUF_LEN];
-        uint64_t volid;
         etcd_node_t *array, *node;
 
-        snprintf(id, MAX_NAME_LEN, "%ju", _volid);
+        snprintf(id, MAX_NAME_LEN, "%ju_%ju", _volid->volid, _volid->snapvers);
         ret = maping_get(ID2NAME, id, buf, NULL);
         if(ret) {
                 if (ret == ENOENT) {
@@ -531,8 +530,16 @@ static int __redis_vol_getnamebyid(uint64_t _volid, char *volume, int *sharding)
                 if(ret)
                         continue;
 
-                volid = atol(value);
-                if (volid == _volid) {
+                uint64_t volid = atol(value);
+                
+                snprintf(key, MAX_NAME_LEN, "%s/snapvers", name);
+                DBUG("key %s\n", key);
+                ret = etcd_get_text(ETCD_VOLUME, key, value, NULL);
+                if(ret)
+                        continue;
+
+                uint64_t snapvers = atol(value);
+                if (volid == _volid->volid && snapvers == _volid->snapvers) {
                         strcpy(volume, name);
 
                         snprintf(key, MAX_NAME_LEN, "%s/sharding", name);
@@ -545,6 +552,7 @@ static int __redis_vol_getnamebyid(uint64_t _volid, char *volume, int *sharding)
                         break;
                 }
         }        
+
         if (i == array->num_node) {
                 ret = ENOENT;
                 GOTO(err_free, ret);
@@ -591,7 +599,7 @@ static void __redis_vol_close(redis_vol_t *vol)
         yfree((void **)&vol);
 }
 
-int redis_conn_vol(uint64_t volid)
+int redis_conn_vol(const volid_t *volid)
 {
         int ret, sharding;
         char volume[MAX_NAME_LEN];
@@ -617,7 +625,7 @@ err_ret:
         return ret;
 }
 
-static int __redis_vol_get(uint64_t volid, redis_vol_t **_vol, int flag)
+static int __redis_vol_get(const volid_t *volid, redis_vol_t **_vol, int flag)
 {
         int ret;
 

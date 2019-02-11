@@ -312,7 +312,7 @@ err_ret:
         return ret;
 }
 
-int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const uint64_t *volid)
+int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const volid_t *volid)
 {
         int ret;
         uint64_t id;
@@ -325,19 +325,22 @@ int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const 
 
         if (volid) {
                 YASSERT(parent == NULL);
-                fileid->volid = *volid;
+                fileid->volid = volid->volid;
+                fileid->snapvers = volid->snapvers;
                 fileid->idx = 0;
                 fileid->id = id;
 
-                ret = redis_conn_new(*volid, &fileid->sharding);
+                ret = redis_conn_new(volid, &fileid->sharding);
                 if (ret)
                         GOTO(err_ret, ret);
         } else {
                 if (parent) {
                         fileid->volid = parent->volid;
+                        fileid->snapvers = parent->snapvers;
                         fileid->idx = 0;
                         fileid->id = id;
-                        ret = redis_conn_new(parent->volid, &fileid->sharding);
+                        volid_t volid = {parent->volid, parent->snapvers};
+                        ret = redis_conn_new(&volid, &fileid->sharding);
                         if (ret)
                                 GOTO(err_ret, ret);
                 } else {
@@ -347,7 +350,8 @@ int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const 
                         fileid->volid = systemvol;
                         fileid->idx = 0;
                         fileid->id = id;
-                        ret = redis_conn_new(systemvol, &fileid->sharding);
+                        volid_t volid = {systemvol, 0};
+                        ret = redis_conn_new(&volid, &fileid->sharding);
                         if (ret)
                                 GOTO(err_ret, ret);
                 }                        

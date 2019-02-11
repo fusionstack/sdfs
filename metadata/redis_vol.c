@@ -22,27 +22,31 @@ typedef struct {
 static vol_tab_t *__vol_tab__;
 
 typedef struct {
-        uint64_t volid;
+        volid_t volid;
         void *vol;
 } entry_t;
 
 #if 1
 static uint32_t __key (const void *_key)
 {
-        return *(uint64_t *)_key;
+        return ((volid_t *)_key)->volid;
 }
 
 static int __cmp(const void *_v1, const void *_v2)
 {
         const entry_t *ent = (entry_t *)_v1;
-        uint64_t v1, v2;
+        const volid_t *v1, *v2;
 
-        v1 = ent->volid;
-        v2 = *(uint64_t *)_v2;
+        v1 = &ent->volid;
+        v2 = (volid_t *)_v2;
 
         //DINFO("%d --> %d\n", v1, v2);
 
-        return v1 - v2;
+        uint64_t r = v1->volid - v2->volid;
+        if (r)
+                return r;
+        else
+                return v1->snapvers - v2->snapvers;
 }
 #endif
 
@@ -70,7 +74,7 @@ err_ret:
         return ret;
 }
 
-int redis_vol_get(uint64_t volid, void **conn)
+int redis_vol_get(const volid_t *volid, void **conn)
 {
         int ret;
         entry_t *ent;
@@ -81,7 +85,7 @@ int redis_vol_get(uint64_t volid, void **conn)
         if(ret)
                 GOTO(err_ret, ret);
         
-        ent = hash_table_find(__vol_tab__->tab, &volid);
+        ent = hash_table_find(__vol_tab__->tab, (void *)volid);
         if (ent == NULL) {
                 ret = ENOENT;
                 GOTO(err_lock, ret);
@@ -98,13 +102,13 @@ err_ret:
         return ret;
 }
 
-int redis_vol_release(uint64_t volid)
+int redis_vol_release(const volid_t *volid)
 {
         (void) volid;
         return 0;
 }
 
-int redis_vol_insert(uint64_t volid, void *conn)
+int redis_vol_insert(const volid_t *volid, void *conn)
 {
         int ret;
         entry_t *ent;
@@ -118,9 +122,9 @@ int redis_vol_insert(uint64_t volid, void *conn)
                 GOTO(err_lock, ret);
 
         ent->vol = conn;
-        ent->volid = volid;
+        ent->volid = *volid;
         
-        ret = hash_table_insert(__vol_tab__->tab, ent, &volid, 0);
+        ret = hash_table_insert(__vol_tab__->tab, ent, (void *)volid, 0);
         if (ret) {
                 GOTO(err_free, ret);
         }

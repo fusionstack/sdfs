@@ -368,6 +368,16 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
                         GOTO(err_ret, ret);
         }
 
+        snprintf(key, MAX_NAME_LEN, "%s/snapvers", name);
+        snprintf(value, MAX_NAME_LEN, "0");
+        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
+        if (ret) {
+                if (ret == EEXIST) {
+                        //pass
+                } else
+                        GOTO(err_ret, ret);
+        }
+        
         snprintf(key, MAX_NAME_LEN, "%s/replica", name);
         snprintf(value, MAX_NAME_LEN, "%d", mdsconf.redis_replica);
         ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
@@ -408,8 +418,9 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
 #endif
 
         int retry = 0;
+        volid_t _volid = {volid, 0};
 retry:
-        ret = redis_conn_vol(volid);
+        ret = redis_conn_vol(&_volid);
         if (ret) {
                 USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
         }
