@@ -22,8 +22,6 @@
 #include "dbg.h"
 
 
-#if 1
-
 typedef struct {
         char name[MAX_NAME_LEN];
         int port;
@@ -31,6 +29,9 @@ typedef struct {
 
 static dirop_t *dirop = &__dirop__;
 static inodeop_t *inodeop = &__inodeop__;
+
+static int __md_vol_set_etcd(const char *name, const fileid_t *fileid,
+                             int sharding, int replica);
 
 static int __md_mkvol_slot(const char *name, int sharding, int replica, const redis_addr_t *addr)
 {
@@ -247,7 +248,8 @@ err_ret:
 }
 
 
-static int __md_mkvol_getredis_replica(const char *name, int idx, struct list_head *_list, int list_count,
+static int __md_mkvol_getredis_replica(const char *name, int idx,
+                                       struct list_head *_list, int list_count,
                                        int replica, redis_addr_t *addr)
 {
         int ret;
@@ -288,22 +290,16 @@ err_ret:
         return ret;
 }
 
-inline static int __md_mkvol_set_redis(const char *name, int sharding, int replica)
+static int __md_vol_set_redis__(const char *name, int sharding, int replica, redis_addr_t *addr)
 {
         int ret, count;
         struct list_head list;
-        redis_addr_t *addr;
         struct list_head *pos, *n;
 
         INIT_LIST_HEAD(&list);
         ret = __md_mkvol_getredis(&list, &count);
         if (ret)
                 GOTO(err_ret, ret);
-
-        ret = ymalloc((void *)&addr, sizeof(*addr) * sharding * replica);
-        if (ret)
-                UNIMPLEMENTED(__DUMP__);
-
 
         int idx = 0;
         for (int i = 0; i < mdsconf.redis_sharding; i++) {
@@ -327,23 +323,39 @@ inline static int __md_mkvol_set_redis(const char *name, int sharding, int repli
                 yfree((void **)&pos);
         }
 
-        yfree((void **)&addr);
-        
         return 0;
 err_free:
         list_for_each_safe(pos, n, &list) {
                 list_del(pos);
                 yfree((void **)&pos);
         }
+err_ret:
+        return ret;
+}
 
+static int __md_vol_set_redis(const char *name, int sharding, int replica)
+{
+        int ret;
+        redis_addr_t *addr;
+
+        ret = ymalloc((void *)&addr, sizeof(*addr) * sharding * replica);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        ret = __md_vol_set_redis__(name, sharding, replica, addr);
+        if (ret)
+                GOTO(err_free, ret);
+
+        yfree((void **)&addr);
+        
+        return 0;
+err_free:
         yfree((void **)&addr);
 err_ret:
         return ret;
 }
 
-
-#endif
-        
+#if 0
 int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
 {
         int ret;
@@ -368,16 +380,6 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
                         GOTO(err_ret, ret);
         }
 
-        snprintf(key, MAX_NAME_LEN, "%s/snapvers", name);
-        snprintf(value, MAX_NAME_LEN, "0");
-        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
-        if (ret) {
-                if (ret == EEXIST) {
-                        //pass
-                } else
-                        GOTO(err_ret, ret);
-        }
-        
         snprintf(key, MAX_NAME_LEN, "%s/replica", name);
         snprintf(value, MAX_NAME_LEN, "%d", mdsconf.redis_replica);
         ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
@@ -406,17 +408,10 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
                         GOTO(err_ret, ret);
         }
 
-        ret = __md_mkvol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_replica);
+        ret = __md_vol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_replica);
         if (ret)
                 GOTO(err_ret, ret);
         
-#if 0
-        (void) parent;
-        (void) setattr;
-        (void) _fileid;
-        (void) fileid;
-#endif
-
         int retry = 0;
         volid_t _volid = {volid, 0};
 retry:
@@ -424,8 +419,16 @@ retry:
         if (ret) {
                 USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
         }
+
+        fileid.volid = volid;
+        fileid.snapvers = 0;
+        fileid.idx = 0;
+        fileid.id = volid;
+        fileid.__pad__ = 0;
+        fileid.snapshot = 0;
+        fileid.type = ftype_vol;
         
-        ret = inodeop->mkvol(setattr, &volid, &fileid);
+        ret = inodeop->mkvol(setattr, &fileid);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -442,6 +445,58 @@ retry:
 err_ret:
         return ret;
 }
+
+#else
+
+int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
+{
+        int ret;
+        fileid_t fileid;
+        uint64_t _volid;
+
+        ret = md_newid(idtype_fileid, &_volid);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        fileid.volid = _volid;
+        fileid.snapvers = 0;
+        fileid.idx = 0;
+        fileid.id = _volid;
+        fileid.__pad__ = 0;
+        fileid.snapshot = 0;
+        fileid.type = ftype_vol;
+
+        ret = __md_vol_set_etcd(name, &fileid, mdsconf.redis_sharding,
+                                mdsconf.redis_replica);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        ret = __md_vol_set_redis(name, mdsconf.redis_sharding, mdsconf.redis_replica);
+        if (ret)
+                GOTO(err_ret, ret);
+        
+        int retry = 0;
+        volid_t volid = {_volid, 0};
+retry:
+        ret = redis_conn_vol(&volid);
+        if (ret) {
+                USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
+        }
+
+        ret = inodeop->mkvol(setattr, &fileid);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        if (_fileid) {
+                *_fileid = fileid;
+        }
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+#endif
 
 int md_lookupvol(const char *name, fileid_t *fileid)
 {
@@ -666,6 +721,218 @@ int md_rmvol(const char *name)
                 GOTO(err_ret, ret);
         
         return 0;
+err_ret:
+        return ret;
+}
+
+static int __md_vol_set_etcd(const char *name, const fileid_t *fileid,
+                             int sharding, int replica)
+{
+        int ret;
+        fileid_t tmp;
+        char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
+
+        snprintf(key, MAX_NAME_LEN, "%s/id", name);
+        ret = etcd_get_text(ETCD_VOLUME, key, (void *)&tmp, NULL);
+        if (ret == 0) {
+                ret = EEXIST;
+                GOTO(err_ret, ret);
+        }
+
+        snprintf(key, MAX_NAME_LEN, "%s/sharding", name);
+        snprintf(value, MAX_NAME_LEN, "%d", sharding);
+        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
+        if (ret) {
+                if (ret == EEXIST) {
+                        //pass
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        snprintf(key, MAX_NAME_LEN, "%s/replica", name);
+        snprintf(value, MAX_NAME_LEN, "%d", replica);
+        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
+        if (ret) {
+                if (ret == EEXIST) {
+                        //pass
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        snprintf(key, MAX_NAME_LEN, "%s/volid", name);
+        snprintf(value, MAX_NAME_LEN, "%ju", fileid->volid);
+        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
+        if (ret) {
+                if (ret == EEXIST) {
+                        ret = etcd_get_text(ETCD_VOLUME, key, value, NULL);
+                        if (ret)
+                                GOTO(err_ret, ret);
+
+                        uint64_t volid = atol(value);
+                        if (fileid->volid != volid) {
+                                ret = EINVAL;
+                                GOTO(err_ret, ret);
+                        }
+                } else
+                        GOTO(err_ret, ret);
+        }
+
+        snprintf(key, MAX_NAME_LEN, "%s/id", name);
+
+        ret = etcd_create(ETCD_VOLUME, key, fileid, sizeof(*fileid), -1);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+
+static int __match(const char *value, const char *match, char *buf)
+{
+        const char *pos;
+        char format[MAX_NAME_LEN];
+
+        pos = strstr(value, match);
+        if (pos == NULL) {
+                return 0;
+        }
+
+        snprintf(format, MAX_NAME_LEN, "%s:%%s[^\r]\r", match);
+        return sscanf(pos, format, buf);
+}
+
+static int __redis_replica_synced(const char *host, int port)
+{
+        int ret;
+        char value[MAX_BUF_LEN],
+                role[MAX_NAME_LEN],
+                master_host[MAX_NAME_LEN],
+                master_port[MAX_NAME_LEN],
+                slave_repl_offset[MAX_NAME_LEN],
+                master_repl_offset[MAX_NAME_LEN];
+
+
+        ret = redis_util_info(host, port, "replication", value);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        printf("%s\n", value);
+        ret = __match(value, "role", role);
+        printf("%d, %s\n", ret, role);
+        YASSERT(ret == 1);
+
+        if (strcmp(role, "slave")) {
+                ret = EINVAL;
+                UNIMPLEMENTED(__DUMP__);
+        }
+
+        ret = __match(value, "master_host", master_host);
+        YASSERT(ret == 1);
+        ret = __match(value, "master_port", master_port);
+        YASSERT(ret == 1);
+        ret = __match(value, "slave_repl_offset", slave_repl_offset);
+        YASSERT(ret == 1);
+        
+        ret = redis_util_info(master_host, atoi(master_port), "replication", value);
+        if (ret)
+                GOTO(err_ret, ret);
+        
+        ret = __match(value, "master_repl_offset", master_repl_offset);
+        YASSERT(ret == 1);
+
+        if (strcmp(master_repl_offset, slave_repl_offset) == 0) {
+                DINFO("%s:%d %s:%s, synced", host, port, master_repl_offset, slave_repl_offset);
+                return 1;
+        } else {
+                DINFO("%s:%d %s:%s, not synced", host, port, master_repl_offset, slave_repl_offset);
+                return 0;
+        }
+err_ret:
+        return 0;
+}
+
+static int __md_snapshot_wait_sync__(const redis_addr_t *addr)
+{
+        while (1) {
+                if (__redis_replica_synced(addr->name, addr->port))
+                        break;
+                else
+                        sleep(1);
+        }
+
+        return 0;
+}
+
+static int __md_snapshot_wait_sync(const redis_addr_t *addr, int sharding, int replica)
+{
+        int ret, i;
+
+        for (i = 0; i < sharding * replica; i++) {
+                ret = __md_snapshot_wait_sync__(&addr[i]);
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+int md_snapshot(const char *name, const char *snap, fileid_t *_fileid)
+{
+        int ret, replica, sharding;
+        fileid_t fileid;
+        redis_addr_t *addr;
+        char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
+
+        replica = mdsconf.redis_replica;
+        sharding = mdsconf.redis_sharding;
+        
+        ret = md_lookupvol(name, &fileid);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        fileid.snapshot = 1;
+        
+        ret = __md_vol_set_etcd(snap, &fileid, sharding, replica);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        snprintf(key, MAX_NAME_LEN, "%s/src", snap);
+        snprintf(value, MAX_NAME_LEN, "%s", name);
+        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
+        if (ret) {
+                GOTO(err_ret, ret);
+        }
+
+        ret = ymalloc((void *)&addr, sizeof(*addr) * sharding * replica);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        ret = __md_vol_set_redis__(name, sharding, replica, addr);
+        if (ret)
+                GOTO(err_free, ret);
+
+        ret = __md_snapshot_wait_sync(addr, sharding, replica);
+        if (ret)
+                GOTO(err_free, ret);
+
+        yfree((void **)&addr);
+        
+        ret = etcd_del(ETCD_VOLUME, key);
+        if (ret) {
+                GOTO(err_ret, ret);
+        }
+        
+        if (_fileid) {
+                *_fileid = fileid;
+        }
+        
+        return 0;
+err_free:
+        yfree((void **)&addr);
 err_ret:
         return ret;
 }

@@ -86,12 +86,6 @@ typedef struct {
 } verid64_t;
 
 typedef struct {
-        uint64_t id;
-        uint32_t idx; /*chunk idx*/
-        uint64_t volid;
-} verid64_new_t;
-
-typedef struct {
         uint64_t volid;
         uint64_t snapvers;
 } volid_t;
@@ -101,9 +95,10 @@ typedef struct {
         uint64_t volid;
         uint64_t snapvers;
         uint32_t idx; /*chunk idx*/
-        uint16_t __pad__;
+        uint8_t snapshot;
         uint8_t sharding;
         uint8_t type;
+        uint8_t __pad__;
 } chkid_t;
 
 typedef enum {
@@ -120,7 +115,6 @@ typedef enum {
         ftype_max = 10,
 } ftype_t;
 
-#if 1
 static inline const char *ftype(const chkid_t *t)
 {
         char *array[] = {"n", "v", "d", "f", "s", "b", "x", "q", "t", "r", "m"};
@@ -131,7 +125,6 @@ static inline const char *ftype(const chkid_t *t)
                 return array[t->type];
         }
 }
-#endif
 
 static inline int stype(int type)
 {

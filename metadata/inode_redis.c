@@ -531,20 +531,14 @@ err_ret:
         return ret;
 }
 
-static int __inode_mkvol(const setattr_t *setattr, const uint64_t *_volid, fileid_t *_fileid)
+static int __inode_mkvol(const setattr_t *setattr, const fileid_t *fileid)
 {
         int ret;
         char buf1[MAX_BUF_LEN];
-        fileid_t fileid;
         md_proto_t *md;
 
-        volid_t volid = {*_volid, 0};
-        ret = md_attr_getid(&fileid, NULL, ftype_vol, &volid);
-        if (ret)
-                GOTO(err_ret, ret);
-
         md = (void *)buf1;
-        ret = md_attr_init((void *)md, setattr, ftype_vol, NULL, &fileid);
+        ret = md_attr_init((void *)md, setattr, ftype_vol, NULL, fileid);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -552,10 +546,6 @@ static int __inode_mkvol(const setattr_t *setattr, const uint64_t *_volid, filei
         if (ret)
                 GOTO(err_ret, ret);
 
-        if (_fileid) {
-                *_fileid = fileid;
-        }
-        
         return 0;
 err_ret:
         return ret;

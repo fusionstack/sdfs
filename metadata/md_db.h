@@ -53,7 +53,7 @@ typedef struct {
         int (*link)(const fileid_t *fileid);
         int (*symlink)(const fileid_t *fileid, const char *link_target);
         int (*readlink)(const fileid_t *fileid, char *link_target);
-        int (*mkvol)(const setattr_t *setattr, const uint64_t *volid, fileid_t *_fileid);
+        int (*mkvol)(const setattr_t *setattr, const fileid_t *_fileid);
         int (*setlock)(const fileid_t *fileid, const void *opaque, size_t len, int flag);
         int (*getlock)(const fileid_t *fileid, void *opaque, size_t *len);
 } inodeop_t;

@@ -24,36 +24,6 @@
 #include <stdint.h>
 #include "dbg.h"
 #include "ylock.h"
-#if 0
-#include "sysutil.h"
-#include "ylib.h"
-#include "dbg.h"
-#include "sdfs_id.h"
-#endif
-#if 0
-typedef struct {
-        uint64_t id;
-        uint32_t version;
-        uint32_t idx; /*chunk idx*/
-        uint32_t mark;/*figer mark*/
-        uint32_t volid;
-} verid64_new_t;
-#endif
-#if 0
-typedef struct fidsimp_s {
-        uint64_t id;
-        uint32_t version;
-        uint32_t volid;
-} fidsimp_t;
-
-typedef struct pfid2cfid_s {
-        /*can not work well in 32 plat 
-         * */
-        fidsimp_t *parent;
-        fidsimp_t fid;
-        char      name[0];
-} pfid2cfid_t;
-#endif
 
 typedef struct mini_ent_s {
         struct mini_ent_s *next;

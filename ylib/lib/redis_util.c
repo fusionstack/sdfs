@@ -1473,3 +1473,33 @@ int redis_iterator(redis_conn_t *conn, const char *match, func1_t func, void *ar
 err_ret:
         return ret;
 }
+
+int redis_util_info(const char *addr, int port, const char *key, char *value)
+{
+        int ret;
+        redisContext *c;
+        redisReply *reply;
+        
+        ret = connect_redis(addr, port, &c);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        reply = redisCommand(c, "info %s", key);
+        if (reply == NULL) {
+                ret = ECONNRESET;
+                GOTO(err_free, ret);
+        }
+
+        YASSERT(reply->type == REDIS_REPLY_STRING);
+
+        strcpy(value, reply->str);
+        freeReplyObject(reply);
+        
+        redisFree(c);
+        
+        return 0;
+err_free:
+        redisFree(c);
+err_ret:
+        return ret;
+}

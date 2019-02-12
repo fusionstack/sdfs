@@ -52,6 +52,7 @@ int redis_scount(redis_conn_t *conn, const char *set, uint64_t *count);
 int redis_siterator(redis_conn_t *conn, const char *set, func1_t func, void *arg);
 int redis_hlen(redis_conn_t *conn, const char *key, uint64_t *count);
 int redis_iterator(redis_conn_t *conn, const char *match, func1_t func, void *arg);
+int redis_util_info(const char *addr, int port, const char *key, char *value);
 
 #if 0
 int redis_exec(redis_conn_t *conn, const char *buf);

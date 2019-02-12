@@ -13,6 +13,7 @@
 #include "ylib.h"
 #include "sdfs_lib.h"
 #include "yfs_md.h"
+#include "redis_util.h"
 #include "sdfs_buffer.h"
 
 #define RANGE_MAX 2
