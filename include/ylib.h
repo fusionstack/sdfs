@@ -25,6 +25,7 @@
 
 typedef struct {
         chkid_t id;
+        uint64_t snapvers;
         //vclock_t vclock;
         uint64_t lease;
         union {

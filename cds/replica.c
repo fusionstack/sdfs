@@ -35,6 +35,7 @@ static int __replica_getfd__(va_list ap)
         int ret, fd;
         char path[MAX_PATH_LEN];
         const chkid_t *chkid = va_arg(ap, const chkid_t *);
+        uint64_t snapvers = va_arg(ap, uint64_t);
         int *_fd = va_arg(ap, int *);
         char *_path = va_arg(ap, char *);
         int flag = va_arg(ap, int);
@@ -43,7 +44,7 @@ static int __replica_getfd__(va_list ap)
         
         ANALYSIS_BEGIN(1);
         
-        chkid2path(chkid, path);
+        chkid2path(chkid, snapvers, path);
 
         ret = path_validate(path, YLIB_NOTDIR, YLIB_DIRCREATE);
         if (ret)
@@ -71,11 +72,11 @@ err_ret:
 }
 
 
-static int __replica_getfd(const chkid_t *chkid, int *_fd, char *path, int flag)
+static int __replica_getfd(const chkid_t *chkid, uint64_t snapvers, int *_fd, char *path, int flag)
 {
         return schedule_newthread(SCHE_THREAD_REPLICA, ++__seq__, FALSE,
                                   "getfd", -1, __replica_getfd__,
-                                  chkid, _fd, path, flag);
+                                  chkid, snapvers, _fd, path, flag);
 }
 
 
@@ -105,7 +106,7 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
         ANALYSIS_BEGIN(0);
         
         char path[MAX_PATH_LEN];
-        ret = __replica_getfd(&io->id, &fd, path, O_CREAT | O_SYNC | O_RDWR);
+        ret = __replica_getfd(&io->id, io->snapvers, &fd, path, O_CREAT | O_SYNC | O_RDWR);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -160,7 +161,7 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
         mbuffer_clone1(&tmp, buf);
 
         char path[MAX_PATH_LEN];
-        ret = __replica_getfd(&io->id, &fd, path, O_CREAT | O_DIRECT | O_RDWR);
+        ret = __replica_getfd(&io->id, io->snapvers, &fd, path, O_CREAT | O_DIRECT | O_RDWR);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -264,7 +265,7 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
         DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
               CHKID_ARG(&io->id), io->offset, io->size);
         
-        ret = __replica_getfd(&io->id, &fd, NULL, O_RDONLY | O_DIRECT);
+        ret = __replica_getfd(&io->id, io->snapvers, &fd, NULL, O_RDONLY | O_DIRECT);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -320,7 +321,7 @@ static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
         
         DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
         
-        ret = __replica_getfd(&io->id, &fd, NULL, O_RDONLY);
+        ret = __replica_getfd(&io->id, io->snapvers, &fd, NULL, O_RDONLY);
         if (ret)
                 GOTO(err_ret, ret);
 

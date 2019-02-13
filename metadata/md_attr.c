@@ -317,6 +317,8 @@ int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const 
         int ret;
         uint64_t id;
 
+        (void) parent;
+        
         ANALYSIS_BEGIN(0);
         
         ret = md_newid(idtype_fileid, &id);
@@ -324,9 +326,7 @@ int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const 
                 GOTO(err_ret, ret);
 
         if (volid) {
-                YASSERT(parent == NULL);
                 fileid->volid = volid->volid;
-                fileid->snapvers = volid->snapvers;
                 fileid->idx = 0;
                 fileid->id = id;
 
@@ -334,32 +334,20 @@ int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const 
                 if (ret)
                         GOTO(err_ret, ret);
         } else {
-                if (parent) {
-                        fileid->volid = parent->volid;
-                        fileid->snapvers = parent->snapvers;
-                        fileid->idx = 0;
-                        fileid->id = id;
-                        volid_t volid = {parent->volid, parent->snapvers};
-                        ret = redis_conn_new(&volid, &fileid->sharding);
-                        if (ret)
-                                GOTO(err_ret, ret);
-                } else {
-                        uint64_t systemvol;
-                        ret = md_system_volid(&systemvol);
+                uint64_t systemvol;
+                ret = md_system_volid(&systemvol);
                         
-                        fileid->volid = systemvol;
-                        fileid->idx = 0;
-                        fileid->id = id;
-                        volid_t volid = {systemvol, 0};
-                        ret = redis_conn_new(&volid, &fileid->sharding);
-                        if (ret)
-                                GOTO(err_ret, ret);
-                }                        
+                fileid->volid = systemvol;
+                fileid->idx = 0;
+                fileid->id = id;
+                volid_t _volid = {systemvol, 0};
+                ret = redis_conn_new(&_volid, &fileid->sharding);
+                if (ret)
+                        GOTO(err_ret, ret);
         }
 
         fileid->type = type;
         fileid->__pad__ = 0;
-        fileid->snapvers = 0;
 
         DBUG("create "CHKID_FORMAT" @ sharding[%u]\n", CHKID_ARG(fileid), fileid->sharding);
 

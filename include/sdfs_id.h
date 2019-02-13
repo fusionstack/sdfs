@@ -93,12 +93,10 @@ typedef struct {
 typedef struct {
         uint64_t id;
         uint64_t volid;
-        uint64_t snapvers;
         uint32_t idx; /*chunk idx*/
-        uint8_t snapshot;
         uint8_t sharding;
         uint8_t type;
-        uint8_t __pad__;
+        uint16_t __pad__;
 } chkid_t;
 
 typedef enum {
@@ -251,7 +249,7 @@ inline static int init_rootid(fileid_t *fileid)
         fileid->type = ftype_vol;
         fileid->sharding = 0;
         fileid->__pad__ = 0;
-        fileid->snapvers = 0;
+        //fileid->snapvers = 0;
 
         return 0;
 }

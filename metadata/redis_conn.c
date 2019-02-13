@@ -497,11 +497,10 @@ err_ret:
 static int __redis_vol_getnamebyid(const volid_t *_volid,
                                    char *volume, int *sharding)
 {
-        int ret, i, valuelen;
+        int ret, i;
         char *name;
         char key[MAX_NAME_LEN], value[MAX_BUF_LEN], id[MAX_NAME_LEN], buf[MAX_BUF_LEN];
         etcd_node_t *array, *node;
-        fileid_t fileid;
 
         snprintf(id, MAX_NAME_LEN, "%ju_%ju", _volid->volid, _volid->snapvers);
         ret = maping_get(ID2NAME, id, buf, NULL);
@@ -525,14 +524,23 @@ static int __redis_vol_getnamebyid(const volid_t *_volid,
                 node = array->nodes[i];
                 name = node->key;
 
-                snprintf(key, MAX_NAME_LEN, "%s/id", name);
-                valuelen = sizeof(fileid);
+                snprintf(key, MAX_NAME_LEN, "%s/volid", name);
                 DBUG("key %s\n", key);
-                ret = etcd_get_bin(ETCD_VOLUME, key, &fileid, &valuelen, NULL);
+                ret = etcd_get_text(ETCD_VOLUME, key, value, NULL);
                 if(ret)
                         continue;
 
-                if (fileid.volid == _volid->volid && fileid.snapvers == _volid->snapvers) {
+                uint64_t volid = atol(value);
+
+                snprintf(key, MAX_NAME_LEN, "%s/snapvers", name);
+                DBUG("key %s\n", key);
+                ret = etcd_get_text(ETCD_VOLUME, key, value, NULL);
+                if(ret)
+                        continue;
+
+                uint64_t snapvers = atol(value);
+                
+                if (volid == _volid->volid && snapvers == _volid->snapvers) {
                         strcpy(volume, name);
 
                         snprintf(key, MAX_NAME_LEN, "%s/sharding", name);

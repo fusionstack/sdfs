@@ -107,6 +107,13 @@ int hget(const volid_t *volid, const fileid_t *fileid, const char *name, char *v
 
         YASSERT(fileid->type);
 
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
+
+        YASSERT(volid);
+
         ANALYSIS_BEGIN(0);
         
 #if ENABLE_REDIS_PIPELINE
@@ -188,6 +195,10 @@ int hset(const volid_t *volid, const fileid_t *fileid, const char *name, const v
         int ret;
         
         ANALYSIS_BEGIN(0);
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
         
 #if ENABLE_REDIS_PIPELINE
         ret = pipeline_hset(volid, fileid, name, value, size, flag);
@@ -252,6 +263,10 @@ int hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
         int ret;
 
         ANALYSIS_BEGIN(0);
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
 #if ENABLE_REDIS_PIPELINE
         ret = pipeline_hlen(volid, fileid, count);
 #else
@@ -309,6 +324,10 @@ static int __hscan(va_list ap)
 redisReply *hscan(const volid_t *volid, const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
 {
         redisReply *reply;
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
         __redis_request(fileid_hash(fileid), "hscan", __hscan,
                         volid, fileid, match, cursor, count, &reply);
 
@@ -362,6 +381,10 @@ static int __hdel(va_list ap)
 
 int hdel(const volid_t *volid, const fileid_t *fileid, const char *name)
 {
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
 #if ENABLE_REDIS_PIPELINE
         return pipeline_hdel(volid, fileid, name);
 #endif
@@ -421,6 +444,10 @@ int kget(const volid_t *volid, const fileid_t *fileid, void *value, size_t *size
 {
         int ret;
 
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
 #if ENABLE_REDIS_PIPELINE
         ret = pipeline_kget(volid, fileid, value, size);
 #else
@@ -483,6 +510,10 @@ int kset(const volid_t *volid, const fileid_t *fileid, const void *value, size_t
 {
         int ret;
         
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
 #if ENABLE_REDIS_PIPELINE
         ret = pipeline_kset(volid, fileid, value, size, flag, -1);
 #else
@@ -538,6 +569,10 @@ static int __kdel(va_list ap)
 
 int kdel(const volid_t *volid, const fileid_t *fileid)
 {
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
 #if ENABLE_REDIS_PIPELINE
         return pipeline_kdel(volid, fileid);
 #endif
@@ -618,6 +653,10 @@ inline static int __klock(va_list ap)
 
 int klock(const volid_t *volid, const fileid_t *fileid, int ttl, int block)
 {
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
 #if ENABLE_KLOCK
         int ret;
         
@@ -687,6 +726,10 @@ inline static int __kunlock(va_list ap)
 
 int kunlock(const volid_t *volid, const fileid_t *fileid)
 {
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
 #if ENABLE_KLOCK
         int ret;
 
@@ -754,6 +797,11 @@ static int __hiter(va_list ap)
 
 int hiter(const volid_t *volid, const fileid_t *fileid, const char *match, func2_t func, void *ctx)
 {
+        if (unlikely(volid == NULL)) {
+                volid_t _volid = {fileid->volid, 0};
+                volid = &_volid;
+        }
+
         return __redis_request(fileid_hash(fileid), "hiter", __hiter,
                                volid, fileid, match, func, ctx);
 }

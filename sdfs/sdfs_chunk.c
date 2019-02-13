@@ -230,7 +230,7 @@ static int __chunk_read(const chkid_t *chkid, buffer_t *buf, int count, int offs
         io_init(&io, chkid, count, offset, 0);
 
         DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
-              CHKID_ARG(&io.id), io.offset, io.size);
+             CHKID_ARG(&io.id), io.offset, io.size);
         
         memcpy(array, chkinfo->diskid, sizeof(diskid_t) * chkinfo->repnum);
 

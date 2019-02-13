@@ -30,7 +30,7 @@ typedef struct {
 static dirop_t *dirop = &__dirop__;
 static inodeop_t *inodeop = &__inodeop__;
 
-static int __md_vol_set_etcd(const char *name, const fileid_t *fileid,
+static int __md_vol_set_etcd(const char *name, const fileid_t *fileid, uint64_t snapvers,
                              int sharding, int replica);
 
 static int __md_mkvol_slot(const char *name, int sharding, int replica, const redis_addr_t *addr)
@@ -459,14 +459,12 @@ int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid)
                 GOTO(err_ret, ret);
 
         fileid.volid = _volid;
-        fileid.snapvers = 0;
         fileid.idx = 0;
         fileid.id = _volid;
         fileid.__pad__ = 0;
-        fileid.snapshot = 0;
         fileid.type = ftype_vol;
 
-        ret = __md_vol_set_etcd(name, &fileid, mdsconf.redis_sharding,
+        ret = __md_vol_set_etcd(name, &fileid, 0, mdsconf.redis_sharding,
                                 mdsconf.redis_replica);
         if (ret)
                 GOTO(err_ret, ret);
@@ -483,8 +481,7 @@ retry:
                 USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
         }
 
-        UNIMPLEMENTED(__DUMP__);
-        ret = inodeop->mkvol(NULL, &fileid, setattr);
+        ret = inodeop->mkvol(&volid, &fileid, setattr);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -728,7 +725,7 @@ err_ret:
         return ret;
 }
 
-static int __md_vol_set_etcd(const char *name, const fileid_t *fileid,
+static int __md_vol_set_etcd(const char *name, const fileid_t *fileid, uint64_t snapvers,
                              int sharding, int replica)
 {
         int ret;
@@ -780,11 +777,18 @@ static int __md_vol_set_etcd(const char *name, const fileid_t *fileid,
                         GOTO(err_ret, ret);
         }
 
-        
-        
+         
+        snprintf(key, MAX_NAME_LEN, "%s/snapvers", name);
+        snprintf(value, MAX_NAME_LEN, "%ju", snapvers);
+        ret = etcd_create_text(ETCD_VOLUME, key, value, -1);
+        if (ret) {
+                if (ret == EEXIST) {
+                        //pass
+                } else
+                        GOTO(err_ret, ret);
+        }
 
         snprintf(key, MAX_NAME_LEN, "%s/id", name);
-
         ret = etcd_create(ETCD_VOLUME, key, fileid, sizeof(*fileid), -1);
         if (ret)
                 GOTO(err_ret, ret);
@@ -900,9 +904,8 @@ int md_snapshot(const char *name, const char *snap, fileid_t *_fileid)
         if (ret)
                 GOTO(err_ret, ret);
 
-        fileid.snapshot = 1;
-        
-        ret = __md_vol_set_etcd(snap, &fileid, sharding, replica);
+        UNIMPLEMENTED(__DUMP__);
+        ret = __md_vol_set_etcd(snap, &fileid, 1, sharding, replica);
         if (ret)
                 GOTO(err_ret, ret);
 

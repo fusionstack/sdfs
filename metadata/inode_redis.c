@@ -95,7 +95,7 @@ static int __inode_create(const volid_t *volid, const fileid_t *parent, const se
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = md_attr_getid(&fileid, parent, type, NULL);
+        ret = md_attr_getid(&fileid, parent, type, volid);
         if (ret)
                 GOTO(err_ret, ret);
 

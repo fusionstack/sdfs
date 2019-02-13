@@ -15,6 +15,7 @@ static inline void io_init(io_t *io, const chkid_t *chkid,
         io->flags = flags;
         io->lsn = 0;
         io->lease = -1;
+        io->snapvers = 0;
 }
 
 int cds_rpc_init();

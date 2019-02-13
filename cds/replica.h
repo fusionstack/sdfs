@@ -5,14 +5,14 @@
 #include "ylib.h"
 #include "net_global.h"
 
-static inline void chkid2path(const chkid_t *chkid, char *path)
+static inline void chkid2path(const chkid_t *chkid, uint64_t snapvers, char *path)
 {
         char cpath[MAX_PATH_LEN];
 
         (void) cascade_id2path(cpath, MAX_PATH_LEN, chkid->id);
 
         (void) snprintf(path, MAX_PATH_LEN, "%s/volume/%ju/%ju/%s/%u.chunk",
-                        ng.home, chkid->volid, chkid->snapvers, cpath, chkid->idx);
+                        ng.home, chkid->volid, snapvers, cpath, chkid->idx);
 
 }
 

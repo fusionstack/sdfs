@@ -177,12 +177,12 @@ int cds_destroy(int cds_sd, int servicenum)
         return 0;
 }
 
-int disk_unlink1(const chkid_t *chkid)
+int disk_unlink1(const chkid_t *chkid, uint64_t snapvers)
 {
         int ret;
         char dpath[MAX_PATH_LEN] = {0}, dir[MAX_PATH_LEN];
 
-        chkid2path(chkid, dpath);
+        chkid2path(chkid, snapvers, dpath);
 
         ret = unlink(dpath);
         if (ret == -1) {
@@ -202,7 +202,7 @@ err_ret:
 }
 
 
-static int __chunk_unlink(const chkid_t *chkid)
+static int __chunk_unlink(const chkid_t *chkid, uint64_t snapvers)
 {
         int i;
         int ret;
@@ -226,7 +226,7 @@ static int __chunk_unlink(const chkid_t *chkid)
                 }
         }
 
-        ret = disk_unlink1(chkid);
+        ret = disk_unlink1(chkid, snapvers);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -263,7 +263,8 @@ int chunk_cleanup(void *arg)
                         chkid = &array[i];
                         YASSERT(chkid_null(chkid) == 0);
 
-                        ret = __chunk_unlink(chkid);
+                        UNIMPLEMENTED(__WARN__);
+                        ret = __chunk_unlink(chkid, 0);
                         if (ret) {
                                 if (ret == ENOENT || ret == EPERM)
                                         continue;
