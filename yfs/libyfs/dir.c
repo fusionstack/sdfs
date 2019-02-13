@@ -89,23 +89,3 @@ err_ret:
         return ret;
 }
 #endif
-
-int ly_readdirplus_count(const char *path, file_statis_t *file_statis)
-{
-        int ret;
-        fileid_t fileid;
-
-        ret = sdfs_lookup_recurive(path, &fileid);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        DBUG("dir %s "FID_FORMAT"\n", path, FID_ARG(&fileid));
-
-        ret = raw_readdirplus_count(&fileid, file_statis);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        return 0;
-err_ret:
-        return ret;
-}

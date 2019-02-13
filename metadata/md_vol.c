@@ -483,7 +483,8 @@ retry:
                 USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
         }
 
-        ret = inodeop->mkvol(setattr, &fileid);
+        UNIMPLEMENTED(__DUMP__);
+        ret = inodeop->mkvol(NULL, &fileid, setattr);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -517,9 +518,9 @@ err_ret:
         return ret;
 }
 
-int md_dirlist(const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist)
+int md_dirlist(const volid_t *volid, const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist)
 {
-        return dirop->dirlist(dirid, count, offset, dirlist);
+        return dirop->dirlist(volid, dirid, count, offset, dirlist);
 }
 
 static int __md_rmvol_inode(const char *name)
@@ -533,7 +534,8 @@ static int __md_rmvol_inode(const char *name)
                 GOTO(err_ret, ret);
 
         //rmove inode
-        ret = inodeop->childcount(&fileid, &count);
+        UNIMPLEMENTED(__DUMP__);
+        ret = inodeop->childcount(NULL, &fileid, &count);
         if (ret) {
                 if (ret == ENOENT) {//already removed
                         //pass
@@ -545,7 +547,8 @@ static int __md_rmvol_inode(const char *name)
                         GOTO(err_ret, ret);
                 }
 
-                ret = inodeop->unlink(&fileid, NULL);
+                UNIMPLEMENTED(__DUMP__);
+                ret = inodeop->unlink(NULL, &fileid, NULL);
                 if (ret) {
                         if (ret == ENOENT) {
                                 DWARN(CHKID_FORMAT" not found\n", CHKID_ARG(&fileid));

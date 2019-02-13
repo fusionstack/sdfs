@@ -30,11 +30,11 @@ int sattr_utime(const fileid_t *fileid, int at, int mt, int ct)
                             ct ? __SET_TO_SERVER_TIME : __DONT_CHANGE, NULL);
 
 #if ENABLE_ATTR_QUEUE
-        ret = attr_queue_settime(fileid, &setattr);
+        ret = attr_queue_settime(NULL, fileid, &setattr);
         if (ret)
                 GOTO(err_ret, ret);
 #else
-        ret = sdfs_setattr(fileid, &setattr, 0);
+        ret = sdfs_setattr(NULL, fileid, &setattr, 0);
         if (ret)
                 GOTO(err_ret, ret);
 #endif

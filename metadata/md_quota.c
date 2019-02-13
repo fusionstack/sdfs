@@ -118,7 +118,7 @@ static int __create_quota(const fileid_t *quotaid,
         if(ret)
                 GOTO(err_ret, ret);
         
-        ret = kset(&fileid, quota, sizeof(*quota), O_EXCL);
+        ret = kset(NULL, &fileid, quota, sizeof(*quota), O_EXCL);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -167,7 +167,7 @@ int md_create_quota(quota_t *quota)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-	ret = md_set_quotaid(&quota->dirid, &quotaid);
+	ret = md_set_quotaid(NULL, &quota->dirid, &quotaid);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
@@ -190,7 +190,7 @@ static int __get_quota(const fileid_t *quotaid,
                 GOTO(err_ret, ret);
         
         size_t size = sizeof(*quota);
-        ret = kget(&fileid, quota, &size);
+        ret = kget(NULL, &fileid, quota, &size);
         if (ret)
                 GOTO(err_ret, ret);
 #else        
@@ -251,13 +251,13 @@ int md_modify_quota(const fileid_t *quotaid,
                 GOTO(err_ret, ret);
         
         
-        ret = kget(&fileid, &tmp_quota, &vlen);
+        ret = kget(NULL, &fileid, &tmp_quota, &vlen);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
         __quota_limit_set(&tmp_quota, quota, modify_mask);
 
-        ret = kset(&fileid, &tmp_quota, sizeof(*quota), 0);
+        ret = kset(NULL, &fileid, &tmp_quota, sizeof(*quota), 0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -302,7 +302,7 @@ int md_update_quota(const quota_t *quota)
         if(ret)
                 GOTO(err_ret, ret);
         
-        ret = kset(&fileid, quota, sizeof(*quota), 0);
+        ret = kset(NULL, &fileid, quota, sizeof(*quota), 0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 #else
@@ -374,7 +374,7 @@ static int __quota_remove(const fileid_t *quotaid, const quota_t *quota)
         if(ret)
                 GOTO(err_ret, ret);
         
-        ret = kdel(&fileid);
+        ret = kdel(NULL, &fileid);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -414,7 +414,7 @@ int md_remove_quota(const fileid_t *quotaid, const quota_t *quota)
                 GOTO(err_ret, ret);
 
         if(quota_type == QUOTA_DIR) {
-                ret = md_set_quotaid(&out_quota.dirid, &out_quota.pquotaid);
+                ret = md_set_quotaid(NULL, &out_quota.dirid, &out_quota.pquotaid);
                 if(unlikely(ret))
                         GOTO(err_ret, ret);
         }

@@ -483,7 +483,7 @@ static int __file_scan(const fileid_t *fileid, itor_ctx_t *ctx)
 
         (void) ctx;
         
-        ret = md_getattr(fileid, (void *)&md);
+        ret = md_getattr(NULL, fileid, (void *)&md);
         if (ret)
                 GOTO(err_ret, ret);
 

@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 
         fileid.idx = 0;
         md = (void *)buf;
-        ret = md_getattr(&fileid, (void *)md);
+        ret = md_getattr(NULL, &fileid, (void *)md);
         if (ret)
                 GOTO(err_ret, ret);
 

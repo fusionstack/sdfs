@@ -21,19 +21,19 @@ static inodeop_t *inodeop = &__inodeop__;
 
 static uint64_t __systemvolid__ = -1;
 
-int md_getattr(const fileid_t *fileid, md_proto_t *md)
+int md_getattr(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
 {
         int ret;
 
         ANALYSIS_BEGIN(0);
 
-        ret = inodeop->getattr(fileid, md);
+        ret = inodeop->getattr(volid, fileid, md);
         if (ret)
                 GOTO(err_ret, ret);
 
 #if ENABLE_ATTR_QUEUE
         if (ng.daemon) {
-                attr_queue_update(fileid, md);
+                attr_queue_update(volid, fileid, md);
         }
 #endif
         
@@ -102,13 +102,13 @@ err_ret:
         return ret;
 }
 
-int md_chmod(const fileid_t *fileid, mode_t mode)
+int md_chmod(const volid_t *volid, const fileid_t *fileid, mode_t mode)
 {
         int ret;
         setattr_t setattr;
 
         setattr_init(&setattr, mode & MODE_MAX, -1, NULL, -1, -1, -1);
-        ret = inodeop->setattr(fileid, &setattr, 1);
+        ret = inodeop->setattr(volid, fileid, &setattr, 1);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -117,11 +117,11 @@ err_ret:
         return ret;
 }
 
-int md_setattr(const fileid_t *fileid, const setattr_t *setattr, int force)
+int md_setattr(const volid_t *volid, const fileid_t *fileid, const setattr_t *setattr, int force)
 {
         int ret;
 
-        ret = inodeop->setattr(fileid, setattr, force);
+        ret = inodeop->setattr(volid, fileid, setattr, force);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -130,7 +130,7 @@ err_ret:
         return ret;
 }
 
-int md_utime(const fileid_t *fileid, const struct timespec *atime,
+int md_utime(const volid_t *volid, const fileid_t *fileid, const struct timespec *atime,
              const struct timespec *mtime, const struct timespec *ctime)
 {
         int ret;
@@ -142,7 +142,7 @@ int md_utime(const fileid_t *fileid, const struct timespec *atime,
                             __SET_TO_CLIENT_TIME, mtime,
                             __SET_TO_CLIENT_TIME, ctime);
 
-        ret = inodeop->setattr(fileid, &setattr, 1);
+        ret = inodeop->setattr(volid, fileid, &setattr, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -151,7 +151,7 @@ err_ret:
         return ret;
 }
 
-int md_set_wormid(const fileid_t *fileid, uint64_t wormid)
+int md_set_wormid(const volid_t *volid, const fileid_t *fileid, uint64_t wormid)
 {
         int ret;
         setattr_t setattr;
@@ -160,7 +160,7 @@ int md_set_wormid(const fileid_t *fileid, uint64_t wormid)
         setattr.wormid.set_it = 1;
         setattr.wormid.val = wormid;
 
-        ret = inodeop->setattr(fileid, &setattr, 1);
+        ret = inodeop->setattr(volid, fileid, &setattr, 1);
         if (ret)
                 GOTO(err_ret, ret);
                 
@@ -169,14 +169,14 @@ err_ret:
         return ret;
 }
 
-int md_chown(const fileid_t *fileid, uid_t uid, gid_t gid)
+int md_chown(const volid_t *volid, const fileid_t *fileid, uid_t uid, gid_t gid)
 {
         int ret;
         setattr_t setattr;
 
         setattr_init(&setattr, -1, -1, NULL, uid, gid, -1);
 
-        ret = inodeop->setattr(fileid, &setattr, 1);
+        ret = inodeop->setattr(volid, fileid, &setattr, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -185,7 +185,7 @@ err_ret:
         return ret;
 }
 
-int md_set_quotaid(const fileid_t *fileid, const fileid_t *quotaid)
+int md_set_quotaid(const volid_t *volid, const fileid_t *fileid, const fileid_t *quotaid)
 {
         int ret;
         setattr_t setattr;
@@ -196,7 +196,7 @@ int md_set_quotaid(const fileid_t *fileid, const fileid_t *quotaid)
 
         //DINFO("set quotaid:\n", (LLU)quotaid);
 
-        ret = inodeop->setattr(fileid, &setattr, 1);
+        ret = inodeop->setattr(volid, fileid, &setattr, 1);
         if (ret)
                 GOTO(err_ret, ret);
                 
@@ -205,14 +205,14 @@ err_ret:
         return ret;
 }
 
-int md_rename(const fileid_t *fparent,
+int md_rename(const volid_t *volid, const fileid_t *fparent,
               const char *fname, const fileid_t *tparent, const char *tname)
 {
         int ret;
         fileid_t fileid;
         uint32_t type;
 
-        ret = dirop->lookup(fparent, fname, &fileid, &type);
+        ret = dirop->lookup(volid, fparent, fname, &fileid, &type);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -221,11 +221,11 @@ int md_rename(const fileid_t *fparent,
                 GOTO(err_ret, ret);
         }
         
-        ret = dirop->newrec(tparent, tname, &fileid, type, O_EXCL);
+        ret = dirop->newrec(volid, tparent, tname, &fileid, type, O_EXCL);
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = dirop->unlink(fparent, fname);
+        ret = dirop->unlink(volid, fparent, fname);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -234,7 +234,7 @@ err_ret:
         return ret;
 }
 
-int md_remove(const fileid_t *fileid)
+int md_remove(const volid_t *volid, const fileid_t *fileid)
 {
         int ret, i, j;
         chkinfo_t *chkinfo;
@@ -248,7 +248,7 @@ int md_remove(const fileid_t *fileid)
         }
         
         md = (void *)buf;
-        ret = inodeop->getattr(fileid, (void *)md);
+        ret = inodeop->getattr(volid, fileid, (void *)md);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -265,7 +265,7 @@ int md_remove(const fileid_t *fileid)
         }
 
 out:
-        ret = inodeop->remove(fileid, NULL);
+        ret = inodeop->remove(volid, fileid, NULL);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -274,11 +274,11 @@ err_ret:
         return ret;
 }
 
-int md_getxattr(const fileid_t *fileid, const char *name, void *value, size_t *size)
+int md_getxattr(const volid_t *volid, const fileid_t *fileid, const char *name, void *value, size_t *size)
 {
         int ret;
 
-        ret = inodeop->getxattr(fileid, name, value, size);
+        ret = inodeop->getxattr(volid, fileid, name, value, size);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -287,12 +287,12 @@ err_ret:
         return ret;
 }
 
-int md_setxattr(const fileid_t *fileid, const char *name,
+int md_setxattr(const volid_t *volid, const fileid_t *fileid, const char *name,
                 const void *value, size_t size, int flags)
 {
         int ret;
 
-        ret = inodeop->setxattr(fileid, name, value, size, flags);
+        ret = inodeop->setxattr(volid, fileid, name, value, size, flags);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -301,11 +301,11 @@ err_ret:
         return ret;
 }
 
-int md_removexattr(const fileid_t *fileid, const char *name)
+int md_removexattr(const volid_t *volid, const fileid_t *fileid, const char *name)
 {
         int ret;
 
-        ret = inodeop->removexattr(fileid, name);
+        ret = inodeop->removexattr(volid, fileid, name);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -314,11 +314,11 @@ err_ret:
         return ret;
 }
 
-int md_listxattr(const fileid_t *fileid, char *list, size_t *size)
+int md_listxattr(const volid_t *volid, const fileid_t *fileid, char *list, size_t *size)
 {
         int ret;
 
-        ret = inodeop->listxattr(fileid, list, size);
+        ret = inodeop->listxattr(volid, fileid, list, size);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -327,8 +327,8 @@ err_ret:
         return ret;
 }
 
-int md_childcount(const fileid_t *fileid, uint64_t *count)
+int md_childcount(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
 {
-        return inodeop->childcount(fileid, count);
+        return inodeop->childcount(volid, fileid, count);
 }
 

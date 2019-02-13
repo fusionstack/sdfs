@@ -14,14 +14,14 @@
 #include "md_db.h"
 #include "dbg.h"
 
-static int dir_lookup(const fileid_t *parent, const char *name, fileid_t *fid, uint32_t *type) {
+static int dir_lookup(const volid_t *volid, const fileid_t *parent, const char *name, fileid_t *fid, uint32_t *type) {
         int ret;
         dir_entry_t *ent;
         char buf[sizeof(dir_entry_t)];
         size_t buflen;
 
         //DWARN("--------------pipeline test--------------------\n");
-        ret = hget(parent, name, buf, &buflen);
+        ret = hget(volid, parent, name, buf, &buflen);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -39,7 +39,7 @@ err_ret:
         return ret;
 }
 
-static int dir_newrec(const fileid_t *parent, const char *name,
+static int dir_newrec(const volid_t *volid, const fileid_t *parent, const char *name,
                       const fileid_t *fileid, uint32_t type, int flag)
 {
         dir_entry_t ent;
@@ -50,7 +50,7 @@ static int dir_newrec(const fileid_t *parent, const char *name,
         
         DBUG(""FID_FORMAT"/"FID_FORMAT" name %s\n", FID_ARG(parent), FID_ARG(fileid), name);
 
-        ret = hlen(parent, &count);
+        ret = hlen(volid, parent, &count);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -63,7 +63,7 @@ static int dir_newrec(const fileid_t *parent, const char *name,
         ent.fileid = *fileid;
         ent.d_type = type;
 
-        ret = hset(parent, name, &ent, sizeof(dir_entry_t), flag);
+        ret = hset(volid, parent, name, &ent, sizeof(dir_entry_t), flag);
         if (ret) {
                 DBUG(""FID_FORMAT" / "FID_FORMAT" name %s\n", FID_ARG(parent), FID_ARG(fileid), name);
                 GOTO(err_ret, ret);
@@ -76,11 +76,11 @@ err_ret:
         return ret;
 }
 
-static int dir_unlink(const fileid_t *parent, const char *name)
+static int dir_unlink(const volid_t *volid, const fileid_t *parent, const char *name)
 {
         int ret;
 
-        ret = hdel(parent, name);
+        ret = hdel(volid, parent, name);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -89,7 +89,7 @@ err_ret:
         return ret;
 }
 
-static int __readdir(const fileid_t *fid, void *buf, int *_buflen,
+static int __readdir(const volid_t *volid, const fileid_t *fid, void *buf, int *_buflen,
                      uint64_t _offset, const filter_t *filter, int is_plus)
 {
         int ret, reclen, buflen;
@@ -107,7 +107,7 @@ static int __readdir(const fileid_t *fid, void *buf, int *_buflen,
 
 retry:
         buflen = *_buflen;
-        reply = hscan(fid, NULL, offset, count);
+        reply = hscan(volid, fid, NULL, offset, count);
         if (reply == NULL || reply->type != REDIS_REPLY_ARRAY) {
                 ret = ENOENT;
                 GOTO(err_ret, ret);
@@ -181,36 +181,25 @@ err_ret:
         return ret;
 }
 
-static int dir_readdir(const fileid_t *fileid, void *buf, int *buflen,
+static int dir_readdir(const volid_t *volid, const fileid_t *fileid, void *buf, int *buflen,
                        uint64_t offset)
 {
-        return __readdir(fileid, buf, buflen, offset, NULL, 0);
+        return __readdir(volid, fileid, buf, buflen, offset, NULL, 0);
 }
 
-static int dir_readdirplus(const fileid_t *fid, void *buf, int *buflen,
+static int dir_readdirplus(const volid_t *volid, const fileid_t *fid, void *buf, int *buflen,
                            uint64_t offset)
 {
-        return __readdir(fid, buf, buflen, offset, NULL, 1);
+        return __readdir(volid, fid, buf, buflen, offset, NULL, 1);
 }
 
-#if 0
-static int dir_child_id2name(const fileid_t *parent, uint64_t id, char *name)
-{
-        (void)parent;
-        (void)id;
-        (void)name;
-        UNIMPLEMENTED(__DUMP__);
-        return 0;
-}
-#endif
-
-static int __readdirplus_filter(const fileid_t *fid, void *buf, int *buflen,
+static int __readdirplus_filter(const volid_t *volid, const fileid_t *fid, void *buf, int *buflen,
                                 uint64_t offset, const filter_t *filter)
 {
-        return __readdir(fid, buf, buflen, offset, filter, 1);
+        return __readdir(volid, fid, buf, buflen, offset, filter, 1);
 }
 
-static int __dir_list(const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist)
+static int __dir_list(const volid_t *volid, const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist)
 {
         int ret, idx;
         redisReply *reply, *e0, *e1, *k1, *v1;
@@ -221,7 +210,7 @@ static int __dir_list(const dirid_t *dirid, uint32_t count, uint64_t offset, dir
         __dirlist_t *node;
         
 
-        reply = hscan(dirid, NULL, offset, count);
+        reply = hscan(volid, dirid, NULL, offset, count);
         if (reply->type != REDIS_REPLY_ARRAY) {
                 ret = ENOENT;
                 GOTO(err_ret, ret);

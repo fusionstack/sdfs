@@ -15,39 +15,38 @@
 #include "sdfs_lib.h"
 
 /* dir.c */
-extern int md_readdir(const fileid_t *fileid, off_t offset, void **de,
+extern int md_readdir(const volid_t *volid, const fileid_t *fileid, off_t offset, void **de,
                        int *delen);
-extern int md_readdirplus(const fileid_t*, off_t offset, void **de,
+extern int md_readdirplus(const volid_t *volid, const fileid_t*, off_t offset, void **de,
                           int *delen);
-extern int md_readdirplus_count(const fileid_t*, file_statis_t *);
-extern int md_readdirplus_with_filter(const fileid_t *fileid, off_t offset,
+extern int md_readdirplus_with_filter(const volid_t *volid, const fileid_t *fileid, off_t offset,
                                       void **de, int *delen, const filter_t *filter);
 
 /* node.c */
-int md_mkdir(const fileid_t *parent, const char *name, const setattr_t *setattr, fileid_t *fileid);
-int md_utime(const fileid_t *fileid, const struct timespec *atime,
+int md_mkdir(const volid_t *volid, const fileid_t *parent, const char *name, const setattr_t *setattr, fileid_t *fileid);
+int md_utime(const volid_t *volid, const fileid_t *fileid, const struct timespec *atime,
              const struct timespec *mtime, const struct timespec *ctime);
-int md_chmod(const fileid_t *fileid, mode_t mode);
-int md_setattr(const fileid_t *fileid, const setattr_t *setattr, int force);
-int md_set_wormid(const fileid_t *fileid, uint64_t fid);
+int md_chmod(const volid_t *volid, const fileid_t *fileid, mode_t mode);
+int md_setattr(const volid_t *volid, const fileid_t *fileid, const setattr_t *setattr, int force);
+int md_set_wormid(const volid_t *volid, const fileid_t *fileid, uint64_t fid);
 int md_list_worm(worm_t *wormlist, uint32_t max_size, int *count, const nid_t *_peer);
-int md_chown(const fileid_t *fileid, uid_t uid, gid_t gid);
-int md_unlink(const fileid_t *parent, const char *name, md_proto_t *md);
-int md_rename(const fileid_t *fparent,
+int md_chown(const volid_t *volid, const fileid_t *fileid, uid_t uid, gid_t gid);
+int md_unlink(const volid_t *volid, const fileid_t *parent, const char *name, md_proto_t *md);
+int md_rename(const volid_t *volid, const fileid_t *fparent,
                const char *fname, const fileid_t *tparent, const char *toname);
-int md_remove(const fileid_t *fileid);
+int md_remove(const volid_t *volid, const fileid_t *fileid);
 
-int md_rmdir(const fileid_t *parent, const char *name);
-int md_link2node(const fileid_t *fileid, const fileid_t *parent,
+int md_rmdir(const volid_t *volid, const fileid_t *parent, const char *name);
+int md_link2node(const volid_t *volid, const fileid_t *fileid, const fileid_t *parent,
                  const char *name);
-int md_setxattr(const fileid_t *fileid, const char *name, const void *value,
+int md_setxattr(const volid_t *volid, const fileid_t *fileid, const char *name, const void *value,
                 size_t size, int flags);
-int md_getxattr(const fileid_t *fileid, const char *name, void *value, size_t *size);
-int md_removexattr(const fileid_t *fileid, const char *name);
-int md_listxattr(const fileid_t *fileid, char *list, size_t *size);
-int md_childcount(const fileid_t *fileid, uint64_t *count);
+int md_getxattr(const volid_t *volid, const fileid_t *fileid, const char *name, void *value, size_t *size);
+int md_removexattr(const volid_t *volid, const fileid_t *fileid, const char *name);
+int md_listxattr(const volid_t *volid, const fileid_t *fileid, char *list, size_t *size);
+int md_childcount(const volid_t *volid, const fileid_t *fileid, uint64_t *count);
 
-int md_set_quotaid(const fileid_t *fileid, const fileid_t *quotaid);
+int md_set_quotaid(const volid_t *volid, const fileid_t *fileid, const fileid_t *quotaid);
 // int md_list_quota(const quota_t *quota_owner, quota_type_t quota_type,
                   // quota_t **quota, int *);
 
@@ -71,24 +70,24 @@ int md_chkload(chkinfo_t *chk, const chkid_t *chkid, const nid_t *nid);
 int md_chkupdate(const chkinfo_t *chkinfo, const nid_t *nid);
 
 /* file.c */
-int md_create(const fileid_t *parent, const char *name, const setattr_t *setattr,
+int md_create(const volid_t *volid, const fileid_t *parent, const char *name, const setattr_t *setattr,
               fileid_t *fileid);
-int md_extend(const fileid_t *fileid, size_t size);
-int md_id2name(const fileid_t *parent, uint64_t id, char *name, int size);
-int md_truncate(const fileid_t *fileid, uint64_t length);
-int md_symlink(const fileid_t *parent, const char *link_name, const char *link_target,
+int md_extend(const volid_t *volid, const fileid_t *fileid, size_t size);
+int md_id2name(const volid_t *volid, const fileid_t *parent, uint64_t id, char *name, int size);
+int md_truncate(const volid_t *volid, const fileid_t *fileid, uint64_t length);
+int md_symlink(const volid_t *volid, const fileid_t *parent, const char *link_name, const char *link_target,
                uint32_t mode, uint32_t uid, uint32_t gid);
-int md_readlink(const fileid_t *fileid, char *_buf);
-int md_lookup(fileid_t *fileid, const fileid_t *parent, const char *name);
-int md_getattr(const fileid_t *fileid, md_proto_t *md);
+int md_readlink(const volid_t *volid, const fileid_t *fileid, char *_buf);
+int md_lookup(const volid_t *volid, fileid_t *fileid, const fileid_t *parent, const char *name);
+int md_getattr(const volid_t *volid, const fileid_t *fileid, md_proto_t *md);
 int md_mkvol(const char *name, const setattr_t *setattr, fileid_t *_fileid);
 int md_rmvol(const char *name);
-int md_dirlist(const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist);
+int md_dirlist(const volid_t *volid, const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist);
 int md_lookupvol(const char *name, fileid_t *fileid);
 int md_initroot();
 int md_system_volid(uint64_t *id);
-int md_getlock(const fileid_t *fileid, sdfs_lock_t *lock);
-int md_setlock(const fileid_t *fileid, const sdfs_lock_t *lock);
+int md_getlock(const volid_t *volid, const fileid_t *fileid, sdfs_lock_t *lock);
+int md_setlock(const volid_t *volid, const fileid_t *fileid, const sdfs_lock_t *lock);
 
 /*quota.c*/
 extern int md_create_quota(quota_t *quota);

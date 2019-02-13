@@ -27,6 +27,7 @@
 typedef struct {
         sy_spinlock_t lock;
         sem_t sem;
+        volid_t volid;
         fileid_t fileid;
         int op;
         size_t size;
@@ -54,7 +55,7 @@ typedef struct {
 } wait_t;
         
 
-static void __attr_queue_set(attr_op_t *attr_op, const fileid_t *fileid, int op, const void *arg)
+static void __attr_queue_set(attr_op_t *attr_op, const volid_t *volid, const fileid_t *fileid, int op, const void *arg)
 {
         int ret;
 
@@ -62,6 +63,7 @@ static void __attr_queue_set(attr_op_t *attr_op, const fileid_t *fileid, int op,
         YASSERT(ret == 0);
 
         attr_op->fileid = *fileid;
+        attr_op->volid = *volid;
         if (op == ATTR_OP_EXTERN) {
                 const uint64_t *size = arg;
                 attr_op->size = *size;
@@ -96,7 +98,7 @@ static void __attr_queue_unset(attr_op_t *attr_op)
         sy_spin_unlock(&attr_op->lock);
 }
 
-static int __attr_queue(const fileid_t *fileid, int op, const void *arg)
+static int __attr_queue(const volid_t *volid, const fileid_t *fileid, int op, const void *arg)
 {
         int ret, retry = 0;
         attr_queue_t *attr_queue = &__attr_queue__[fileid_hash(fileid) % __count__];
@@ -137,7 +139,7 @@ retry:
         DBUG("attr queue len %u\n", attr_queue->len);
         attr_op_t *attr_op = &attr_queue->queue[(attr_queue->begin + attr_queue->len)
                                                 % ATTR_OP_MAX];
-        __attr_queue_set(attr_op, fileid, op, arg);
+        __attr_queue_set(attr_op, volid, fileid, op, arg);
         attr_queue->len++;
         
         sy_spin_unlock(&attr_queue->lock);
@@ -155,22 +157,22 @@ err_ret:
         return ret;
 }
 
-int attr_queue_settime(const fileid_t *fileid, const setattr_t *setattr)
+int attr_queue_settime(const volid_t *volid, const fileid_t *fileid, const setattr_t *setattr)
 {
-        return __attr_queue(fileid, ATTR_OP_SETTIME, setattr);
+        return __attr_queue(volid, fileid, ATTR_OP_SETTIME, setattr);
 }
 
-int attr_queue_extern(const fileid_t *fileid, uint64_t size)
+int attr_queue_extern(const volid_t *volid, const fileid_t *fileid, uint64_t size)
 {
-        return __attr_queue(fileid, ATTR_OP_EXTERN, &size);
+        return __attr_queue(volid, fileid, ATTR_OP_EXTERN, &size);
 }
 
-int attr_queue_truncate(const fileid_t *fileid, uint64_t size)
+int attr_queue_truncate(const volid_t *volid, const fileid_t *fileid, uint64_t size)
 {
-        return __attr_queue(fileid, ATTR_OP_TRUNCATE, &size);
+        return __attr_queue(volid, fileid, ATTR_OP_TRUNCATE, &size);
 }
 
-int attr_queue_update(const fileid_t *fileid, md_proto_t *md)
+int attr_queue_update(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
 {
         int ret, begin, count;
         attr_queue_t *attr_queue = &__attr_queue__[fileid_hash(fileid) % __count__];
@@ -184,7 +186,8 @@ int attr_queue_update(const fileid_t *fileid, md_proto_t *md)
         for (int i = 0; i < count; i++) {
                 attr_op = &attr_queue->queue[(i + begin) % ATTR_OP_MAX];
 
-                if (fileid_cmp(fileid, &attr_op->fileid) != 0) {
+                if (fileid_cmp(fileid, &attr_op->fileid) != 0
+                    || volid->snapvers != attr_op->volid.snapvers) {
                         continue;
                 }
 
@@ -233,7 +236,7 @@ static void __attr_queue_run__(void *arg)
 
 retry:
         if (attr_op->op == ATTR_OP_EXTERN) {
-                ret = md_extend(&attr_op->fileid, attr_op->size);
+                ret = md_extend(&attr_op->volid, &attr_op->fileid, attr_op->size);
         } else if (attr_op->op == ATTR_OP_SETTIME) {
                 setattr_init(&setattr, -1, -1, NULL, -1, -1, -1);
                 setattr.atime = attr_op->atime;
@@ -241,9 +244,9 @@ retry:
                 setattr.ctime = attr_op->ctime;
                 setattr.mtime = attr_op->mtime;
                 
-                ret = md_setattr(&attr_op->fileid, &setattr, 1);
+                ret = md_setattr(&attr_op->volid, &attr_op->fileid, &setattr, 1);
         } else if (attr_op->op == ATTR_OP_TRUNCATE) {
-                ret = md_truncate(&attr_op->fileid, attr_op->size);
+                ret = md_truncate(&attr_op->volid, &attr_op->fileid, attr_op->size);
         } else {
                 UNIMPLEMENTED(__DUMP__);
         }

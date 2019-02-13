@@ -306,8 +306,6 @@ int md_chunk_create(const fileinfo_t *md, uint64_t idx, chkinfo_t *chkinfo)
         diskid_t disk[YFS_CHK_REP_MAX];
         chkid_t chkid;
 
-        UNIMPLEMENTED(__NULL__);//get tier
-
         ANALYSIS_BEGIN(0);
         
         ret = allocator_new(md->repnum, 0, TIER_SSD, disk);
@@ -321,7 +319,7 @@ int md_chunk_create(const fileinfo_t *md, uint64_t idx, chkinfo_t *chkinfo)
         fid2cid(&chkid, &md->fileid, idx);
         __chkinfo_init(chkinfo, &chkid, disk, md);
 
-        ret = chunkop->create(chkinfo);
+        ret = chunkop->create(NULL, chkinfo);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -335,8 +333,8 @@ err_ret:
 int md_chunk_load(const chkid_t *chkid, chkinfo_t *chkinfo)
 {
         int ret;
-        
-        ret = chunkop->load(chkid, chkinfo);
+
+        ret = chunkop->load(NULL, chkid, chkinfo);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -417,7 +415,7 @@ static int __md_chunk_load_slow(const chkid_t *chkid, chkinfo_t *chkinfo, int re
 {
         int ret;
 
-        ret = klock(chkid, 10, 1);
+        ret = klock(NULL, chkid, 10, 1);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -438,18 +436,18 @@ static int __md_chunk_load_slow(const chkid_t *chkid, chkinfo_t *chkinfo, int re
         }
         YASSERT(count < 2);
 #endif
-        
-        ret = chunkop->update(chkinfo);
+
+        ret = chunkop->update(NULL, chkinfo);
         if (ret)
                 GOTO(err_lock, ret);
 
-        ret = kunlock(chkid);
+        ret = kunlock(NULL, chkid);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
         return 0;
 err_lock:
-        kunlock(chkid);
+        kunlock(NULL, chkid);
 err_ret:
         return ret;
 }
@@ -508,8 +506,8 @@ int md_chunk_update(const chkinfo_t *chkinfo)
                 YASSERT(chkinfo->diskid[i].status == 0);
         }
 #endif
-        
-        ret = chunkop->update(chkinfo);
+
+        ret = chunkop->update(NULL, chkinfo);
         if (ret)
                 GOTO(err_ret, ret);
 

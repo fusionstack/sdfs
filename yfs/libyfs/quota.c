@@ -1005,7 +1005,7 @@ int quota_chown(const fileid_t *fileid, IN uid_t new_uid, IN gid_t new_gid)
 
         md = (md_proto_t *)buf;
 
-        ret = md_getattr(fileid, md);
+        ret = md_getattr(NULL, fileid, md);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -1123,7 +1123,7 @@ int quota_check_dec(const fileid_t *fileid)
 
         md = (md_proto_t *)buf;
 
-        ret = md_getattr(fileid, md);
+        ret = md_getattr(NULL, fileid, md);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -1153,7 +1153,7 @@ int quota_inode_increase(const fileid_t *fileid, const setattr_t *setattr)
         char buf[MAX_BUF_LEN];
 
         md = (void *)buf;
-        ret = md_getattr(fileid, md);
+        ret = md_getattr(NULL, fileid, md);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -1181,7 +1181,7 @@ int quota_inode_decrease(const fileid_t *fileid, const setattr_t *setattr)
         char buf[MAX_BUF_LEN];
 
         md = (void *)buf;
-        ret = md_getattr(fileid, md);
+        ret = md_getattr(NULL, fileid, md);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -1209,7 +1209,7 @@ int quota_space_increase(const fileid_t *fileid, uid_t uid, gid_t gid, uint64_t 
         char buf[MAX_BUF_LEN];
 
         md = (void *)buf;
-        ret = md_getattr(fileid, md);
+        ret = md_getattr(NULL, fileid, md);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -1237,7 +1237,7 @@ int quota_space_decrease(const fileid_t *fileid, uid_t uid, gid_t gid, uint64_t 
         char buf[MAX_BUF_LEN];
 
         md = (void *)buf;
-        ret = md_getattr(fileid, md);
+        ret = md_getattr(NULL, fileid, md);
         if (ret) {
                 GOTO(err_ret, ret);
         }

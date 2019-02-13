@@ -409,7 +409,7 @@ static int __chunk_write(const fileinfo_t *md, const chkid_t *chkid,
                 GOTO(err_ret, ret);
         
         if (unlikely(!intect)) {
-                ret = klock(chkid, 10, 1);
+                ret = klock(NULL, chkid, 10, 1);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
@@ -419,7 +419,7 @@ static int __chunk_write(const fileinfo_t *md, const chkid_t *chkid,
                 GOTO(err_lock, ret);
 
         if (unlikely(!intect)) {
-                ret = kunlock(chkid);
+                ret = kunlock(NULL, chkid);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
@@ -431,7 +431,7 @@ static int __chunk_write(const fileinfo_t *md, const chkid_t *chkid,
         return 0;
 err_lock:
         if (unlikely(!intect)) {
-                kunlock(chkid);
+                kunlock(NULL, chkid);
         }
 err_ret:
         DWARN("write "CHKID_FORMAT" fail\n", CHKID_ARG(chkid));
@@ -731,7 +731,7 @@ static int __chunk_write_ec(const fileinfo_t *md, const chkid_t *chkid,
                 GOTO(err_ret, ret);
 
         if (unlikely(!intect)) {
-                ret = klock(chkid, 10, 1);
+                ret = klock(NULL, chkid, 10, 1);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
@@ -748,7 +748,7 @@ static int __chunk_write_ec(const fileinfo_t *md, const chkid_t *chkid,
         __chunk_write_ec_free(&ec_arg);
         
         if (unlikely(!intect)) {
-                ret = kunlock(chkid);
+                ret = kunlock(NULL, chkid);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
@@ -763,7 +763,7 @@ err_free:
         __chunk_write_ec_free(&ec_arg);
 err_lock:
         if (unlikely(!intect)) {
-                kunlock(chkid);
+                kunlock(NULL, chkid);
         }
 err_ret:
         DWARN("write "CHKID_FORMAT" fail\n", CHKID_ARG(chkid));

@@ -160,7 +160,7 @@ int ly_rename(const char *from, const char *to)
                 GOTO(err_ret, ret);
 
 again:
-        ret = md_rename(&fparent, fname, &tparent, tname);
+        ret = md_rename(NULL, &fparent, fname, &tparent, tname);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
                         ret = network_connect_mond(0);
@@ -303,7 +303,7 @@ again:
         /*
         *BABY
         */
-        ret = md_getattr(&fileid, md);
+        ret = md_getattr(NULL, &fileid, md);
         if (ret) {
                 if (ret == EPIPE || ret == ETIMEDOUT || ret == ENOTCONN) {
                         ret = network_connect_mond(0);

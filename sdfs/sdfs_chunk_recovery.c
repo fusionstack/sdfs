@@ -497,14 +497,14 @@ int sdfs_chunk_recovery(const chkid_t *chkid)
         
         chkinfo = (void *)_chkinfo;
         cid2fid(&fileid, chkid);
-        ret = md_getattr(&fileid, (void *)&md);
+        ret = md_getattr(NULL, &fileid, (void *)&md);
         if (ret)
                 GOTO(err_ret, ret);
 
         repmin = (md.plugin != PLUGIN_NULL) ? md.k : 1;
 
         begin = time(NULL);
-        ret = klock(chkid, 20, 0);
+        ret = klock(NULL, chkid, 20, 0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -541,7 +541,7 @@ int sdfs_chunk_recovery(const chkid_t *chkid)
         if (ret)
                 GOTO(err_lock, ret);
         
-        ret = kunlock(chkid);
+        ret = kunlock(NULL, chkid);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -549,7 +549,7 @@ int sdfs_chunk_recovery(const chkid_t *chkid)
         
         return 0;
 err_lock:
-        kunlock(chkid);
+        kunlock(NULL, chkid);
 err_ret:
         DWARN("recovery "CHKID_FORMAT" fail\n", CHKID_ARG(chkid));
         return ret;

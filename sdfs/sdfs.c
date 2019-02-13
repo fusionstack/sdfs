@@ -91,8 +91,9 @@ int sdfs_read(sdfs_ctx_t *ctx, const fileid_t *fileid, buffer_t *_buf, uint32_t 
         DBUG("fileid "FID_FORMAT" size %llu off %llu size %u\n", FID_ARG(&md->fileid),
               (LLU)md->at_size, (LLU)offset, size);
 
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_getattr(fileid, (void *)md);
+        ret = md_getattr(&volid, fileid, (void *)md);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -388,8 +389,9 @@ int sdfs_write(sdfs_ctx_t *ctx, const fileid_t *fileid, const buffer_t *_buf, ui
         mbuffer_init(&newbuf, 0);
         mbuffer_reference(&newbuf, _buf);
         
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_getattr(fileid, (void *)md);
+        ret = md_getattr(&volid, fileid, (void *)md);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -436,12 +438,12 @@ retry:
 
 #if ENABLE_ATTR_QUEUE
         if (ng.daemon) {
-                ret = attr_queue_extern(fileid, size + offset);
+                ret = attr_queue_extern(&volid, fileid, size + offset);
                 if (ret)
                         GOTO(err_ret, ret);
         } else {
         retry1:
-                ret = md_extend(fileid, size + offset);
+                ret = md_extend(&volid, fileid, size + offset);
                 if (ret) {
                         ret = _errno(ret);
                         if (ret == EAGAIN) {
@@ -452,7 +454,7 @@ retry:
         }
 #else
 retry1:
-        ret = md_extend(fileid, size + offset);
+        ret = md_extend(&volid, fileid, size + offset);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -647,14 +649,16 @@ int sdfs_truncate(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t length)
         }
 #endif
 
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
+        
 #if ENABLE_ATTR_QUEUE
-        ret = attr_queue_truncate(fileid, length);
+        ret = attr_queue_truncate(&volid, fileid, length);
         if (ret)
                 GOTO(err_ret, ret);
 #else
         int retry = 0;
 retry:
-        ret = md_truncate(fileid, length);
+        ret = md_truncate(&volid, fileid, length);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -673,12 +677,11 @@ int sdfs_getxattr(sdfs_ctx_t *ctx, const fileid_t *fileid, const char *name, voi
 {
         int ret, retry = 0;
 
-        (void) ctx;
-        
         io_analysis(ANALYSIS_OP_READ, 0);
 
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_getxattr(fileid, name, value, size);
+        ret = md_getxattr(&volid, fileid, name, value, size);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -696,12 +699,11 @@ int sdfs_removexattr(sdfs_ctx_t *ctx, const fileid_t *fileid, const char *name)
 {
         int ret, retry = 0;
 
-        (void) ctx;
-        
         io_analysis(ANALYSIS_OP_WRITE, 0);
 
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_removexattr(fileid, name);
+        ret = md_removexattr(&volid, fileid, name);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -723,8 +725,9 @@ int sdfs_listxattr(sdfs_ctx_t *ctx, const fileid_t *fileid, char *list, size_t *
         
         io_analysis(ANALYSIS_OP_READ, 0);
 
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_listxattr(fileid, list, size);
+        ret = md_listxattr(&volid, fileid, list, size);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -750,8 +753,9 @@ int sdfs_setxattr(sdfs_ctx_t *ctx, const fileid_t *fileid, const char *name, con
         io_analysis(ANALYSIS_OP_WRITE, 0);
         md = (void *)buf;
 
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_getattr(fileid, md);
+        ret = md_getattr(&volid, fileid, md);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -807,7 +811,7 @@ retry:
                 }
         }
 
-        ret = md_setxattr(fileid, name, value, size, flags);
+        ret = md_setxattr(&volid, fileid, name, value, size, flags);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -829,8 +833,9 @@ int sdfs_setlock(sdfs_ctx_t *ctx, const fileid_t *fileid, const sdfs_lock_t *loc
         (void) ctx;
 
         io_analysis(ANALYSIS_OP_WRITE, 0);
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_setlock(fileid, lock);
+        ret = md_setlock(&volid, fileid, lock);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -851,9 +856,9 @@ int sdfs_getlock(sdfs_ctx_t *ctx, const fileid_t *fileid, sdfs_lock_t *lock)
         (void) ctx;
 
         io_analysis(ANALYSIS_OP_READ, 0);
-        
+        volid_t volid = {fileid->volid, ctx ? ctx->snapvers : 0};
 retry:
-        ret = md_getlock(fileid, lock);
+        ret = md_getlock(&volid, fileid, lock);
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {

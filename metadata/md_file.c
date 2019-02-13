@@ -20,7 +20,7 @@
 
 static inodeop_t *inodeop = &__inodeop__;
 
-static int __md_truncate(md_proto_t *md, uint64_t length)
+static int __md_truncate(const volid_t *volid, md_proto_t *md, uint64_t length)
 {
         int ret;
         setattr_t setattr;
@@ -52,7 +52,7 @@ static int __md_truncate(md_proto_t *md, uint64_t length)
         }
 
         setattr_init(&setattr, -1, -1, NULL, -1, -1, length);
-        ret = inodeop->setattr(fileid, &setattr, 1);
+        ret = inodeop->setattr(volid, fileid, &setattr, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -61,18 +61,18 @@ err_ret:
         return ret;
 }
 
-int md_truncate(const fileid_t *fileid, uint64_t length)
+int md_truncate(const volid_t *volid, const fileid_t *fileid, uint64_t length)
 {
         int ret;
         md_proto_t *md;
         char buf[MAX_BUF_LEN] = {0};
 
         md = (md_proto_t *)buf;
-        ret = inodeop->getattr(fileid, md);
+        ret = inodeop->getattr(volid, fileid, md);
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = __md_truncate(md, length);
+        ret = __md_truncate(volid, md, length);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -81,13 +81,13 @@ err_ret:
         return ret;
 }
 
-int md_extend(const fileid_t *fileid, size_t size)
+int md_extend(const volid_t *volid, const fileid_t *fileid, size_t size)
 {
         int ret;
 
         ANALYSIS_BEGIN(0);
         
-        ret = inodeop->extend(fileid, size);
+        ret = inodeop->extend(volid, fileid, size);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -148,20 +148,20 @@ static int __md_lock_collision(const sdfs_lock_t *lock, const char *buf, size_t 
         return 0;
 }
 
-static int __md_lock(const fileid_t *fileid, const sdfs_lock_t *lock)
+static int __md_lock(const volid_t *volid, const fileid_t *fileid, const sdfs_lock_t *lock)
 {
         int ret;
         char buf[MAX_BUF_LEN] = {0};
         size_t size = MAX_BUF_LEN;
 
-        ret = klock(fileid, 10, 1);
+        ret = klock(volid, fileid, 10, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = inodeop->getlock(fileid, buf, &size);
+        ret = inodeop->getlock(volid, fileid, buf, &size);
         if (ret) {
                 if (ret == ENOENT) {
-                        ret = inodeop->setlock(fileid, lock, SDFS_LOCK_SIZE(lock), O_CREAT);
+                        ret = inodeop->setlock(volid, fileid, lock, SDFS_LOCK_SIZE(lock), O_CREAT);
                         if (ret)
                                 GOTO(err_lock, ret);
 
@@ -183,16 +183,16 @@ static int __md_lock(const fileid_t *fileid, const sdfs_lock_t *lock)
 
         memcpy(buf + size, lock, SDFS_LOCK_SIZE(lock));
 
-        ret = inodeop->setlock(fileid, buf, size + SDFS_LOCK_SIZE(lock), 0);
+        ret = inodeop->setlock(volid, fileid, buf, size + SDFS_LOCK_SIZE(lock), 0);
         if (ret)
                 GOTO(err_lock, ret);
         
 out:
-        kunlock(fileid);
+        kunlock(volid, fileid);
 
         return 0;
 err_lock:
-        kunlock(fileid);
+        kunlock(volid, fileid);
 err_ret:
         return ret;
 }
@@ -218,18 +218,18 @@ static sdfs_lock_t *__md_lock_find(const sdfs_lock_t *lock, char *buf, size_t si
         return NULL;
 }
 
-static int __md_unlock(const fileid_t *fileid, const sdfs_lock_t *lock)
+static int __md_unlock(const volid_t *volid, const fileid_t *fileid, const sdfs_lock_t *lock)
 {
         int ret;
         char buf[MAX_BUF_LEN] = {0};
         size_t size = MAX_BUF_LEN;
         sdfs_lock_t *pos;
 
-        ret = klock(fileid, 10, 1);
+        ret = klock(volid, fileid, 10, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = inodeop->getlock(fileid, buf, &size);
+        ret = inodeop->getlock(volid, fileid, buf, &size);
         if (ret) {
                 GOTO(err_lock, ret);
         }
@@ -246,25 +246,25 @@ static int __md_unlock(const fileid_t *fileid, const sdfs_lock_t *lock)
         memmove(pos, (void *)pos + SDFS_LOCK_SIZE(pos),
                 size - ((void *)pos - (void *)buf) - SDFS_LOCK_SIZE(pos));
 
-        ret = inodeop->setlock(fileid, buf, size - SDFS_LOCK_SIZE(lock), 0);
+        ret = inodeop->setlock(volid, fileid, buf, size - SDFS_LOCK_SIZE(lock), 0);
         if (ret)
                 GOTO(err_lock, ret);
         
-        kunlock(fileid);
+        kunlock(volid, fileid);
 
         return 0;
 err_lock:
-        kunlock(fileid);
+        kunlock(volid, fileid);
 err_ret:
         return ret;
 }
 
-int md_setlock(const fileid_t *fileid, const sdfs_lock_t *lock)
+int md_setlock(const volid_t *volid, const fileid_t *fileid, const sdfs_lock_t *lock)
 {
         if (lock->type == SDFS_UNLOCK) {
-                return __md_unlock(fileid, lock);
+                return __md_unlock(volid, fileid, lock);
         } else {
-                return __md_lock(fileid, lock);
+                return __md_lock(volid, fileid, lock);
         }
 }
 
@@ -290,18 +290,18 @@ static sdfs_lock_t *__md_lock_find_collision(const sdfs_lock_t *lock, char *buf,
 }
 
 
-int md_getlock(const fileid_t *fileid, sdfs_lock_t *lock)
+int md_getlock(const volid_t *volid, const fileid_t *fileid, sdfs_lock_t *lock)
 {
         int ret;
         char buf[MAX_BUF_LEN] = {0};
         size_t size = MAX_BUF_LEN;
         sdfs_lock_t *pos;
 
-        ret = klock(fileid, 10, 1);
+        ret = klock(volid, fileid, 10, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = inodeop->getlock(fileid, buf, &size);
+        ret = inodeop->getlock(volid, fileid, buf, &size);
         if (ret) {
                 GOTO(err_lock, ret);
         }
@@ -314,11 +314,11 @@ int md_getlock(const fileid_t *fileid, sdfs_lock_t *lock)
 
         memcpy(lock, pos, SDFS_LOCK_SIZE(pos));
 
-        kunlock(fileid);
+        kunlock(volid, fileid);
 
         return 0;
 err_lock:
-        kunlock(fileid);
+        kunlock(volid, fileid);
 err_ret:
         return ret;
 }

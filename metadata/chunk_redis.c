@@ -15,7 +15,7 @@
 
 #define CHKINFO_SIZE(__repnum__) (sizeof(chkinfo_t) + sizeof(diskid_t) * __repnum__)
 
-static int __chunk_create(const chkinfo_t *chkinfo)
+static int __chunk_create(const volid_t *volid, const chkinfo_t *chkinfo)
 {
         int ret;
         const chkid_t *chkid = &chkinfo->chkid;
@@ -25,7 +25,7 @@ static int __chunk_create(const chkinfo_t *chkinfo)
         cid2fid(&fileid, chkid);
 
         snprintf(key, MAX_NAME_LEN, "%u", chkid->idx);
-        ret = hset(&fileid, key, chkinfo, CHKINFO_SIZE(chkinfo->repnum), O_EXCL);
+        ret = hset(volid, &fileid, key, chkinfo, CHKINFO_SIZE(chkinfo->repnum), O_EXCL);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -34,7 +34,7 @@ err_ret:
         return ret;
 }
 
-static int __chunk_load(const chkid_t *chkid, chkinfo_t *chkinfo)
+static int __chunk_load(const volid_t *volid, const chkid_t *chkid, chkinfo_t *chkinfo)
 {
         int ret;
         size_t len;
@@ -45,7 +45,7 @@ static int __chunk_load(const chkid_t *chkid, chkinfo_t *chkinfo)
 
         snprintf(key, MAX_NAME_LEN, "%u", chkid->idx);
         len = CHKINFO_SIZE(YFS_CHK_REP_MAX);
-        ret = hget(&fileid, key, (char *)chkinfo, &len);
+        ret = hget(volid, &fileid, key, (char *)chkinfo, &len);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -54,7 +54,7 @@ err_ret:
         return ret;
 }
 
-static int __chunk_update(const chkinfo_t *chkinfo)
+static int __chunk_update(const volid_t *volid, const chkinfo_t *chkinfo)
 {
         int ret;
         const chkid_t *chkid = &chkinfo->chkid;
@@ -64,7 +64,7 @@ static int __chunk_update(const chkinfo_t *chkinfo)
         cid2fid(&fileid, chkid);
 
         snprintf(key, MAX_NAME_LEN, "%u", chkid->idx);
-        ret = hset(&fileid, key, chkinfo, CHKINFO_SIZE(chkinfo->repnum), 0);
+        ret = hset(volid, &fileid, key, chkinfo, CHKINFO_SIZE(chkinfo->repnum), 0);
         if (ret)
                 GOTO(err_ret, ret);
 

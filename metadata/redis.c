@@ -50,7 +50,7 @@ int __redis_conn_pool__ = -1;
 static int __redis_request(const int hash, const char *name, func_va_t exec, ...);
 
 #if !ENABLE_REDIS_PIPELINE
-static int __hget__(const fileid_t *fileid, const char *name, char *value, size_t *size)
+static int __hget__(const volid_t *volid, const fileid_t *fileid, const char *name, char *value, size_t *size)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
@@ -59,10 +59,9 @@ static int __hget__(const fileid_t *fileid, const char *name, char *value, size_
         ANALYSIS_BEGIN(0);
         
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
         
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -90,6 +89,7 @@ err_ret:
 
 static int __hget(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         const char *name = va_arg(ap, const char *);
         char *value = va_arg(ap, char *);
@@ -97,11 +97,11 @@ static int __hget(va_list ap)
 
         va_end(ap);
 
-        return __hget__(fileid, name, value, size);
+        return __hget__(volid, fileid, name, value, size);
 }
 #endif
 
-int hget(const fileid_t *fileid, const char *name, char *value, size_t *size)
+int hget(const volid_t *volid, const fileid_t *fileid, const char *name, char *value, size_t *size)
 {
         int ret;
 
@@ -110,10 +110,10 @@ int hget(const fileid_t *fileid, const char *name, char *value, size_t *size)
         ANALYSIS_BEGIN(0);
         
 #if ENABLE_REDIS_PIPELINE
-        ret = pipeline_hget(fileid, name, value, size);
+        ret = pipeline_hget(volid, fileid, name, value, size);
 #else
         ret =  __redis_request(fileid_hash(fileid), "hget", __hget,
-                               fileid, name, value, size);
+                               volid, fileid, name, value, size);
 #endif        
         
 
@@ -123,7 +123,7 @@ int hget(const fileid_t *fileid, const char *name, char *value, size_t *size)
 }
 
 #if !ENABLE_REDIS_PIPELINE
-static int __hset__(const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
+static int __hset__(const volid_t *volid, const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
@@ -132,10 +132,9 @@ static int __hset__(const fileid_t *fileid, const char *name, const void *value,
         ANALYSIS_BEGIN(0);
         
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -171,6 +170,7 @@ err_ret:
 
 static int __hset(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         const char *name = va_arg(ap, const char *);
         const char *value = va_arg(ap, const char *);
@@ -179,21 +179,21 @@ static int __hset(va_list ap)
 
         va_end(ap);
 
-        return __hset__(fileid, name, value, size, flag);
+        return __hset__(volid, fileid, name, value, size, flag);
 }
 #endif
 
-int hset(const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
+int hset(const volid_t *volid, const fileid_t *fileid, const char *name, const void *value, uint32_t size, int flag)
 {
         int ret;
         
         ANALYSIS_BEGIN(0);
         
 #if ENABLE_REDIS_PIPELINE
-        ret = pipeline_hset(fileid, name, value, size, flag);
+        ret = pipeline_hset(volid, fileid, name, value, size, flag);
 #else        
         ret = __redis_request(fileid_hash(fileid), "hset", __hset,
-                               fileid, name, value, size, flag);
+                               volid, fileid, name, value, size, flag);
 #endif
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
@@ -202,17 +202,16 @@ int hset(const fileid_t *fileid, const char *name, const void *value, uint32_t s
 }
 
 #if !ENABLE_REDIS_PIPELINE
-static int __hlen__(const fileid_t *fileid, uint64_t *count)
+static int __hlen__(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
 
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -238,32 +237,33 @@ err_ret:
 
 static int __hlen(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         uint64_t *count = va_arg(ap, uint64_t *);
 
         va_end(ap);
 
-        return __hlen__(fileid, count);
+        return __hlen__(volid, fileid, count);
 }
 #endif
 
-int hlen(const fileid_t *fileid, uint64_t *count)
+int hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
 {
         int ret;
 
         ANALYSIS_BEGIN(0);
 #if ENABLE_REDIS_PIPELINE
-        ret = pipeline_hlen(fileid, count);
+        ret = pipeline_hlen(volid, fileid, count);
 #else
         ret = __redis_request(fileid_hash(fileid), "hlen", __hlen,
-                               fileid, count);
+                               volid, fileid, count);
 #endif
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
         return ret;
 }
 
-redisReply *__hscan__(const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
+redisReply *__hscan__(const volid_t *volid, const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
@@ -271,10 +271,8 @@ redisReply *__hscan__(const fileid_t *fileid, const char *match, uint64_t cursor
         redisReply *reply;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
-
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -294,6 +292,7 @@ err_ret:
 
 static int __hscan(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         const char *match = va_arg(ap, const char *);
         uint64_t cursor = va_arg(ap, uint64_t);
@@ -302,32 +301,30 @@ static int __hscan(va_list ap)
 
         va_end(ap);
 
-        *_redisReply = __hscan__(fileid, match, cursor, count);
+        *_redisReply = __hscan__(volid, fileid, match, cursor, count);
         return 0;
 }
 
 
-redisReply *hscan(const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
+redisReply *hscan(const volid_t *volid, const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
 {
         redisReply *reply;
         __redis_request(fileid_hash(fileid), "hscan", __hscan,
-                        fileid, match, cursor, count, &reply);
+                        volid, fileid, match, cursor, count, &reply);
 
         return reply;
 }
 
 
-static int __hdel__(const fileid_t *fileid, const char *name)
+static int __hdel__(const volid_t *volid, const fileid_t *fileid, const char *name)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
-
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -353,37 +350,36 @@ err_ret:
 
 static int __hdel(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         const char *name = va_arg(ap, const char *);
 
         va_end(ap);
 
-        return __hdel__(fileid, name);
+        return __hdel__(volid, fileid, name);
 }
 
 
-int hdel(const fileid_t *fileid, const char *name)
+int hdel(const volid_t *volid, const fileid_t *fileid, const char *name)
 {
 #if ENABLE_REDIS_PIPELINE
-        return pipeline_hdel(fileid, name);
+        return pipeline_hdel(volid, fileid, name);
 #endif
         
         return __redis_request(fileid_hash(fileid), "hdel", __hdel,
-                               fileid, name);
+                               volid, fileid, name);
 }
 
 #if !ENABLE_REDIS_PIPELINE
-static int __kget__(const fileid_t *fileid, void *value, size_t *size)
+static int __kget__(const volid_t *volid, const fileid_t *fileid, void *value, size_t *size)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
-
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -410,42 +406,41 @@ err_ret:
 
 static int __kget(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         void *value = va_arg(ap, void *);
         size_t *size = va_arg(ap, size_t *);
 
         va_end(ap);
 
-        return __kget__(fileid, value, size);
+        return __kget__(volid, fileid, value, size);
 }
 #endif
 
-int kget(const fileid_t *fileid, void *value, size_t *size)
+int kget(const volid_t *volid, const fileid_t *fileid, void *value, size_t *size)
 {
         int ret;
 
 #if ENABLE_REDIS_PIPELINE
-        ret = pipeline_kget(fileid, value, size);
+        ret = pipeline_kget(volid, fileid, value, size);
 #else
         ret = __redis_request(fileid_hash(fileid), "kget", __kget,
-                               fileid, value, size);
+                               volid, fileid, value, size);
 #endif
 
         return ret;
 }
 
 #if !ENABLE_REDIS_PIPELINE
-static int __kset__(const fileid_t *fileid, const void *value, size_t size, int flag)
+static int __kset__(const volid_t *volid, const fileid_t *fileid, const void *value, size_t size, int flag)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
-
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -472,6 +467,7 @@ err_ret:
 
 static int __kset(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         const void *value = va_arg(ap, const void *);
         size_t size = va_arg(ap, size_t);
@@ -479,35 +475,33 @@ static int __kset(va_list ap)
 
         va_end(ap);
 
-        return __kset__(fileid, value, size, flag);
+        return __kset__(volid, fileid, value, size, flag);
 }
 #endif
 
-int kset(const fileid_t *fileid, const void *value, size_t size, int flag)
+int kset(const volid_t *volid, const fileid_t *fileid, const void *value, size_t size, int flag)
 {
         int ret;
         
 #if ENABLE_REDIS_PIPELINE
-        ret = pipeline_kset(fileid, value, size, flag, -1);
+        ret = pipeline_kset(volid, fileid, value, size, flag, -1);
 #else
         ret = __redis_request(fileid_hash(fileid), "kset", __kset,
-                               fileid, value, size, flag);
+                               volid, fileid, value, size, flag);
 #endif
 
         return ret;
 }
 
-static int __kdel__(const fileid_t *fileid)
+static int __kdel__(const volid_t *volid, const fileid_t *fileid)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
-
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -533,35 +527,34 @@ err_ret:
 
 static int __kdel(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
 
         va_end(ap);
 
-        return __kdel__(fileid);
+        return __kdel__(volid, fileid);
 }
 
 
-int kdel(const fileid_t *fileid)
+int kdel(const volid_t *volid, const fileid_t *fileid)
 {
 #if ENABLE_REDIS_PIPELINE
-        return pipeline_kdel(fileid);
+        return pipeline_kdel(volid, fileid);
 #endif
         
         return __redis_request(fileid_hash(fileid), "kdel", __kdel,
-                               fileid);
+                               volid, fileid);
 }
 
 #if !ENABLE_REDIS_PIPELINE
-static int __klock1(const fileid_t *fileid, int ttl)
+static int __klock1(const volid_t *volid, const fileid_t *fileid, int ttl)
 {
         int ret, retry = 0;
         redis_handler_t handler;
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
 
-        volid_t volid = {fileid->volid, fileid->snapvers};
-        
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -587,12 +580,12 @@ err_ret:
         return ret;
 }
 
-static int __klock__(const fileid_t *fileid, int ttl, int block)
+static int __klock__(const volid_t *volid, const fileid_t *fileid, int ttl, int block)
 {
         int ret, retry = 0;
 
 retry:
-        ret = __klock1(fileid, ttl);
+        ret = __klock1(volid, fileid, ttl);
         if(ret) {
                 if (ret == EEXIST && block) {
                         if (retry > 500 && retry % 100 == 0 ) {
@@ -612,27 +605,28 @@ err_ret:
 
 inline static int __klock(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         int ttl = va_arg(ap, int);
         int block = va_arg(ap, int);
 
         va_end(ap);
 
-        return __klock__(fileid, ttl, block);
+        return __klock__(volid, fileid, ttl, block);
 }
 #endif
 
-int klock(const fileid_t *fileid, int ttl, int block)
+int klock(const volid_t *volid, const fileid_t *fileid, int ttl, int block)
 {
 #if ENABLE_KLOCK
         int ret;
         
         ANALYSIS_BEGIN(0);
 #if ENABLE_REDIS_PIPELINE
-        ret = pipeline_klock(fileid, ttl, block);
+        ret = pipeline_klock(volid, fileid, ttl, block);
 #else
         ret = __redis_request(fileid_hash(fileid), "klock", __klock,
-                               fileid, ttl, block);
+                               volid, fileid, ttl, block);
 #endif
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
@@ -647,15 +641,14 @@ int klock(const fileid_t *fileid, int ttl, int block)
 }
 
 #if !ENABLE_REDIS_PIPELINE
-static int __kunlock__(const fileid_t *fileid)
+static int __kunlock__(const volid_t *volid, const fileid_t *fileid)
 {
         int ret, retry = 0;
         redis_handler_t handler;
         char key[MAX_PATH_LEN];
 
-        volid_t volid = {fileid->volid, fileid->snapvers};
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -683,25 +676,26 @@ err_ret:
 
 inline static int __kunlock(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
 
         va_end(ap);
 
-        return __kunlock__(fileid);
+        return __kunlock__(volid, fileid);
 }
 #endif
 
-int kunlock(const fileid_t *fileid)
+int kunlock(const volid_t *volid, const fileid_t *fileid)
 {
 #if ENABLE_KLOCK
         int ret;
 
         ANALYSIS_BEGIN(0);
 #if ENABLE_REDIS_PIPELINE
-        ret = pipeline_kunlock(fileid);
+        ret = pipeline_kunlock(volid, fileid);
 #else        
         ret = __redis_request(fileid_hash(fileid), "kunlock", __kunlock,
-                               fileid);
+                              volid, fileid);
 
 #endif
         ANALYSIS_END(0, IO_WARN, NULL);
@@ -712,17 +706,15 @@ int kunlock(const fileid_t *fileid)
 #endif
 }
 
-static int __hiter__(const fileid_t *fileid, const char *match, func2_t func, void *ctx)
+static int __hiter__(const volid_t *volid, const fileid_t *fileid, const char *match, func2_t func, void *ctx)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
         redis_handler_t handler;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
-
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -748,6 +740,7 @@ err_ret:
 
 static int __hiter(va_list ap)
 {
+        const volid_t *volid = va_arg(ap, const volid_t *);
         const fileid_t *fileid = va_arg(ap, const fileid_t *);
         const char *match = va_arg(ap, const char *);
         func2_t func = va_arg(ap, func2_t);
@@ -755,14 +748,14 @@ static int __hiter(va_list ap)
 
         va_end(ap);
 
-        return __hiter__(fileid, match, func, ctx);
+        return __hiter__(volid, fileid, match, func, ctx);
 }
 
 
-int hiter(const fileid_t *fileid, const char *match, func2_t func, void *ctx)
+int hiter(const volid_t *volid, const fileid_t *fileid, const char *match, func2_t func, void *ctx)
 {
         return __redis_request(fileid_hash(fileid), "hiter", __hiter,
-                               fileid, match, func, ctx);
+                               volid, fileid, match, func, ctx);
 }
 
 static int __rm_push__(const nid_t *nid, int _hash, const chkid_t *chkid)

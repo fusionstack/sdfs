@@ -21,6 +21,7 @@
 typedef struct {
         struct list_head hook;
         fileid_t fileid;
+        volid_t volid;
         const char *format;
         va_list ap;
         redisReply *reply;
@@ -245,7 +246,7 @@ err_ret:
         return ret;
 }
 
-int redis_pipeline(const fileid_t *fileid, redisReply **reply,
+int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
                    const char *format, ...)
 {
         int ret;
@@ -254,6 +255,7 @@ int redis_pipeline(const fileid_t *fileid, redisReply **reply,
 
         ctx.format = format;
         ctx.fileid = *fileid;
+        ctx.volid = *volid;
         ctx.pipeline = pipeline;
         va_start(ctx.ap, format);
 
@@ -324,6 +326,7 @@ err_ret:
 typedef struct {
         struct list_head list;
         fileid_t fileid;
+        volid_t volid;
         int finished;
 } arg2_t;
 
@@ -372,7 +375,7 @@ inline STATIC void __redis_pipline_run__(void *_arg)
 {
         int ret;
         arg2_t *arg = _arg;
-                
+
         ret = redis_exec(&arg->fileid, __redis_exec, arg);
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
@@ -409,6 +412,7 @@ STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd)
                 pos = (void *)list.next;
                 ctx = (redis_pipline_ctx_t *)pos;
                 arg->fileid = ctx->fileid;
+                arg->volid = ctx->volid;
                 arg->finished = 0;
                 INIT_LIST_HEAD(&arg->list);
                 list_del(pos);
@@ -420,7 +424,8 @@ STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd)
                         ctx = (redis_pipline_ctx_t *)pos;
 
                         if (ctx->fileid.sharding == arg->fileid.sharding
-                            && ctx->fileid.volid == arg->fileid.volid) {
+                            && ctx->fileid.volid == arg->fileid.volid
+                            && ctx->volid.snapvers == arg->volid.snapvers) {
                                 list_del(pos);
                                 list_add_tail(pos, &arg->list);
                                 submit++;
@@ -473,7 +478,7 @@ err_ret:
         return ret;
 }
 
-int pipeline_hget(const fileid_t *fileid, const char *key, void *buf, size_t *len)
+int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key, void *buf, size_t *len)
 {
         int ret;
         redisReply *reply;
@@ -483,7 +488,7 @@ int pipeline_hget(const fileid_t *fileid, const char *key, void *buf, size_t *le
 
         DBUG("%s %s\n", hash, key);
         
-        ret = redis_pipeline(fileid, &reply, "HGET %s %s", hash, key);
+        ret = redis_pipeline(volid, fileid, &reply, "HGET %s %s", hash, key);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -516,7 +521,7 @@ err_ret:
         return ret;
 }
 
-int pipeline_hset(const fileid_t *fileid, const char *key, const void *value, size_t size, int flag)
+int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key, const void *value, size_t size, int flag)
 {
         int ret;
         redisReply *reply;
@@ -527,9 +532,9 @@ int pipeline_hset(const fileid_t *fileid, const char *key, const void *value, si
         DBUG("%s %s, flag 0x%o\n", hash, key, flag);
         
         if (flag & O_EXCL) {
-                ret = redis_pipeline(fileid, &reply, "HSETNX %s %s %b", hash, key, value, size);
+                ret = redis_pipeline(volid, fileid, &reply, "HSETNX %s %s %b", hash, key, value, size);
         } else {
-                ret = redis_pipeline(fileid, &reply, "HSET %s %s %b", hash, key, value, size);
+                ret = redis_pipeline(volid, fileid, &reply, "HSET %s %s %b", hash, key, value, size);
         }
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -560,7 +565,7 @@ err_ret:
         return ret;
 }
 
-int pipeline_hdel(const fileid_t *fileid, const char *key)
+int pipeline_hdel(const volid_t *volid, const fileid_t *fileid, const char *key)
 {
         int ret;
         redisReply *reply;
@@ -570,7 +575,7 @@ int pipeline_hdel(const fileid_t *fileid, const char *key)
 
         DBUG("%s %s\n", hash, key);
         
-        ret = redis_pipeline(fileid, &reply, "HDEL %s %s", hash, key);
+        ret = redis_pipeline(volid, fileid, &reply, "HDEL %s %s", hash, key);
         if (unlikely(ret))
                 GOTO(err_ret, ret);        
 
@@ -599,14 +604,14 @@ err_ret:
         return ret;
 }
 
-STATIC int __pipeline_kget(const fileid_t *fileid, const char *key, void *buf, size_t *len)
+STATIC int __pipeline_kget(const volid_t *volid, const fileid_t *fileid, const char *key, void *buf, size_t *len)
 {
         int ret;
         redisReply *reply;
 
         DBUG("%s\n", key);
         
-        ret = redis_pipeline(fileid, &reply,"GET %s", key);
+        ret = redis_pipeline(volid, fileid, &reply,"GET %s", key);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -639,7 +644,7 @@ err_ret:
         return ret;
 }
 
-STATIC int __pipeline_kset(const fileid_t *fileid, const char *key, const void *value,
+STATIC int __pipeline_kset(const volid_t *volid, const fileid_t *fileid, const char *key, const void *value,
                   size_t size, int flag, int _ttl)
 {
         int ret;
@@ -650,18 +655,18 @@ STATIC int __pipeline_kset(const fileid_t *fileid, const char *key, const void *
         if (_ttl != -1) {
                 size_t ttl = _ttl;
                 if (flag & O_EXCL) {
-                        ret = redis_pipeline(fileid, &reply, "SET %s %b EX %d NX",
+                        ret = redis_pipeline(volid, fileid, &reply, "SET %s %b EX %d NX",
                                              key, value, size, ttl);
                 } else {
-                        ret = redis_pipeline(fileid, &reply, "SET %s %b EX %d",
+                        ret = redis_pipeline(volid, fileid, &reply, "SET %s %b EX %d",
                                              key, value, size, ttl);
                 }
         } else {
                 if (flag & O_EXCL) {
-                        ret = redis_pipeline(fileid, &reply, "SET %s %b NX",
+                        ret = redis_pipeline(volid, fileid, &reply, "SET %s %b NX",
                                              key, value, size);
                 } else {
-                        ret = redis_pipeline(fileid, &reply, "SET %s %b",
+                        ret = redis_pipeline(volid, fileid, &reply, "SET %s %b",
                                              key, value, size);
                 }
         }
@@ -694,14 +699,14 @@ err_ret:
         return ret;
 }
 
-STATIC int __pipeline_kdel(const fileid_t *fileid, const char *key)
+STATIC int __pipeline_kdel(const volid_t *volid, const fileid_t *fileid, const char *key)
 {
         int ret;
         redisReply *reply;
 
         DBUG("%s\n", key);
         
-        ret = redis_pipeline(fileid, &reply, "DEL %s", key);
+        ret = redis_pipeline(volid, fileid, &reply, "DEL %s", key);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -730,7 +735,7 @@ err_ret:
         return ret;
 }
 
-int pipeline_hlen(const fileid_t *fileid, uint64_t *count)
+int pipeline_hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
 {
         int ret;
         redisReply *reply;
@@ -740,7 +745,7 @@ int pipeline_hlen(const fileid_t *fileid, uint64_t *count)
 
         DBUG("%s\n", hash);
 
-        ret = redis_pipeline(fileid, &reply, "HLEN %s", hash);
+        ret = redis_pipeline(volid, fileid, &reply, "HLEN %s", hash);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -760,14 +765,14 @@ err_ret:
         return ret;
 }
 
-STATIC int __pipeline_klock(const fileid_t *fileid, int ttl)
+STATIC int __pipeline_klock(const volid_t *volid, const fileid_t *fileid, int ttl)
 {
         int ret;
         char key[MAX_PATH_LEN], value[MAX_BUF_LEN];
 
         snprintf(key, MAX_NAME_LEN, "lock:"CHKID_FORMAT, CHKID_ARG(fileid));
         snprintf(value, MAX_NAME_LEN, "%u", ng.local_nid.id);
-        ret = __pipeline_kset(fileid, key, value, strlen(value) + 1, O_EXCL, ttl);
+        ret = __pipeline_kset(volid, fileid, key, value, strlen(value) + 1, O_EXCL, ttl);
         if(ret) {
                 GOTO(err_ret, ret);
         }
@@ -777,12 +782,12 @@ err_ret:
         return ret;
 }
 
-int pipeline_klock(const fileid_t *fileid, int ttl, int block)
+int pipeline_klock(const volid_t *volid, const fileid_t *fileid, int ttl, int block)
 {
         int ret, retry = 0;
 
 retry:
-        ret = __pipeline_klock(fileid, ttl);
+        ret = __pipeline_klock(volid, fileid, ttl);
         if(ret) {
                 if (ret == EEXIST && block) {
                         if (retry > 500 && retry % 100 == 0 ) {
@@ -800,13 +805,13 @@ err_ret:
         return ret;
 }
 
-int pipeline_kunlock(const fileid_t *fileid)
+int pipeline_kunlock(const volid_t *volid, const fileid_t *fileid)
 {
         int ret;
         char key[MAX_PATH_LEN];
 
         snprintf(key, MAX_NAME_LEN, "lock:"CHKID_FORMAT, CHKID_ARG(fileid));
-        ret = __pipeline_kdel(fileid, key);
+        ret = __pipeline_kdel(volid, fileid, key);
         if(ret) {
                 GOTO(err_ret, ret);
         }
@@ -817,32 +822,32 @@ err_ret:
         return ret;
 }
 
-int pipeline_kget(const fileid_t *fileid, void *buf, size_t *len)
+int pipeline_kget(const volid_t *volid, const fileid_t *fileid, void *buf, size_t *len)
 {
         char key[MAX_NAME_LEN];
 
         id2key(ftype(fileid), fileid, key);
         
-        return __pipeline_kget(fileid, key, buf, len);
+        return __pipeline_kget(volid, fileid, key, buf, len);
 }
 
-int pipeline_kset(const fileid_t *fileid, const void *value,
+int pipeline_kset(const volid_t *volid, const fileid_t *fileid, const void *value,
                   size_t size, int flag, int _ttl)
 {
         char key[MAX_NAME_LEN];
  
         id2key(ftype(fileid), fileid, key);
         
-        return __pipeline_kset(fileid, key, value, size, flag, _ttl);
+        return __pipeline_kset(volid, fileid, key, value, size, flag, _ttl);
 }
 
-int pipeline_kdel(const fileid_t *fileid)
+int pipeline_kdel(const volid_t *volid, const fileid_t *fileid)
 {
         char key[MAX_NAME_LEN];
 
         id2key(ftype(fileid), fileid, key);
         
-        return __pipeline_kdel(fileid, key);
+        return __pipeline_kdel(volid, fileid, key);
 }
 
 #endif

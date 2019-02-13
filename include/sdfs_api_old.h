@@ -79,7 +79,6 @@ extern void ly_set_daemon();
 extern int ly_readdir(const char *path, off_t offset, void **de, int *delen, int prog_type);
 extern int ly_readdirplus(const char *path, off_t offset, void **de, int *delen, int prog_type);
 
-extern int ly_readdirplus_count(const char *path, file_statis_t *);
 extern int ly_readdirplus_with_filter(const char *path, off_t offset, void **de, int *delen,
                                       const filter_t *filter);
 
@@ -128,8 +127,6 @@ extern int ly_set_default_acl(const char *path, mode_t mode);
 
 
 /*raw*/
-extern int raw_readdirplus_count(const fileid_t *fileid, file_statis_t *);
-
 extern int raw_set_wormid(const fileid_t *fileid);
 extern int raw_create_worm(const fileid_t *fileid, const worm_t *worm);
 extern int raw_modify_worm(const fileid_t *fileid, const worm_t *worm,

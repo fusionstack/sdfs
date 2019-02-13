@@ -66,11 +66,6 @@ int normalize_path(const char *path, char *path2) {
         return 0;
 }
 
-int raw_readdirplus_count(const fileid_t *fileid, file_statis_t *file_statis)
-{
-        return md_readdirplus_count(fileid, file_statis);
-}
-
 #if ENABLE_WORM
 int raw_unlink_with_worm(const fileid_t *parent, const char *name,
                 const char *username, const char *password)
@@ -183,7 +178,7 @@ int raw_printfile(fileid_t *fileid, uint32_t _chkno)
         md = (void *)buf;
         chkinfo = (void *)buf1;
 
-        ret = md_getattr(fileid, (void *)md);
+        ret = md_getattr(NULL, fileid, (void *)md);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -273,7 +268,7 @@ int raw_printfile1(fileid_t *fileid)
         md = (void *)buf;
         chkinfo = (void *)buf1;
 
-        ret = md_getattr(fileid, (void *)md);
+        ret = md_getattr(NULL, fileid, (void *)md);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -347,7 +342,7 @@ int raw_is_directory_empty(const fileid_t *fileid, int *is_empty)
                 GOTO(err_ret, ret);
         }
 
-        ret = md_childcount(fileid, &count);
+        ret = md_childcount(NULL, fileid, &count);
         if (ret)
                 GOTO(err_ret, ret);
 

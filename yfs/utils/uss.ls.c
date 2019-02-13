@@ -225,43 +225,6 @@ err_ret:
         return ret;
 }
 
-#if 0
-
-static int __ls_count(const char *path, file_statis_t *file_statis, const filter_t *filter)
-{
-        int ret;
-        uint64_t from = 0, to = 0;
-
-        ret = ly_readdirplus_count(path, file_statis);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        if (filter && (filter->travel_from != 0) && (filter->travel_to != 0)) {
-                if ((filter->travel_from > file_statis->total) && (filter->travel_to > file_statis->total)) {
-                        ret = EPERM;
-                        fprintf(stderr, "display range out total[%lu], please input again\n", file_statis->total);
-                        GOTO(err_ret, ret);
-                }
-
-                to = (filter->travel_to <= file_statis->total) ? filter->travel_to : file_statis->total;
-                from = (filter->travel_from <= file_statis->total) ? filter->travel_from : file_statis->total;
-                printf("total:%lu dir:%lu file:%lu display: %lu-%lu \n",
-                                file_statis->total, file_statis->dir_count, file_statis->file_count, from, to);
-        } else if (filter && (filter->travel_num != 0)) {
-                to = (filter->travel_num < file_statis->total) ? filter->travel_num : file_statis->total;
-                printf("total:%lu dir:%lu file:%lu display:%lu\n",
-                                file_statis->total, file_statis->dir_count, file_statis->file_count, to);
-        } else
-                printf("total:%lu dir:%lu file:%lu\n",
-                                file_statis->total, file_statis->dir_count, file_statis->file_count);
-
-        return 0;
-err_ret:
-        return ret;
-}
-
-#endif
-
 static int __number_check(const char *name, off_t *offset, size_t *size)
 {
         int ret, count = 0;
