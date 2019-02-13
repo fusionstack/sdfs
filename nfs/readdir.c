@@ -153,7 +153,7 @@ static void __readdir_remove(const cookie_t *cookie)
         }
 }
 
-static int __readdir_getlist(const dirid_t *dirid, cookie_t *_cookie, dirlist_t **_dirlist)
+static int __readdir_getlist(sdfs_ctx_t *ctx, const dirid_t *dirid, cookie_t *_cookie, dirlist_t **_dirlist)
 {
         int ret;
         dirlist_t *dirlist;
@@ -161,7 +161,7 @@ static int __readdir_getlist(const dirid_t *dirid, cookie_t *_cookie, dirlist_t 
 
         cookie = *_cookie;
         if (cookie.id == 0 && cookie.cur == 0) {
-                ret = sdfs_dirlist(dirid, UINT8_MAX / 2, 0, &dirlist);
+                ret = sdfs_dirlist(ctx, dirid, UINT8_MAX / 2, 0, &dirlist);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -186,7 +186,7 @@ err_ret:
         return ret;
 }
 
-static int __readdir_putlist(const dirid_t *dirid, const cookie_t *cookie, dirlist_t *dirlist, int *_eof)
+static int __readdir_putlist(sdfs_ctx_t *ctx, const dirid_t *dirid, const cookie_t *cookie, dirlist_t *dirlist, int *_eof)
 {
         int ret, eof;
         uint64_t offset;
@@ -201,7 +201,7 @@ static int __readdir_putlist(const dirid_t *dirid, const cookie_t *cookie, dirli
                         offset = dirlist->offset;
                         yfree((void **)&dirlist);
                         
-                        ret = sdfs_dirlist(dirid, UINT8_MAX / 2, offset, &dirlist);
+                        ret = sdfs_dirlist(ctx, dirid, UINT8_MAX / 2, offset, &dirlist);
                         if (ret) {
 #if 0
                                 ret = __readdir_save(&cookie, dirlist);
@@ -238,7 +238,7 @@ static int __readirplus_entry(entryplus *entryplus, char *name, fileid_t *fileid
         int ret;
         struct stat stbuf;
 
-        ret = sdfs_getattr(&node->fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &node->fileid, &stbuf);
         if (ret) {
                 if (ret == ENOENT) {
                         memset(&stbuf, 0x0, sizeof(stbuf));
@@ -272,7 +272,7 @@ err_ret:
         return ret;
 }
 
-int readdirplus(const fileid_t *fileid, uint64_t _cookie, char *verf,
+int readdirplus(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t _cookie, char *verf,
                 uint32_t count, readdirplus_ret *res, entryplus *_entryplus,
                 char *obj, fileid_t *fharray)
 {
@@ -311,7 +311,7 @@ int readdirplus(const fileid_t *fileid, uint64_t _cookie, char *verf,
         DBUG("readdir "CHKID_FORMAT" count %u, cookie %u,%u\n",
               CHKID_ARG(fileid), count, cookie.id, cookie.cur);
 
-        ret = __readdir_getlist(fileid, &cookie, &dirlist);
+        ret = __readdir_getlist(ctx, fileid, &cookie, &dirlist);
         if (ret) {
                 if (ret == ENOENT) {
                         resok = &res->u.ok;
@@ -368,7 +368,7 @@ int readdirplus(const fileid_t *fileid, uint64_t _cookie, char *verf,
         }
 
         resok = &res->u.ok;
-        ret = __readdir_putlist(fileid, &cookie, dirlist, &resok->reply.eof);
+        ret = __readdir_putlist(NULL, fileid, &cookie, dirlist, &resok->reply.eof);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -386,7 +386,7 @@ out:
 
         return 0;
 err_free:
-        __readdir_putlist(fileid, &cookie, dirlist, NULL);
+        __readdir_putlist(ctx, fileid, &cookie, dirlist, NULL);
 err_ret:
         res->status = readdir_err(ret);
         return ret;
@@ -398,7 +398,7 @@ static int __readir_entry(entry *entry, char *name,
         int ret;
         struct stat stbuf;
 
-        ret = sdfs_getattr(&node->fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &node->fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -428,9 +428,9 @@ err_ret:
 }
 
 
-int read_dir(const fileid_t *fileid, uint64_t _cookie, char *verf,
-                uint32_t count, readdir_ret *res, entry *_entry,
-                char *obj)
+int read_dir(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t _cookie, char *verf,
+             uint32_t count, readdir_ret *res, entry *_entry,
+             char *obj)
 {
         int ret;
         uint32_t i, real_count;
@@ -466,10 +466,11 @@ int read_dir(const fileid_t *fileid, uint64_t _cookie, char *verf,
 
         DBUG("readdir "FID_FORMAT" count %u\n", FID_ARG(fileid), count);
 
-        ret = __readdir_getlist(fileid, &cookie, &dirlist);
+        ret = __readdir_getlist(ctx, fileid, &cookie, &dirlist);
         if (ret) {
                 if (ret == ENOENT) {
                         resok = &res->u.ok;
+                        
                         resok->reply.eof = 1;
                         _entry[0].name = NULL;
                         goto out;
@@ -525,7 +526,7 @@ int read_dir(const fileid_t *fileid, uint64_t _cookie, char *verf,
         DBUG("ly_opendir "FID_FORMAT" end.\n", FID_ARG(fileid));
 
         resok = &res->u.ok;
-        ret = __readdir_putlist(fileid, &cookie, dirlist, &resok->reply.eof);
+        ret = __readdir_putlist(ctx, fileid, &cookie, dirlist, &resok->reply.eof);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -542,7 +543,7 @@ out:
 
         return 0;
 err_free:
-        __readdir_putlist(fileid, &cookie, dirlist, NULL);
+        __readdir_putlist(ctx, fileid, &cookie, dirlist, NULL);
 err_ret:
         return ret;
 }

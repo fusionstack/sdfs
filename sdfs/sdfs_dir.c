@@ -36,12 +36,14 @@
 #include "io_analysis.h"
 #include "dbg.h"
 
-int sdfs_mkdir(const fileid_t *parent, const char *name, const ec_t *ec,
-              fileid_t *fileid, uint32_t mode, uint32_t uid, uint32_t gid)
+int sdfs_mkdir(sdfs_ctx_t *ctx, const fileid_t *parent, const char *name, const ec_t *ec,
+               fileid_t *fileid, uint32_t mode, uint32_t uid, uint32_t gid)
 {
         int ret, retry = 0;
         setattr_t setattr;
 
+        (void) ctx;
+        
         io_analysis(ANALYSIS_OP_WRITE, 0);
         
         setattr_init(&setattr, mode, -1, ec, uid, gid, -1);
@@ -172,57 +174,6 @@ err_ret:
         return ret;
 }
 
-int sdfs_mkdir_recurive(const char *path, const ec_t *ec, mode_t mode, fileid_t *_fileid)
-{
-        int ret;
-        fileid_t parent, fileid;
-        char dirname[MAX_NAME_LEN], basename[MAX_NAME_LEN];
-
-        _path_split2(path, dirname, basename);
-        
-        if (strcmp(dirname, ROOT_NAME) == 0) {
-                DINFO("dirname (%s), basename (%s)\n", dirname, basename);
-
-                ret = sdfs_mkvol(basename, ec, mode, &fileid);
-                if (ret) {
-                        if (ret == EEXIST) {
-                                //pass
-                        } else 
-                                GOTO(err_ret, ret);
-                }
-        } else {
-                DINFO("dirname (%s) basename (%s)\n", dirname, basename);
-
-        retry:
-                ret = sdfs_lookup_recurive(dirname, &parent);
-                if (ret) {
-                        if (ret == ENOENT) {
-                                ret = sdfs_mkdir_recurive(dirname, ec, mode, &parent);
-                                if (ret) {
-                                        if (ret == EEXIST) {
-                                                goto retry;
-                                        } else
-                                                GOTO(err_ret, ret);
-                                }
-                        } else
-                                GOTO(err_ret, ret);
-                }
-
-                ret = sdfs_mkdir(&parent, basename, ec, &fileid, mode, geteuid(), getgid());
-                if (ret)
-                        GOTO(err_ret, ret);
-        }
-        
-        DBUG("dir (%s) created\n", path);
-
-        if (_fileid)
-                *_fileid = fileid;
-        
-        return 0;
-err_ret:
-        return ret;
-}
-
 inline static int __etcd_getattr(const char *name, md_proto_t *md)
 {
         int ret;
@@ -332,10 +283,12 @@ err_ret:
         return ret;
 }
 
-int sdfs_readdir1(const fileid_t *fileid, off_t offset, void **de, int *delen)
+int sdfs_readdir1(sdfs_ctx_t *ctx, const fileid_t *fileid, off_t offset, void **de, int *delen)
 {
         int ret, retry = 0;
 
+        (void) ctx;
+        
         if (offset == 2147483647) {  /* 2GB - 1 */
                 *delen = 0;
                 return 0;
@@ -361,9 +314,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_readdirplus(const fileid_t *fileid, off_t offset, void **de, int *delen)
+int sdfs_readdirplus(sdfs_ctx_t *ctx, const fileid_t *fileid, off_t offset, void **de, int *delen)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         if (offset == 2147483647) {  /* 2GB - 1 */
                 *delen = 0;
@@ -392,10 +347,12 @@ err_ret:
         return ret;
 }
 
-int sdfs_readdirplus_with_filter(const fileid_t *fileid, off_t offset,
+int sdfs_readdirplus_with_filter(sdfs_ctx_t *ctx, const fileid_t *fileid, off_t offset,
                                  void **de, int *delen, const filter_t *filter)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         if (offset == 2147483647) {  /* 2GB - 1 */
                 *delen = 0;
@@ -424,9 +381,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_rmdir(const fileid_t *parent, const char *name)
+int sdfs_rmdir(sdfs_ctx_t *ctx, const fileid_t *parent, const char *name)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_WRITE, 0);
         
@@ -491,9 +450,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_lookup(const fileid_t *parent, const char *name, fileid_t *fileid)
+int sdfs_lookup(sdfs_ctx_t *ctx, const fileid_t *parent, const char *name, fileid_t *fileid)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_READ, 0);
         
@@ -516,9 +477,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_statvfs(const fileid_t *fileid, struct statvfs *vfs)
+int sdfs_statvfs(sdfs_ctx_t *ctx, const fileid_t *fileid, struct statvfs *vfs)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_READ, 0);
 retry:
@@ -536,10 +499,12 @@ err_ret:
         return ret;
 }
 
-int sdfs_symlink(const fileid_t *parent, const char *link_name,
+int sdfs_symlink(sdfs_ctx_t *ctx, const fileid_t *parent, const char *link_name,
                  const char *link_target, uint32_t mode, uid_t uid, gid_t gid)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_WRITE, 0);
 retry:
@@ -557,9 +522,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_link2node(const fileid_t *old, const fileid_t *parent, const char *name)
+int sdfs_link2node(sdfs_ctx_t *ctx, const fileid_t *old, const fileid_t *parent, const char *name)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_WRITE, 0);
 retry:
@@ -577,10 +544,12 @@ err_ret:
         return ret;
 }
 
-int sdfs_readlink(const fileid_t *fileid, char *buf, uint32_t *buflen)
+int sdfs_readlink(sdfs_ctx_t *ctx, const fileid_t *fileid, char *buf, uint32_t *buflen)
 {
         int ret, len, retry = 0;
         char link_target[MAX_BUF_LEN];
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_READ, 0);
         
@@ -605,11 +574,13 @@ err_ret:
         return ret;
 }
 
-int sdfs_unlink(const fileid_t *parent, const char *name)
+int sdfs_unlink(sdfs_ctx_t *ctx, const fileid_t *parent, const char *name)
 {
         int ret, retry = 0;
         fileinfo_t *md;
         char buf[MAX_BUF_LEN];
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_WRITE, 0);
 #if ENABLE_WORM
@@ -655,12 +626,14 @@ err_ret:
         return ret;
 }
 
-int sdfs_create(const fileid_t *parent, const char *name,
+int sdfs_create(sdfs_ctx_t *ctx, const fileid_t *parent, const char *name,
                 fileid_t *fileid, uint32_t mode, uint32_t uid, uint32_t gid)
 {
         int ret, retry = 0;
         setattr_t setattr;
 
+        (void) ctx;
+        
         io_analysis(ANALYSIS_OP_WRITE, 0);
         setattr_init(&setattr, mode, -1, NULL, uid, gid, -1);
 #if 1
@@ -735,10 +708,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_dirlist(const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist)
+int sdfs_dirlist(sdfs_ctx_t *ctx, const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist)
 {
         int ret, retry = 0;
 
+        (void) ctx;
 retry:
         if (dirid->type == ftype_root) {
                 ret = __sdfs_listvol(dirlist);
@@ -759,14 +733,14 @@ err_ret:
         return ret;
 }
 
-int sdfs_opendir(const dirid_t *dirid, dirhandler_t **_dirhandler)
+int sdfs_opendir(sdfs_ctx_t *ctx, const dirid_t *dirid, dirhandler_t **_dirhandler)
 {
         int ret;
         struct stat stbuf;
         dirhandler_t *dirhandler;
         
         if (dirid->type != ftype_root) {
-                ret = sdfs_getattr(dirid, &stbuf);
+                ret = sdfs_getattr(ctx, dirid, &stbuf);
                 if (ret)
                         GOTO(err_ret, ret);
                 
@@ -791,8 +765,10 @@ err_ret:
         return ret;
 }
 
-void sdfs_closedir(dirhandler_t *dirhandler)
+void sdfs_closedir(sdfs_ctx_t *ctx, dirhandler_t *dirhandler)
 {
+        (void) ctx;
+        
         if (dirhandler->dirlist) {
                 yfree((void **)&dirhandler->dirlist);
         }
@@ -800,7 +776,7 @@ void sdfs_closedir(dirhandler_t *dirhandler)
         yfree((void **)&dirhandler);
 }
 
-int sdfs_readdir(dirhandler_t *dirhandler, struct dirent **_de, fileid_t *_fileid)
+int sdfs_readdir(sdfs_ctx_t *ctx, dirhandler_t *dirhandler, struct dirent **_de, fileid_t *_fileid)
 {
         int ret, len, retry = 0;
         dirlist_t *dirlist;
@@ -809,6 +785,8 @@ int sdfs_readdir(dirhandler_t *dirhandler, struct dirent **_de, fileid_t *_filei
         diroff_t diroff;
         dirid_t *dirid;
 
+        (void) ctx;
+        
         DINFO("readdir "CHKID_FORMAT"\n", CHKID_ARG(&dirhandler->dirid));
 
         diroff = dirhandler->diroff;
@@ -890,11 +868,13 @@ err_ret:
         return ret;
 }
 
-long sdfs_telldir(dirhandler_t *dirhandler)
+long sdfs_telldir(sdfs_ctx_t *ctx, dirhandler_t *dirhandler)
 {
         long off;
         static_assert(sizeof(diroff_t) == sizeof(off), "diroff");
 
+        (void) ctx;
+        
         io_analysis(ANALYSIS_OP_READ, 0);
         
         DINFO("telldir "CHKID_FORMAT"\n", CHKID_ARG(&dirhandler->dirid));
@@ -904,11 +884,12 @@ long sdfs_telldir(dirhandler_t *dirhandler)
         return off;
 }
 
-void sdfs_rewinddir(dirhandler_t *dirhandler)
+void sdfs_rewinddir(sdfs_ctx_t *ctx, dirhandler_t *dirhandler)
 {
-
         DINFO("rewinddir "CHKID_FORMAT"\n", CHKID_ARG(&dirhandler->dirid));
 
+        (void) ctx;
+        
         io_analysis(ANALYSIS_OP_READ, 0);
         
         if (dirhandler->dirlist) {
@@ -920,10 +901,12 @@ void sdfs_rewinddir(dirhandler_t *dirhandler)
 }
 
 
-void sdfs_seekdir(dirhandler_t *dirhandler, long loc)
+void sdfs_seekdir(sdfs_ctx_t *ctx, dirhandler_t *dirhandler, long loc)
 {
         DINFO("seekdir "CHKID_FORMAT"\n", CHKID_ARG(&dirhandler->dirid));
 
+        (void) ctx;
+        
         io_analysis(ANALYSIS_OP_READ, 0);
         
         if (dirhandler->dirlist) {
@@ -932,4 +915,83 @@ void sdfs_seekdir(dirhandler_t *dirhandler, long loc)
         }
 
         memcpy(&dirhandler->diroff, &loc, sizeof(dirhandler->diroff));
+}
+
+static void *__sdfs_ctx_worker(void *arg)
+{
+        int ret, idx;
+        sdfs_ctx_t *ctx = arg;
+        char key[MAX_PATH_LEN];
+        etcd_session  sess;
+        etcd_node_t  *node = NULL;
+
+        snprintf(key, MAX_NAME_LEN, "%s/%s/%s/snapvers", ETCD_ROOT, ETCD_VOLUME, ctx->vol);
+
+        char *host = strdup("localhost:2379");
+        sess = etcd_open_str(host);
+        if (!sess) {
+                ret = ENONET;
+                GOTO(err_ret, ret);
+        }
+
+        while (ctx->running) {
+                ret = etcd_watch(sess, key, &idx, &node, 5);
+                if(ret != ETCD_OK){
+                        ret = EPERM;
+                        GOTO(err_close, ret);
+                }
+
+                DINFO("conn watch %s:%s\n", node->key, node->value);
+                idx = node->modifiedIndex + 1;
+                ctx->snapvers = atol(node->value);
+
+                free_etcd_node(node);
+        }
+
+        etcd_close_str(sess);
+        free(host);
+        yfree((void **)&ctx);
+        pthread_exit(NULL);
+err_close:
+        etcd_close_str(sess);
+err_ret:
+        free(host);
+        yfree((void **)&ctx);
+        pthread_exit(NULL);
+}
+
+
+int sdfs_connect(const char *vol, sdfs_ctx_t **_ctx)
+{
+        int ret;
+        sdfs_ctx_t *ctx;
+        fileid_t fileid;
+
+        ret = md_lookupvol(vol, &fileid);
+        if (ret)
+                GOTO(err_ret, ret);
+        
+        ret = ymalloc((void **)&ctx, sizeof(*ctx));
+        if (ret)
+                GOTO(err_ret, ret);
+
+        strcpy(ctx->vol, vol);
+        ctx->rootid = fileid;
+        ctx->snapvers = 0;
+        ctx->running = 1;
+
+        ret = sy_thread_create2(__sdfs_ctx_worker, ctx, "ctx_worker");
+        if (ret)
+                GOTO(err_ret, ret);
+
+        *_ctx = ctx;
+        
+        return 0;
+err_ret:
+        return ret;
+}
+                
+void sdfs_disconnect(sdfs_ctx_t *ctx)
+{
+        ctx->running = 0;
 }

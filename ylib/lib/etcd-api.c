@@ -421,7 +421,7 @@ etcd_result etcd_get(etcd_session session_as_void, char *key, long timeout,
         return res;
 }
 
-etcd_result etcd_watch(etcd_session session_as_void, char *pfx, const int *index_in, etcd_node_t **ppnode){
+etcd_result etcd_watch(etcd_session session_as_void, char *pfx, const int *index_in, etcd_node_t **ppnode, int timeout){
         _etcd_session   *session   = session_as_void;
         etcd_server     *srv;
         etcd_result     res = ETCD_ERR;
@@ -453,7 +453,7 @@ etcd_result etcd_watch(etcd_session session_as_void, char *pfx, const int *index
         }
         for (srv = session->servers; srv->host; ++srv) {
                 res = etcd_get_one(session,path,srv,"keys/",NULL,
-                                parse_get_response, (void*)&node, 0);
+                                parse_get_response, (void*)&node, timeout);
                 if ((res == ETCD_OK) && node) {
                         free(path);
                         *ppnode = node;

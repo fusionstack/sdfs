@@ -111,7 +111,7 @@ int create_file(struct perf_args *perf, int file_per_thread, int do_file, int th
         if(ret == 0) {
                 for(i=start_no; i<file_num; ++i) {
                         snprintf(filename, MAX_NAME_LEN, "%s_%d", tmp_filename, i);
-                        ret = sdfs_create(&parent, filename, &fileid, 0644, 0, 0);
+                        ret = sdfs_create(NULL, &parent, filename, &fileid, 0644, 0, 0);
                         if(ret) {
                                 fprintf(stderr, "create file %s, failed:%d\n", filename, ret);
                         }
@@ -170,7 +170,7 @@ int delete_file(struct perf_args *perf, int file_per_thread, int do_file, int th
         if(ret == 0) {
                 for(i=start_no; i<file_num; ++i) {
                         snprintf(filename, MAX_NAME_LEN, "%s_%d", tmp_filename, i);
-                        ret = sdfs_unlink(&parent, filename);
+                        ret = sdfs_unlink(NULL, &parent, filename);
                         if(ret) {
                                 fprintf(stderr, "delete file %s, failed:%d\n", filename, ret);
                         }
@@ -196,7 +196,7 @@ int write_file(struct perf_args *perf, int thread_no)
         ret = sdfs_splitpath(perf->path, &parent, tmp_filename);
         if(ret == 0) {
                 snprintf(filename, MAX_NAME_LEN, "%s_%d", tmp_filename, thread_no);
-                ret = sdfs_create(&parent, filename, &fileid, 0644, 0, 0);
+                ret = sdfs_create(NULL, &parent, filename, &fileid, 0644, 0, 0);
                 if(ret) {
                         fprintf(stderr, "create file %s, failed:%d\n", filename, ret);
                         pthread_exit("sdfs_create");
@@ -235,7 +235,7 @@ int write_file(struct perf_args *perf, int thread_no)
 
                 /* fprintf(stdout, "offset:%llu, size:%d left:%d\n", (LLU)offset, len, left); */
 
-                ret = sdfs_write_sync(&fileid, &pack, len, offset);
+                ret = sdfs_write_sync(NULL, &fileid, &pack, len, offset);
                 if (ret < 0) {
                         fprintf(stderr, "sdfs_write_sync failed\n");
                         mbuffer_free(&pack);
@@ -249,7 +249,7 @@ int write_file(struct perf_args *perf, int thread_no)
         }
 
         if(perf->should_remove) {
-                ret = sdfs_unlink(&parent, filename);
+                ret = sdfs_unlink(NULL, &parent, filename);
                 if(ret) {
                         fprintf(stderr, "raw_unlink failed\n");
                         pthread_exit("raw_unlink");

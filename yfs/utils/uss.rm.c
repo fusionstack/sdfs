@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
                         GOTO(err_ret, ret);
         }
 
-        ret = sdfs_unlink(&parent, name);
+        ret = sdfs_unlink(NULL, &parent, name);
         if (ret) {
                 if (ret == ENOENT) {
                         printf("cannot remove %s, %s\n", path, strerror(ret));

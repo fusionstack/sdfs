@@ -775,7 +775,7 @@ class Redisd():
                 
     def run(self):
         self.name = "%s %s/slot/%d" % (self.workdir, self.volume, self.id[0])
-        dmsg("run " + self.name)
+        #dmsg("run " + self.name)
         key = "redis/%s" % (self.id[1])
 
         addr = self.__redis_addr()
@@ -790,22 +790,37 @@ class Redisd():
             exit(1)
 
         self.__redis_start()
-        dmsg("run 0 " + self.name)
+        #dmsg("run 0 " + self.name)
+
+        """
+        key = "/sdfs/volume/%s/src" % (self.volume)
+        #dmsg("etcd read " + key)
+        try:
+            res = self.etcd.read(key)
+            self.__snapshot_sync(res.value)
+        except etcd.EtcdKeyNotFound:
+            return
+        """
+
         self.__wait_sync()
-        dmsg("run 1 " + self.name)
+        #dmsg("run 1 " + self.name)
 
         self.__lock()
-        dmsg("run 2 " + self.name)
+        #dmsg("run 2 " + self.name)
 
         self.__watch_start()
 
-        dmsg("run 3 " + self.name)
+        #dmsg("run 3 " + self.name)
         while (self.running):
             if (self.lock.is_acquired):
                 self.__run_master()
             else:
                 self.__run_slave()
 
+    def __snapshot_sync(self, src):
+        dmsg("run as snapshot of %s[%d]" % (src, self.id[0]))
+        pass
+        
     def status(self):
         cmd = "redis-cli -h %s -p %s info replication" % (self.hostname, self.port)
 

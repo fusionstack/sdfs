@@ -151,7 +151,7 @@ int check_if_dir(const char *_path, int *is_dir, fileid_t *fileid)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -199,7 +199,7 @@ int dataio_transfer_dir(struct yftp_session *ys, int rfd, char *dirname,
 
         if(!is_dir) {
                 //this is a file
-                ret = sdfs_getattr(&fileidp, &stbuf);
+                ret = sdfs_getattr(NULL, &fileidp, &stbuf);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -221,7 +221,7 @@ int dataio_transfer_dir(struct yftp_session *ys, int rfd, char *dirname,
         }
 
         while (srv_running) {
-                ret = sdfs_readdir1(&fileidp, offset, &de0, &delen);
+                ret = sdfs_readdir1(NULL, &fileidp, offset, &de0, &delen);
                 if (ret) {
                         ret = cmdio_write(ys, FTP_TRANSFEROK,
                                "Transfer done (but failed to open directory).");
@@ -288,7 +288,7 @@ int dataio_transfer_dir(struct yftp_session *ys, int rfd, char *dirname,
                                 ret = sdfs_lookup_recurive(depath, &fileidc);
                                 if (ret)
                                         goto next;
-                                ret = sdfs_getattr(&fileidc, &stbuf);
+                                ret = sdfs_getattr(NULL, &fileidc, &stbuf);
                                 if (ret)
                                         goto next;
 

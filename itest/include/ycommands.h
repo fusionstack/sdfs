@@ -76,7 +76,7 @@ int cmd_stat_file(const char *path) {
                 }
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 

@@ -46,7 +46,7 @@ uint32_t yftp_read(fileid_t *fileid, char *buf,  uint32_t size, uint64_t off)
 
         mbuffer_init(&buffer, 0);
 
-        ret = sdfs_read_sync(fileid, &buffer, size, off);
+        ret = sdfs_read_sync(NULL, fileid, &buffer, size, off);
         if (ret < 0) {
                 ret = -ret;
                 GOTO(err_ret, ret);
@@ -72,7 +72,7 @@ uint32_t yftp_write(fileid_t *fileid, char *buf,  uint32_t size, uint64_t off)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_write_sync(fileid, &buffer, size, off);
+        ret = sdfs_write_sync(NULL, fileid, &buffer, size, off);
         if (ret < 0) {
                 ret = -ret;
                 GOTO(err_free, ret);
@@ -928,7 +928,7 @@ not_exist:
                 ret = sdfs_lookup_recurive(path, &fileid);
                 if (ret)
                         goto middle_out;
-                ret = sdfs_getattr(&fileid, &stbuf);
+                ret = sdfs_getattr(NULL, &fileid, &stbuf);
                 if (ret)
                         goto middle_out;
 
@@ -965,10 +965,10 @@ middle_out:
                         }
 
 retry:
-                        ret = sdfs_create(&fileidp, name, &fileid, 0644, 0, 0);
+                        ret = sdfs_create(NULL, &fileidp, name, &fileid, 0644, 0, 0);
                         if (ret) {
                                 if (ret == EEXIST) {
-                                        ret = sdfs_unlink(&fileidp, name);
+                                        ret = sdfs_unlink(NULL, &fileidp, name);
                                         if (ret)
                                                 GOTO(err_rfd, ret);
 
@@ -1246,7 +1246,7 @@ int handle_retr(struct yftp_session *ys)
                 goto out_yfd;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -1379,7 +1379,7 @@ int handle_size(struct yftp_session *ys)
                 goto out;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret) {
                 DBUG("open (%s ...) %s\n", path, strerror(ret));
                 ret = cmdio_write(ys, FTP_FILEFAIL, "Failed to open file.");
@@ -1478,7 +1478,7 @@ int handle_site_chmod(struct yftp_session *ys, char *chmod_args)
                 goto out;
         }
 
-        ret = sdfs_chmod(&fileid, mode);
+        ret = sdfs_chmod(NULL, &fileid, mode);
         if (ret) {
                 DERROR("chmod(%s, ...) %s\n", path, strerror(ret));
 
@@ -1580,7 +1580,7 @@ int handle_rnfr(struct yftp_session *ys)
                 goto err_ret;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
 
         if (ret == 0) {
                 snprintf(ys->rnfr_filename, MAX_PATH_LEN, "%s", path);
@@ -1639,7 +1639,7 @@ int handle_rnto(struct yftp_session *ys)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_rename(&fileidf, namef, &fileidt, namet);
+        ret = sdfs_rename(NULL, &fileidf, namef, &fileidt, namet);
         if (ret)
                 ret = cmdio_write(ys, FTP_FILEFAIL, "Rename failed.");
         ys->rnfr_filename[0] = '\0';
@@ -1886,7 +1886,7 @@ int handle_mkdir(struct yftp_session *ys)
                                 "Create directory operation failed.");
                 goto err_ret;
         }
-        ret = sdfs_mkdir(&fileid, name, NULL, NULL, 0755, 0, 0);
+        ret = sdfs_mkdir(NULL, &fileid, name, NULL, NULL, 0755, 0, 0);
         if (ret) {
                 ret = cmdio_write(ys, FTP_FILEFAIL,
                                 "Create directory operation failed.");
@@ -1940,7 +1940,7 @@ int handle_rmdir(struct yftp_session *ys)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_rmdir(&fileid, name);
+        ret = sdfs_rmdir(NULL, &fileid, name);
         if (ret)
                 ret = cmdio_write(ys, FTP_FILEFAIL,
                                 "Remove directory operation failed.");
@@ -1988,7 +1988,7 @@ int handle_dele(struct yftp_session *ys)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_lookup(&fileidp, name, &fileid);
+        ret = sdfs_lookup(NULL, &fileidp, name, &fileid);
         if (ret) {
                 DERROR("open (%s ...) %s\n", path, strerror(ret));
                 ret = cmdio_write(ys, FTP_FILEFAIL, "Failed to delete file.");
@@ -2001,7 +2001,7 @@ int handle_dele(struct yftp_session *ys)
                 goto out;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -2011,7 +2011,7 @@ int handle_dele(struct yftp_session *ys)
                 goto out;
         }
 
-        ret = sdfs_unlink(&fileidp, name);
+        ret = sdfs_unlink(NULL, &fileidp, name);
         if (ret)
                 ret = cmdio_write(ys, FTP_FILEFAIL, "Delete operation failed.");
         else

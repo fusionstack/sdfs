@@ -143,7 +143,7 @@ static int __ls_line(const char *path, const fileid_t *fileid, struct dirent *de
                 snprintf(depath, MAX_PATH_LEN, "%s/%s", path,
                          de->d_name);
 
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (ret) {
                 if (ret == ENOENT) {
                         memset(&stbuf, 0x0, sizeof(stbuf));
@@ -313,12 +313,7 @@ static int __ls_filter(const char *path, const filter_t *filter, int verbose, in
                 exit (ret);
         }
 
-#if ENABLE_NEWMD
-
         ret = sdfs_lookup_recurive(path, &fileid);
-#else
-        ret = sdfs_lookup_recurive(path, &fileid);
-#endif
         if (ret){
                 fprintf(stderr,"raw_lookup1 uss.ls: %s: No such file or directory\n",path);
                 exit (ret);
@@ -328,7 +323,7 @@ static int __ls_filter(const char *path, const filter_t *filter, int verbose, in
         
 #if 0
         struct stat stbuf;
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret)
                 exit (ret);
 
@@ -358,20 +353,11 @@ static int __ls_filter(const char *path, const filter_t *filter, int verbose, in
         while (srv_running) {
                 DBUG("read %s offset %ju\n", path, offset);
 
-#if ENABLE_NEWMD
                 if (filter) {
-                        ret = sdfs_readdirplus_with_filter(&fileid, offset, &de0, &delen, filter);
+                        ret = sdfs_readdirplus_with_filter(NULL, &fileid, offset, &de0, &delen, filter);
                 } else {
-                        ret = sdfs_readdirplus(&fileid, offset, &de0, &delen);
+                        ret = sdfs_readdirplus(NULL, &fileid, offset, &de0, &delen);
                 }
-#else
-                if (filter) {
-                        ret = ly_readdirplus_with_filter(path, offset, &de0, &delen, filter);
-                } else {
-                        ret = ly_readdirplus(path, offset, &de0, &delen, EXEC_USS_CMD);
-                }
-#endif
-                
                 if (ret) {
                         fprintf(stderr, "ly_readdir(%s, ...) %s\n", path,
                                         strerror(ret));
@@ -440,7 +426,7 @@ inline static int __ls(const char *path, int verbose, int statis, int row)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_opendir(&dirid, &dirhandler);
+        ret = sdfs_opendir(NULL, &dirid, &dirhandler);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -449,7 +435,7 @@ inline static int __ls(const char *path, int verbose, int statis, int row)
         while (srv_running) {
                 DBUG("read %s offset %ju\n", path, offset);
 
-                ret = sdfs_readdir(dirhandler, &de, &fileid);
+                ret = sdfs_readdir(NULL, dirhandler, &de, &fileid);
                 if (ret) {
                         fprintf(stderr, "ly_readdir(%s, ...) %s\n", path,
                                 strerror(ret));
@@ -463,11 +449,11 @@ inline static int __ls(const char *path, int verbose, int statis, int row)
                 __ls_line(path, &fileid, de, verbose, row);
         }
 
-        sdfs_closedir(dirhandler);
+        sdfs_closedir(NULL, dirhandler);
 
         return 0;
 err_close:
-        sdfs_closedir(dirhandler);
+        sdfs_closedir(NULL, dirhandler);
 err_ret:
         return ret;
 }

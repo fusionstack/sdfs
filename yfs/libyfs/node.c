@@ -24,6 +24,7 @@
 
 int yrecycle_fd;
 
+#if 1
 int ly_getattr(const char *path, struct stat *stbuf)
 {
         int ret;
@@ -35,7 +36,7 @@ int ly_getattr(const char *path, struct stat *stbuf)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_getattr(&fileid, stbuf);
+        ret = sdfs_getattr(NULL, &fileid, stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -63,7 +64,7 @@ int ly_mkdir(const char *path, const ec_t *ec, mode_t mode)
         uid = geteuid();
         gid = getegid();
 
-        ret = sdfs_mkdir(&parent, name, ec, NULL, mode, uid, gid);
+        ret = sdfs_mkdir(NULL, &parent, name, ec, NULL, mode, uid, gid);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -85,7 +86,7 @@ int ly_chmod(const char *path, mode_t mode)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_chmod(&fileid, mode);
+        ret = sdfs_chmod(NULL, &fileid, mode);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -107,7 +108,7 @@ int ly_chown(const char *path, uid_t uid, gid_t gid)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_chown(&fileid, uid, gid);
+        ret = sdfs_chown(NULL, &fileid, uid, gid);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -129,7 +130,7 @@ int ly_unlink(const char *path)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_unlink(&parent, name);
+        ret = sdfs_unlink(NULL, &parent, name);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -176,11 +177,11 @@ again:
                         if(ret)
                                 GOTO(err_ret, ret);
 
-                        ret = sdfs_getattr(&from_fileid, &from_sbuf);
+                        ret = sdfs_getattr(NULL, &from_fileid, &from_sbuf);
                         if(ret)
                                 GOTO(err_ret, ret);
 
-                        ret = sdfs_getattr(&to_fileid, &to_sbuf);
+                        ret = sdfs_getattr(NULL, &to_fileid, &to_sbuf);
                         if(ret)
                                 GOTO(err_ret, ret);
 
@@ -190,14 +191,14 @@ again:
                                         GOTO(err_ret, ret);
                                 } else {
                                         uint64_t child;
-                                        ret = sdfs_childcount(&to_fileid, &child);
+                                        ret = sdfs_childcount(NULL, &to_fileid, &child);
                                         if(ret)
                                                 GOTO(err_ret, ret);
 
                                         empty = !child;
                                         
                                         if(empty) {
-                                                ret = sdfs_rmdir(&tparent, tname);
+                                                ret = sdfs_rmdir(NULL, &tparent, tname);
                                                 if(ret)
                                                         GOTO(err_ret, ret);
 
@@ -213,7 +214,7 @@ again:
                                         GOTO(err_ret, ret);
                                 } else {
                                         if(fileid_cmp(&from_fileid, &to_fileid)) {
-                                                ret = sdfs_unlink(&tparent, tname);
+                                                ret = sdfs_unlink(NULL, &tparent, tname);
                                                 if(ret)
                                                         GOTO(err_ret, ret);
 
@@ -245,7 +246,7 @@ int ly_rmdir(const char *path)
 
         YASSERT(path[0] != '\0');
 
-        ret = sdfs_rmdir(&parent, name);
+        ret = sdfs_rmdir(NULL, &parent, name);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -264,7 +265,7 @@ int ly_statfs(const char *path, struct statvfs *vfs)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_statvfs(&fileid, vfs);
+        ret = sdfs_statvfs(NULL, &fileid, vfs);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -340,7 +341,7 @@ int ly_utime(const char *path, uint32_t atime, uint32_t mtime)
 
         _atime.tv_sec = atime;
         _mtime.tv_sec = mtime;
-        ret = sdfs_utime(&fileid, &_atime, &_mtime, &_mtime);
+        ret = sdfs_utime(NULL, &fileid, &_atime, &_mtime, &_mtime);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -391,7 +392,7 @@ int ly_setxattr(const char *path, const char *name, const void *value,
         ret = sdfs_lookup_recurive(path, &fileid);
         if (ret)
                 GOTO(err_ret, ret);
-        ret = sdfs_setxattr(&fileid, name, value, size, flags);
+        ret = sdfs_setxattr(NULL, &fileid, name, value, size, flags);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -410,7 +411,7 @@ int ly_getxattr(const char *path, const char *name, void *value, size_t *size)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_getxattr(&fileid, name, value, size);
+        ret = sdfs_getxattr(NULL, &fileid, name, value, size);
         if (ret) {
                 if (ret == ENOKEY) {
                         goto err_ret;
@@ -434,7 +435,7 @@ int ly_listxattr(const char *path, char *list, size_t *size)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_listxattr(&fileid, list, size);
+        ret = sdfs_listxattr(NULL, &fileid, list, size);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -452,7 +453,7 @@ int ly_removexattr(const char *path, const char *name)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_removexattr(&fileid, name);
+        ret = sdfs_removexattr(NULL, &fileid, name);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -572,3 +573,5 @@ again:
 err_ret:
         return -ret;
 }
+
+#endif

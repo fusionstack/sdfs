@@ -205,7 +205,7 @@ static int __mount_mnt_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                 goto err_rep;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret) {
                 res.fhs_status = MNT_EACCES;
                 GOTO(err_rep, ret);

@@ -138,7 +138,7 @@ int free_etcd_node(etcd_node_t *node);
  * the next.  It's entirely legitimate to point both at the same variable.
  */
 
-etcd_result etcd_watch (etcd_session session, char *pfx, const int *index_in, etcd_node_t **ppnode);
+etcd_result etcd_watch (etcd_session session, char *pfx, const int *index_in, etcd_node_t **ppnode, int timeout);
 
 
 /*

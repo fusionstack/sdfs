@@ -140,7 +140,7 @@ static int __clone_path_init_uss_source(struct clone_args *cargs)
                 goto err_ret;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret) {
                 fprintf(stderr, "can't stat uss file: %s, %s\n",
                         cargs->source.path, strerror(ret));
@@ -174,14 +174,14 @@ static int __clone_path_init_uss_target(struct clone_args *cargs)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_create(&parent, name, &fileid, 0644, 0, 0);
+        ret = sdfs_create(NULL, &parent, name, &fileid, 0644, 0, 0);
         if (ret) {
                 fprintf(stderr, "can't create uss file: %s, %s\n",
                         cargs->target.path, strerror(ret));
                 goto err_ret;
         }
 
-        ret = sdfs_truncate(&fileid, cargs->source.size);
+        ret = sdfs_truncate(NULL, &fileid, cargs->source.size);
         if (ret) {
                 fprintf(stderr, "can't truncate uss file: %s, %s\n",
                         cargs->target.path, strerror(ret));
@@ -359,7 +359,7 @@ static int __clone_host2uss(struct clone_args *cargs)
 
                 ctx->size = cnt;
 
-                ret = sdfs_write_async(fileid, &ctx->buf, cnt, off, __cb_host2uss, ctx);
+                ret = sdfs_write_async(NULL, fileid, &ctx->buf, cnt, off, __cb_host2uss, ctx);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -460,7 +460,7 @@ static int __clone_uss2host(struct clone_args *cargs)
                 ctx->size = cnt;
                 ctx->off = off;
 
-                ret = sdfs_read_async(fileid, &ctx->buf, cnt, off, __cb_uss2host, ctx);
+                ret = sdfs_read_async(NULL, fileid, &ctx->buf, cnt, off, __cb_uss2host, ctx);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -537,7 +537,7 @@ static int __clone_uss2uss(struct clone_args *cargs)
                 if (ret)
                         GOTO(err_ret, ret);
 
-                len = sdfs_read_sync(sfd, &ctx->buf, cnt, off);
+                len = sdfs_read_sync(NULL, sfd, &ctx->buf, cnt, off);
                 if (len != cnt) {
                         fprintf(stderr, "read error: (%d,%d)\n", len, cnt);
                         ret = EIO;
@@ -562,7 +562,7 @@ static int __clone_uss2uss(struct clone_args *cargs)
                 ctx->size = cnt;
 
 retry:
-                ret = sdfs_write_async(tfd, &ctx->buf, cnt, off, __cb_uss2uss, ctx);
+                ret = sdfs_write_async(NULL, tfd, &ctx->buf, cnt, off, __cb_uss2uss, ctx);
                 if (ret) {
                         USLEEP_RETRY(err_ret, ret, retry, retry, retry_max, 1000);
                 }

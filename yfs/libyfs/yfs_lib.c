@@ -29,7 +29,7 @@
 #include "../../cds/cds_rpc.h"
 #include "net_global.h"
 #include "mem_hugepage.h"
-#include "license_helper.h"
+//#include "license_helper.h"
 #include "main_loop.h"
 #include "dbg.h"
 
@@ -350,6 +350,7 @@ int need_license_check(const char *proname)
         return ret;
 }
 
+#if 0
 int ly_license_init(const char *name)
 {
 #ifdef __CYGWIN__
@@ -371,6 +372,7 @@ err_ret:
         return ret;
 #endif
 }
+#endif
 
 void ly_set_daemon()
 {
@@ -882,9 +884,11 @@ int ly_init_simple2(const char *name)
         ng.live = 0;
         is_daemon = 0;
 
+#if 0
         ret = ly_license_init(name);
         if (ret)
                 GOTO(err_ret, ret);
+#endif
 
         return 0;
 err_ret:
@@ -912,9 +916,11 @@ retry:
                 USLEEP_RETRY(err_ret, ret, retry, retry, 10, (1000 * 1000));
         }
 
+#if 0
         ret = ly_license_init(name);
         if (ret)
                 GOTO(err_ret, ret);
+#endif
 
         return 0;
 err_ret:

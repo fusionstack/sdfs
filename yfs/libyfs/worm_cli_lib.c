@@ -88,7 +88,7 @@ retry:
                 if (ret)
                         GOTO(err_ret, ret);
 
-                ret = sdfs_mkdir(&parent, name, NULL, NULL, 0755, 0, 0);
+                ret = sdfs_mkdir(NULL, &parent, name, NULL, NULL, 0755, 0, 0);
                 if(ret)
                         GOTO(err_ret, ret);
 

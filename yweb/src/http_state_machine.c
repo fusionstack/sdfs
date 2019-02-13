@@ -245,7 +245,7 @@ int http_state_machine_get(job_t *job, char *name)
                                 break;
                         }
 
-                        ret = sdfs_getattr(&context->fileid, &http_req->stat);
+                        ret = sdfs_getattr(NULL, &context->fileid, &http_req->stat);
                         if (ret)
                                 GOTO(err_ret, ret);
 

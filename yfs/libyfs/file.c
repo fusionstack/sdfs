@@ -53,6 +53,7 @@
 #define yfs_file_dump(yf) {}
 #endif
 
+#if 1
 extern jobtracker_t *jobtracker;
 
 int ly_open(const char *path)
@@ -83,7 +84,7 @@ int ly_read(const char *path, char *buf, size_t size, yfs_off_t offset)
 
         mbuffer_init(&pack, 0);
 
-        ret = sdfs_read_sync(&fileid, &pack, size, offset);
+        ret = sdfs_read_sync(NULL, &fileid, &pack, size, offset);
         if (ret < 0) {
                 ret = -ret;
                 GOTO(err_free, ret);
@@ -98,64 +99,6 @@ err_free:
 err_ret:
         return -ret;
 }
-
-#if 0
-void __ly_pread_callback(union sigval foo)
-{
-        sem_post((sem_t *)foo.sival_ptr);
-}
-
-int ly_pread(int fd, char *buf, size_t size, yfs_off_t offset)
-{
-        int ret;
-        struct aiocb iocb;
-        sem_t sem;
-        buffer_t pack;
-
-
-        DBUG("off %lu size %lu\n", (unsigned long)offset, (unsigned long)size);
-
-        sem_init(&sem, 0, 0);
-
-        mbuffer_init(&pack, 0);
-
-        _memset(&iocb, 0x0, sizeof(struct aiocb));
-        iocb.aio_nbytes = size;
-        iocb.aio_offset = offset;
-        iocb.aio_fildes = fd;
-        iocb.aio_buf = &pack;
-        iocb.aio_sigevent.sigev_notify = SIGEV_THREAD;
-        iocb.aio_sigevent.sigev_notify_function
-                = __ly_pread_callback;
-        iocb.aio_sigevent.sigev_notify_attributes = NULL;
-        iocb.aio_sigevent.sigev_value.sival_ptr = &sem;
-
-        UNIMPLEMENTED(__DUMP__);
-#if 0
-        ret = ly_read_aio(&iocb);
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
-
-        ret = _sem_wait(&sem);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        ret = __aio_error(&iocb);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        ret = __aio_return(&iocb);
-
-        mbuffer_get(&pack, buf, ret);
-
-        mbuffer_free(&pack);
-
-        return ret;
-err_ret:
-        return -ret;
-}
-#endif
 
 int ly_create(const char *path, mode_t mode)
 {
@@ -175,7 +118,7 @@ int ly_create(const char *path, mode_t mode)
         gid = getegid();
 
         DBUG("parent "FID_FORMAT" name %s\n", FID_ARG(&parent), name);
-        ret = sdfs_create(&parent, name, &fileid, mode, uid , gid);
+        ret = sdfs_create(NULL, &parent, name, &fileid, mode, uid , gid);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -204,7 +147,7 @@ int ly_write(const char *path, const char *buf, size_t size, yfs_off_t offset)
                 GOTO(err_free, ret);
         }
 
-        ret = sdfs_write_sync(&fileid, &pack, size, offset);
+        ret = sdfs_write_sync(NULL, &fileid, &pack, size, offset);
         if (ret < 0) {
                 GOTO(err_free, -ret);
         }
@@ -289,7 +232,7 @@ int ly_truncate(const char *path, off_t length)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_truncate(&fileid, length);
+        ret = sdfs_truncate(NULL, &fileid, length);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -311,7 +254,7 @@ int ly_symlink(const char *link_target, const char *link_name)
         if(ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_symlink(&lparent, lname, link_target, 0777, -1, -1);
+        ret = sdfs_symlink(NULL, &lparent, lname, link_target, 0777, -1, -1);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -337,7 +280,7 @@ int ly_link(const char *target, const char *link)
         if(ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_link2node(&fileid, &lparent, lname);
+        ret = sdfs_link2node(NULL, &fileid, &lparent, lname);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -355,7 +298,7 @@ int ly_readlink(const char *path, char *buf, size_t *buflen)
         if(ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_readlink(&fileid, buf, (uint32_t*)buflen);
+        ret = sdfs_readlink(NULL, &fileid, buf, (uint32_t*)buflen);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -364,6 +307,7 @@ err_ret:
         return ret;
 }
 
+#endif
 #if 0
 int ly_set_default_acl(const char *path, mode_t mode)
 {
@@ -387,7 +331,7 @@ int ly_set_default_acl(const char *path, mode_t mode)
         if(ret)
                 GOTO(err_free, ret);
 
-        ret = sdfs_setxattr(&fileid, ACL_EA_ACCESS,
+        ret = sdfs_setxattr(NULL, &fileid, ACL_EA_ACCESS,
                            acl_buf, acl_buf_size, USS_XATTR_DEFAULT);
         if(ret)
                 GOTO(err_free, ret);

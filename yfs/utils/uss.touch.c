@@ -82,7 +82,7 @@ static void *write_file(void *arg)
         if (0 == ret) {
                 for (i = 0; i < g_thread_file_num; i++) {
                         snprintf(name, MAX_NAME_LEN, "%s_%d_%d", nametmp, thread_arg->threadNum, i);
-                        ret = sdfs_create(&parent, name, &fid, 0777, 0, 0);
+                        ret = sdfs_create(NULL, &parent, name, &fid, 0777, 0, 0);
                         if (ret) {
                                 printf("creat file %s failed, errno %d\n", name, ret);
                                 continue;
@@ -91,7 +91,7 @@ static void *write_file(void *arg)
                         if ( g_file_size > 0){
                                  mbuffer_init(&stbuf, 0);
                                  mbuffer_copy(&stbuf, buf, g_file_size);
-                                 len = sdfs_write_sync(&fid, &stbuf, g_file_size, 0);
+                                 len = sdfs_write_sync(NULL, &fid, &stbuf, g_file_size, 0);
                                  if (len != g_file_size) {
                                         printf("write failed len = %d\n", len);
                                  }
@@ -129,7 +129,7 @@ static void *read_file(void *arg)
         if (0 == ret) {
                 for (i = 0; i < g_thread_file_num; i++) {
                         snprintf(name, MAX_NAME_LEN, "%s_%d_%d", nametmp, thread_arg->threadNum, i);
-                        ret = sdfs_lookup(&parent, name, &fid);
+                        ret = sdfs_lookup(NULL, &parent, name, &fid);
                         if (ret) {
                                 printf("lookup %s failed, ret = %d.\n", name, ret);
                                 continue;
@@ -137,7 +137,7 @@ static void *read_file(void *arg)
 
                         if (g_file_size > 0) {
                                 mbuffer_init(&stbuf, g_file_size);
-                                ret = sdfs_read_sync(&fid, &stbuf, g_file_size, 0);
+                                ret = sdfs_read_sync(NULL, &fid, &stbuf, g_file_size, 0);
                                 if (ret != g_file_size)
                                         printf("read failed ret = %d\n", ret);
                         }
@@ -174,7 +174,7 @@ static void *delete_file(void *arg)
         if (0 == ret) {
                 for (i = 0; i < g_thread_file_num; i++) {
                         snprintf(name, MAX_NAME_LEN, "%s_%d_%d", nametmp, thread_arg->threadNum, i);
-                        ret = sdfs_unlink(&parent, name);
+                        ret = sdfs_unlink(NULL, &parent, name);
                         if (ret && ENOENT != ret)
                                 printf("delete file %s failed,errno %d\n", name, ret);
                 }
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
 		uid = getuid();
 		gid = getgid();
 
-                ret = sdfs_create(&parent, name, &fid, 0777, uid, gid);
+                ret = sdfs_create(NULL, &parent, name, &fid, 0777, uid, gid);
                 if (ret)
                         GOTO(err_ret, ret);
 

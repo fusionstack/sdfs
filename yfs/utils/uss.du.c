@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
                 }
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret)
                 exit (ret);
 

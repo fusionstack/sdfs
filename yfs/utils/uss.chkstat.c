@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 
 #if 0
         if (S_ISREG((stbuf).st_mode)) {
-                ret = sdfs_getattr(&fileid, &stbuf);
+                ret = sdfs_getattr(NULL, &fileid, &stbuf);
                 if (ret) {
                         size = 0;
                 } else {

@@ -777,6 +777,9 @@ static int __md_vol_set_etcd(const char *name, const fileid_t *fileid,
                         GOTO(err_ret, ret);
         }
 
+        
+        
+
         snprintf(key, MAX_NAME_LEN, "%s/id", name);
 
         ret = etcd_create(ETCD_VOLUME, key, fileid, sizeof(*fileid), -1);

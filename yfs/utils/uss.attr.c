@@ -208,14 +208,14 @@ int main(int argc, char *argv[])
         switch (op_type) {
         case XATTR_SET:
                 size = strlen(value) + 1;
-                ret = sdfs_setxattr(&fileid, name, value, size, flags);
+                ret = sdfs_setxattr(NULL, &fileid, name, value, size, flags);
                 if (ret)
                         GOTO(err_ret, ret);
                 break;
         case XATTR_GET:
                 value = buf;
                 size = sizeof(buf);
-                ret = sdfs_getxattr(&fileid, name, value, &size);
+                ret = sdfs_getxattr(NULL, &fileid, name, value, &size);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -227,14 +227,14 @@ int main(int argc, char *argv[])
 
                 break;
         case XATTR_REMOVE:
-                ret = sdfs_removexattr(&fileid, name);
+                ret = sdfs_removexattr(NULL, &fileid, name);
                 if (ret)
                         GOTO(err_ret, ret);
                 break;
         case XATTR_LIST:
                 value = buf;
                 size = sizeof(buf);
-                ret = sdfs_listxattr(&fileid, value, &size);
+                ret = sdfs_listxattr(NULL, &fileid, value, &size);
                 if (0 == ret) {
                         if (0 == size)
                                 printf("have no xattr names.\n");

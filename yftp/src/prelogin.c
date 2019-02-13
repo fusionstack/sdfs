@@ -313,7 +313,7 @@ int handle_addu(struct yftp_session *ys)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_create(&fileidp, name, &fileid, 0755, 0, 0);
+        ret = sdfs_create(NULL, &fileidp, name, &fileid, 0755, 0, 0);
         if (ret) {
                 DBUG("useradd ret (%d)\n", ret);
                 cmdio_write(ys, FTP_USEREXIST, "user exist");
@@ -321,7 +321,7 @@ int handle_addu(struct yftp_session *ys)
         }
 
         size = strlen(passwd) + 1;
-        ret = sdfs_setxattr(&fileid, name + 1, passwd, size, USS_XATTR_CREATE);
+        ret = sdfs_setxattr(NULL, &fileid, name + 1, passwd, size, USS_XATTR_CREATE);
         if (ret) {
                 DBUG("useradd ret (%d)\n", ret);
                 cmdio_write(ys, FTP_USEREXIST, "user exist");

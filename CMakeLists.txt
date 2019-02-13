@@ -43,7 +43,7 @@ set(CMAKE_C_LIBS sdfs pthread crypt crypto uuid ssl isal z jemalloc m curl yajl 
 include_directories(
     /usr/local/include
     #/usr/include/tirpc/
-    ${CMAKE_CURRENT_SOURCE_DIR}/license/include
+    #${CMAKE_CURRENT_SOURCE_DIR}/license/include
     ${CMAKE_CURRENT_SOURCE_DIR}/itest/include
     ${CMAKE_CURRENT_SOURCE_DIR}/yfuse/include
     ${CMAKE_CURRENT_SOURCE_DIR}/yfuse3/include
@@ -183,7 +183,7 @@ add_library(sdfs SHARED
 
     #------sdfs------
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/license/src/aes.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/license/src/aes.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_pipeline.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_vol.c
@@ -203,7 +203,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/cds/cds_rpc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_chunk.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sdfs/sdfs_chunk_recovery.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/license/src/license_helper.c
+    #${CMAKE_CURRENT_SOURCE_DIR}/license/src/license_helper.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_dir.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_vol.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/md_node.c

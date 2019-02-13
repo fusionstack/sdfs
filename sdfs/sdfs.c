@@ -73,7 +73,7 @@ typedef struct {
         void *arg;
 } sdfs_write_ctx_t;
 
-int sdfs_read(const fileid_t *fileid, buffer_t *_buf, uint32_t size, uint64_t offset)
+int sdfs_read(sdfs_ctx_t *ctx, const fileid_t *fileid, buffer_t *_buf, uint32_t size, uint64_t offset)
 {
         int ret, retry = 0, chkno = -1;
         fileinfo_t _md;
@@ -84,6 +84,8 @@ int sdfs_read(const fileid_t *fileid, buffer_t *_buf, uint32_t size, uint64_t of
         ec_t ec;
         buffer_t buf;
 
+        (void) ctx;
+        
         ANALYSIS_BEGIN(0);
         
         DBUG("fileid "FID_FORMAT" size %llu off %llu size %u\n", FID_ARG(&md->fileid),
@@ -163,7 +165,7 @@ static void __sdfs_read_async(void *_arg)
         int ret;
         sdfs_read_ctx_t *ctx = _arg;
 
-        ret = sdfs_read(&ctx->fileid, ctx->buf, ctx->size, ctx->offset);
+        ret = sdfs_read(NULL, &ctx->fileid, ctx->buf, ctx->size, ctx->offset);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -179,12 +181,14 @@ err_ret:
         
 }
 
-int sdfs_read_async(const fileid_t *fileid, buffer_t *buf, uint32_t size,
-                  uint64_t off, int (*callback)(void *, int), void *obj)
+int sdfs_read_async(sdfs_ctx_t *_ctx, const fileid_t *fileid, buffer_t *buf, uint32_t size,
+                    uint64_t off, int (*callback)(void *, int), void *obj)
 {
         int ret;
         sdfs_read_ctx_t *ctx;
 
+        (void) _ctx;
+        
         YASSERT(fileid->id);
         YASSERT(fileid->volid);
 
@@ -223,7 +227,7 @@ static int __resume_sem(void *obj, int retval)
         return 0;
 }
 
-static int __sdfs_read_sync1(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
+static int __sdfs_read_sync1(sdfs_ctx_t *ctx, const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
 {
         int ret;
         __block_t blk;
@@ -232,7 +236,7 @@ static int __sdfs_read_sync1(const fileid_t *fileid, buffer_t *buf, uint32_t siz
         sem_init(&blk.sem, 0, 0);
         blk.ret = 0;
 
-        ret = sdfs_read_async(fileid, buf, size, off,
+        ret = sdfs_read_async(ctx, fileid, buf, size, off,
                               __resume_sem, &blk);
         if (ret)
                 GOTO(err_ret, ret);
@@ -265,14 +269,15 @@ int IO_FUNC __sdfs_read_sync__(va_list ap)
 
         va_end(ap);
 
-        *retval =  sdfs_read(fileid, buf, size, off);
+        *retval =  sdfs_read(NULL, fileid, buf, size, off);
         return 0;
 }
 
-static int __sdfs_read_sync0(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
+static int __sdfs_read_sync0(sdfs_ctx_t *ctx, const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
 {
         int ret, retval;
-        
+
+        (void) ctx;
         ret = core_request(fileid_hash(fileid), -1, "sdfs_read_sync",
                            __sdfs_read_sync__, fileid, buf, size, off, &retval);
         if (ret) {
@@ -290,15 +295,15 @@ err_ret:
 }
 
 
-int sdfs_read_sync(const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
+int sdfs_read_sync(sdfs_ctx_t *ctx, const fileid_t *fileid, buffer_t *buf, uint32_t size, uint64_t off)
 {
         int ret;
 
-        ret = __sdfs_read_sync0(fileid, buf, size, off);
+        ret = __sdfs_read_sync0(ctx, fileid, buf, size, off);
         if (ret < 0) {
                 ret = -ret;
                 if (ret == ENOSYS) {
-                        ret = __sdfs_read_sync1(fileid, buf, size, off);
+                        ret = __sdfs_read_sync1(ctx, fileid, buf, size, off);
                         if (ret < 0) {
                                 ret = -ret;
                                 GOTO(err_ret, ret);
@@ -362,7 +367,7 @@ err_ret:
         return ret;
 }
 
-int sdfs_write(const fileid_t *fileid, const buffer_t *_buf, uint32_t size, uint64_t offset)
+int sdfs_write(sdfs_ctx_t *ctx, const fileid_t *fileid, const buffer_t *_buf, uint32_t size, uint64_t offset)
 {
         int ret, retry = 0;
         fileinfo_t _md;
@@ -372,6 +377,8 @@ int sdfs_write(const fileid_t *fileid, const buffer_t *_buf, uint32_t size, uint
         int i, seg_count;
         buffer_t newbuf;
 
+        (void) ctx;
+        
         ANALYSIS_BEGIN(0);
         
         YASSERT(_buf->len == size);
@@ -479,7 +486,7 @@ static void __sdfs_write_async(void *_arg)
         int ret;
         sdfs_write_ctx_t *ctx = _arg;
 
-        ret = sdfs_write(&ctx->fileid, ctx->buf, ctx->size, ctx->offset);
+        ret = sdfs_write(NULL, &ctx->fileid, ctx->buf, ctx->size, ctx->offset);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -495,12 +502,14 @@ err_ret:
         
 }
 
-int sdfs_write_async(const fileid_t *fileid, const buffer_t *buf, uint32_t size,
+int sdfs_write_async(sdfs_ctx_t *_ctx, const fileid_t *fileid, const buffer_t *buf, uint32_t size,
                   uint64_t off, int (*callback)(void *, int), void *obj)
 {
         int ret;
         sdfs_write_ctx_t *ctx;
 
+        (void) _ctx;
+        
         YASSERT(fileid->id);
         YASSERT(fileid->volid);
 
@@ -528,7 +537,7 @@ err_ret:
         return ret;
 }
 
-static int __sdfs_write_sync1(const fileid_t *fileid, const buffer_t *buf,
+static int __sdfs_write_sync1(sdfs_ctx_t *ctx, const fileid_t *fileid, const buffer_t *buf,
                               uint32_t size, uint64_t off)
 {
         int ret;
@@ -537,7 +546,7 @@ static int __sdfs_write_sync1(const fileid_t *fileid, const buffer_t *buf,
         sem_init(&blk.sem, 0, 0);
         blk.ret = 0;
 
-        ret = sdfs_write_async(fileid, buf, size, off,
+        ret = sdfs_write_async(ctx, fileid, buf, size, off,
                               __resume_sem, &blk);
         if (ret)
                 GOTO(err_ret, ret);
@@ -569,15 +578,17 @@ int IO_FUNC __sdfs_write_sync__(va_list ap)
 
         va_end(ap);
 
-        *retval = sdfs_write(fileid, buf, size, off);
+        *retval = sdfs_write(NULL, fileid, buf, size, off);
 
         return 0;
 }
 
-static int __sdfs_write_sync0(const fileid_t *fileid, const buffer_t *buf,
+static int __sdfs_write_sync0(sdfs_ctx_t *ctx, const fileid_t *fileid, const buffer_t *buf,
                               uint32_t size, uint64_t off)
 {
         int ret, retval;
+
+        (void) ctx;
         
         ret = core_request(fileid_hash(fileid), -1, "sdfs_write_sync",
                            __sdfs_write_sync__, fileid, buf, size, off, &retval);
@@ -597,15 +608,15 @@ err_ret:
         return -ret;
 }
 
-int sdfs_write_sync(const fileid_t *fileid, const buffer_t *buf, uint32_t size, uint64_t off)
+int sdfs_write_sync(sdfs_ctx_t *ctx, const fileid_t *fileid, const buffer_t *buf, uint32_t size, uint64_t off)
 {
         int ret;
 
-        ret = __sdfs_write_sync0(fileid, buf, size, off);
+        ret = __sdfs_write_sync0(ctx, fileid, buf, size, off);
         if (ret < 0) {
                 ret = -ret;
                 if (ret == ENOSYS) {
-                        ret = __sdfs_write_sync1(fileid, buf, size, off);
+                        ret = __sdfs_write_sync1(ctx, fileid, buf, size, off);
                         if (ret < 0) {
                                 ret = -ret;
                                 GOTO(err_ret, ret);
@@ -619,9 +630,11 @@ err_ret:
         return -ret;
 }
 
-int sdfs_truncate(const fileid_t *fileid, uint64_t length)
+int sdfs_truncate(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t length)
 {
         int ret;
+
+        (void) ctx;
 
 #if ENABLE_WORM
         worm_status_t worm_status;
@@ -656,9 +669,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_getxattr(const fileid_t *fileid, const char *name, void *value, size_t *size)
+int sdfs_getxattr(sdfs_ctx_t *ctx, const fileid_t *fileid, const char *name, void *value, size_t *size)
 {
         int ret, retry = 0;
+
+        (void) ctx;
         
         io_analysis(ANALYSIS_OP_READ, 0);
 
@@ -677,9 +692,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_removexattr(const fileid_t *fileid, const char *name)
+int sdfs_removexattr(sdfs_ctx_t *ctx, const fileid_t *fileid, const char *name)
 {
         int ret, retry = 0;
+
+        (void) ctx;
         
         io_analysis(ANALYSIS_OP_WRITE, 0);
 
@@ -698,9 +715,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_listxattr(const fileid_t *fileid, char *list, size_t *size)
+int sdfs_listxattr(sdfs_ctx_t *ctx, const fileid_t *fileid, char *list, size_t *size)
 {
         int ret, retry = 0;
+
+        (void) ctx;
         
         io_analysis(ANALYSIS_OP_READ, 0);
 
@@ -719,10 +738,12 @@ err_ret:
         return ret;
 }
 
-int sdfs_setxattr(const fileid_t *fileid, const char *name, const void *value,
+int sdfs_setxattr(sdfs_ctx_t *ctx, const fileid_t *fileid, const char *name, const void *value,
                  size_t size, int flags)
 {
         int ret, retry = 0;
+
+        (void) ctx;
         md_proto_t *md;
         char buf[MAX_BUF_LEN];
 
@@ -760,7 +781,7 @@ retry:
                 	}
 
                         if (new_mode != md->at_mode) {
-                	        ret = sdfs_chmod(fileid, new_mode);
+                	        ret = sdfs_chmod(ctx, fileid, new_mode);
                 	        if (ret < 0)
                 	                GOTO(err_ret, -ret);
                         }
@@ -801,9 +822,11 @@ err_ret:
 }
 
 
-int sdfs_setlock(const fileid_t *fileid, const sdfs_lock_t *lock)
+int sdfs_setlock(sdfs_ctx_t *ctx, const fileid_t *fileid, const sdfs_lock_t *lock)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_WRITE, 0);
 retry:
@@ -821,9 +844,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_getlock(const fileid_t *fileid, sdfs_lock_t *lock)
+int sdfs_getlock(sdfs_ctx_t *ctx, const fileid_t *fileid, sdfs_lock_t *lock)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
         io_analysis(ANALYSIS_OP_READ, 0);
         

@@ -370,7 +370,7 @@ static int __object_scan_dir(rept_t *rept, dir_objck_t *dir_objck, struct list_h
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 

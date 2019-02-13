@@ -138,7 +138,7 @@ int sattr_set(const fileid_t *fileid, const sattr *attr, const nfs3_time *ctime)
         }
 
         if (update) {
-                ret = sdfs_setattr(fileid, &setattr, 1);
+                ret = sdfs_setattr(NULL, fileid, &setattr, 1);
                 if (ret)
                         GOTO(err_ret, ret);
         }
@@ -216,7 +216,7 @@ void get_postopattr1(const fileid_t *fileid, post_op_attr *attr)
         attr->attr_follow = FALSE;
         retry = 0;
 retry:
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (ret) {
                 if (NEED_EAGAIN(ret)) {
                         USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
@@ -244,7 +244,7 @@ void get_preopattr1(const fileid_t *fileid, preop_attr *attr)
         attr->attr_follow = FALSE;
         retry = 0;
 retry:
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (ret) {
                 if (NEED_EAGAIN(ret)) {
                         USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));

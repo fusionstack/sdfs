@@ -302,7 +302,7 @@ int main(int argc, char *argv[])
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -325,7 +325,7 @@ int main(int argc, char *argv[])
 
                 mbuffer_init(&buf, 0);
 
-                ret = sdfs_read_sync(&fileid, &buf, cnt, off);
+                ret = sdfs_read_sync(NULL, &fileid, &buf, cnt, off);
                 if (ret != (int)cnt) {
                         ret = EIO;
                         GOTO(err_ret, ret);

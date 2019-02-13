@@ -558,7 +558,7 @@ static int mode_target_new(char *ns, char *subname)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_mkdir(&parent, name, NULL, 0755, 0, 0);
+        ret = sdfs_mkdir(NULL, &parent, name, NULL, 0755, 0, 0);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -652,7 +652,7 @@ retry:
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_create(&parent, name, &fileid, 0755, 0, 0);
+        ret = sdfs_create(NULL, &parent, name, &fileid, 0755, 0, 0);
         if (ret) {
                 if (ret == EEXIST) {
                         DERROR("temporary file exists, retry ...\n");

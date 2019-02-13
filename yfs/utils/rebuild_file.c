@@ -76,7 +76,7 @@ static int __rebuild(const char *filename, uint32_t chkno, uint32_t resume)
         if (ret)
                 GOTO(err_ret, ret);
 #if 0
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 

@@ -228,7 +228,7 @@ static void *__allocator_worker(void *arg)
         snprintf(key, MAX_NAME_LEN, "%s/%s/diskmap", ETCD_ROOT, ETCD_DISKMAP);
         DINFO("watch %s idx %u\n", key, idx);
         while (1) {
-                ret = etcd_watch(sess, key, &idx, &node);
+                ret = etcd_watch(sess, key, &idx, &node, 0);
                 if(ret != ETCD_OK){
                         if (ret == ETCD_ENOENT) {
                                 DWARN("%s not exist\n");

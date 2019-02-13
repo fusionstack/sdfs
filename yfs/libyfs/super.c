@@ -12,6 +12,7 @@
 #include "sdfs_lib.h"
 #include "dbg.h"
 
+#if 1
 int ly_statvfs(const char *path, struct statvfs *svbuf)
 {
         int ret;
@@ -22,11 +23,11 @@ int ly_statvfs(const char *path, struct statvfs *svbuf)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_lookup(&parent, name, &fileid);
+        ret = sdfs_lookup(NULL, &parent, name, &fileid);
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_statvfs(&fileid, svbuf);
+        ret = sdfs_statvfs(NULL, &fileid, svbuf);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -34,3 +35,4 @@ int ly_statvfs(const char *path, struct statvfs *svbuf)
 err_ret:
         return ret;
 }
+#endif

@@ -23,6 +23,57 @@ static void usage(char *prog)
         fprintf(stderr, "%s [--engine|-g] <localfs|leveldb> <dirpath>\n", prog);
 }
 
+static int __sdfs_mkdir_recurive(const char *path, const ec_t *ec, mode_t mode, fileid_t *_fileid)
+{
+        int ret;
+        fileid_t parent, fileid;
+        char dirname[MAX_NAME_LEN], basename[MAX_NAME_LEN];
+
+        _path_split2(path, dirname, basename);
+        
+        if (strcmp(dirname, ROOT_NAME) == 0) {
+                DINFO("dirname (%s), basename (%s)\n", dirname, basename);
+
+                ret = sdfs_mkvol(basename, ec, mode, &fileid);
+                if (ret) {
+                        if (ret == EEXIST) {
+                                //pass
+                        } else 
+                                GOTO(err_ret, ret);
+                }
+        } else {
+                DINFO("dirname (%s) basename (%s)\n", dirname, basename);
+
+        retry:
+                ret = sdfs_lookup_recurive(dirname, &parent);
+                if (ret) {
+                        if (ret == ENOENT) {
+                                ret = __sdfs_mkdir_recurive(dirname, ec, mode, &parent);
+                                if (ret) {
+                                        if (ret == EEXIST) {
+                                                goto retry;
+                                        } else
+                                                GOTO(err_ret, ret);
+                                }
+                        } else
+                                GOTO(err_ret, ret);
+                }
+
+                ret = sdfs_mkdir(NULL, &parent, basename, ec, &fileid, mode, geteuid(), getgid());
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
+        
+        DBUG("dir (%s) created\n", path);
+
+        if (_fileid)
+                *_fileid = fileid;
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
 int main(int argc, char *argv[])
 {
         int ret, args, verbose = 0, c_opt;
@@ -123,11 +174,7 @@ int main(int argc, char *argv[])
         ec.k = k;
         ec.plugin = (!k || !r) ? PLUGIN_NULL:PLUGIN_EC_ISA;
 
-#if ENABLE_NEWMD
-        ret = sdfs_mkdir_recurive(path, &ec, 0755, NULL);
-#else
-        ret = ly_mkdir(path, &ec, 0755);
-#endif
+        ret = __sdfs_mkdir_recurive(path, &ec, 0755, NULL);
         if (ret) {
                 fprintf(stderr, "ly_mkdir(%s,...) %s\n", path, strerror(ret));
                 exit(ret);

@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
         MD2STAT(md, &stbuf);
 
         if (S_ISREG((stbuf).st_mode)) {
-                ret = sdfs_getattr(&fileid, &stbuf);
+                ret = sdfs_getattr(NULL, &fileid, &stbuf);
                 if (ret) {
                         DERROR("getattr ret: %d\n", ret);
                         size = 0;

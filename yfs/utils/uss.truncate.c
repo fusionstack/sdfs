@@ -151,7 +151,7 @@ opt_err:
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_getattr(&fid, &stbuf);
+        ret = sdfs_getattr(NULL, &fid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -160,7 +160,7 @@ opt_err:
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_truncate(&fid, size);
+        ret = sdfs_truncate(NULL, &fid, size);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -174,7 +174,7 @@ opt_err:
                         mbuffer_init(&buf, 0);
                         mbuffer_appendzero(&buf, split);
 
-                        cnt = sdfs_write_sync(&fid, &buf, split, off);
+                        cnt = sdfs_write_sync(NULL, &fid, &buf, split, off);
                         if (cnt != split) {
                                 /*
                                  * Only report a warning here.

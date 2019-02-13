@@ -33,12 +33,14 @@
 #include "dbg.h"
 
 
-int sdfs_getattr(const fileid_t *fileid, struct stat *stbuf)
+int sdfs_getattr(sdfs_ctx_t *ctx, const fileid_t *fileid, struct stat *stbuf)
 {
         int ret, retry = 0;
         md_proto_t *md;
         char buf[MAX_BUF_LEN];
 
+        (void) ctx;
+        
         md = (void *)buf;
 
         io_analysis(ANALYSIS_OP_READ, 0);
@@ -66,14 +68,14 @@ err_ret:
         return ret;
 }
 
-int sdfs_rename(const fileid_t *fparent, const char *fname, const fileid_t *tparent,
+int sdfs_rename(sdfs_ctx_t *ctx, const fileid_t *fparent, const char *fname, const fileid_t *tparent,
                const char *tname)
 {
         int ret, retry = 0;
         fileid_t src_fileid, dist_fileid;
 
         memset(&src_fileid, 0, sizeof(src_fileid));
-        ret = sdfs_lookup(fparent, fname, &src_fileid);
+        ret = sdfs_lookup(ctx, fparent, fname, &src_fileid);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -87,7 +89,7 @@ int sdfs_rename(const fileid_t *fparent, const char *fname, const fileid_t *tpar
         }
 #endif
 
-        ret = sdfs_lookup(tparent, tname, &dist_fileid);
+        ret = sdfs_lookup(ctx, tparent, tname, &dist_fileid);
         if (ret) {
                 if (ret == ENOENT) {
                         memset(&dist_fileid, 0x0, sizeof(dist_fileid));
@@ -119,10 +121,12 @@ err_ret:
         return ret;
 }
 
-int sdfs_chown(const fileid_t *fileid, uid_t uid, gid_t gid)
+int sdfs_chown(sdfs_ctx_t *ctx, const fileid_t *fileid, uid_t uid, gid_t gid)
 {
         int ret, retry = 0;
 
+        (void) ctx;
+        
 #if ENABLE_WORM
         worm_status_t worm_status;
 
@@ -150,11 +154,12 @@ err_ret:
 }
 
 
-int sdfs_utime(const fileid_t *fileid, const struct timespec *atime,
+int sdfs_utime(sdfs_ctx_t *ctx, const fileid_t *fileid, const struct timespec *atime,
                const struct timespec *mtime, const struct timespec *ctime)
 {
         int ret, retry = 0;
 
+        (void) ctx;
 retry:
         ret = md_utime(fileid, atime, mtime, ctime);
         if (ret) {
@@ -170,9 +175,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_chmod(const fileid_t *fileid, mode_t mode)
+int sdfs_chmod(sdfs_ctx_t *ctx, const fileid_t *fileid, mode_t mode)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
 #if ENABLE_WORM
         worm_status_t worm_status;
@@ -200,9 +207,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_childcount(const fileid_t *fileid, uint64_t *count)
+int sdfs_childcount(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t *count)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
 retry:
         ret = md_childcount(fileid, count);
@@ -219,9 +228,11 @@ err_ret:
         return ret;
 }
 
-int sdfs_setattr(const fileid_t *fileid, const setattr_t *setattr, int force)
+int sdfs_setattr(sdfs_ctx_t *ctx, const fileid_t *fileid, const setattr_t *setattr, int force)
 {
         int ret, retry = 0;
+
+        (void) ctx;
 
 #if ENABLE_WORM
         worm_status_t worm_status;

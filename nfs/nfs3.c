@@ -235,7 +235,7 @@ static int __nfs3_getattr_svc(const sockid_t *sockid, const sunrpc_request_t *re
 
         DBUG("----NFS3---- fileid "FID_FORMAT" len %u\n", FID_ARG(fileid), args->obj.len);
 
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (ret) {
                 GOTO(err_rep, ret);
         }
@@ -379,7 +379,7 @@ static int __nfs3_lookup_svc(const sockid_t *sockid, const sunrpc_request_t *req
                         DWARN("lookup parent\n");
                 }
 
-                ret = sdfs_lookup(parent, args->name, &fileid);
+                ret = sdfs_lookup(NULL, parent, args->name, &fileid);
                 if (ret) {
                         DBUG("lookup %s\n", args->name);
                         GOTO(err_rep, ret);
@@ -543,7 +543,7 @@ static int __nfs3_fsstat_svc(const sockid_t *sockid, const sunrpc_request_t *req
         /* overlaps with resfail */
         get_postopattr1(fileid, &res.u.ok.attr);
 
-        ret = sdfs_statvfs(fileid, &svbuf);
+        ret = sdfs_statvfs(NULL, fileid, &svbuf);
         if (ret) {
                 DWARN("fileid "FID_FORMAT"\n", FID_ARG(fileid));
                 GOTO(err_rep, ret);
@@ -647,16 +647,16 @@ static int __nfs3_create(const fileid_t *parent, const char *name, uint32_t cmod
 {
         int ret;
 
-        ret = sdfs_create(parent, name, fileid, fmode, uid, gid);
+        ret = sdfs_create(NULL, parent, name, fileid, fmode, uid, gid);
         if (ret) {
                 if (ret == EEXIST) {
-                        ret = sdfs_lookup(parent, name, fileid);
+                        ret = sdfs_lookup(NULL, parent, name, fileid);
                         if (ret)
                                 GOTO(err_ret, ret);
 
                         if (cmode == EXCLUSIVE) {
                                 struct stat stbuf;
-                                ret = sdfs_getattr(fileid, &stbuf);
+                                ret = sdfs_getattr(NULL, fileid, &stbuf);
                                 if (ret)
                                         GOTO(err_ret, ret);
 
@@ -680,7 +680,7 @@ static int __nfs3_create(const fileid_t *parent, const char *name, uint32_t cmod
                                 DBUG("file "FID_FORMAT"/%s exist\n", FID_ARG(parent), name);
 
                                 uint64_t count = 0;
-                                ret = sdfs_childcount(fileid, &count);
+                                ret = sdfs_childcount(NULL, fileid, &count);
                                 if (ret)
                                         GOTO(err_ret, ret);
 
@@ -883,17 +883,17 @@ static int __nfs3_mkdir(const fileid_t *parent, const char *name,
         (void) mtime;
         (void) atime;
         
-        ret = sdfs_mkdir(parent, name, NULL, fileid, mode, uid, gid);
+        ret = sdfs_mkdir(NULL, parent, name, NULL, fileid, mode, uid, gid);
         if (ret) {
                 if (ret == EEXIST) {
                         DBUG("dir "FID_FORMAT" %s exist\n", FID_ARG(parent), name);
 
-                        ret = sdfs_lookup(parent, name, fileid);
+                        ret = sdfs_lookup(NULL, parent, name, fileid);
                         if (ret)
                                 GOTO(err_ret, ret);
 
                         uint64_t count = 0;
-                        ret = sdfs_childcount(fileid, &count);
+                        ret = sdfs_childcount(NULL, fileid, &count);
                         if (ret)
                                 GOTO(err_ret, ret);
 
@@ -999,7 +999,7 @@ static int __nfs3_readdir_svc(const sockid_t *sockid, const sunrpc_request_t *re
 
         DBUG("----NFS3---- "FID_FORMAT"\n", FID_ARG(fileid));
 
-        ret = read_dir(fileid, args->cookie, args->cookieverf,
+        ret = read_dir(NULL, fileid, args->cookie, args->cookieverf,
                         args->count, &res, entrys, patharray);
         if (ret)
                 GOTO(err_rep, ret);
@@ -1061,7 +1061,7 @@ static int __nfs3_readdirplus_svc(const sockid_t *sockid, const sunrpc_request_t
 
         DBUG("max %ju\n", args->maxcount);
         
-        ret = readdirplus(fileid, args->cookie, args->cookieverf,
+        ret = readdirplus(NULL, fileid, args->cookie, args->cookieverf,
                           args->dircount, &res, entrys, patharray,
                           fharray);
         if (ret)
@@ -1110,7 +1110,7 @@ static int __nfs3_rmdir_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 
         DBUG("----NFS3---- parent "FID_FORMAT" name %s\n", FID_ARG(parent), args->obj.name);
 
-        ret = sdfs_lookup(parent, args->obj.name, &fileid);
+        ret = sdfs_lookup(NULL, parent, args->obj.name, &fileid);
         if (ret) {
                 if (ret == ENOENT) {
                         goto rmdir_ok;
@@ -1123,7 +1123,7 @@ static int __nfs3_rmdir_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 
         get_preopattr1(&fileid, &res.dir_wcc.before);
 
-        ret = sdfs_rmdir(parent, args->obj.name);
+        ret = sdfs_rmdir(NULL, parent, args->obj.name);
         if (ret) {
                 if (ret == ENOENT) {
                         goto rmdir_ok;
@@ -1176,7 +1176,7 @@ static int __nfs3_readlink_svc(const sockid_t *sockid, const sunrpc_request_t *r
         (void) gid;
         (void) buf;
 
-        ret = sdfs_readlink(fileid, tmp, &buflen);
+        ret = sdfs_readlink(NULL, fileid, tmp, &buflen);
         if (ret)
                 GOTO(err_rep, ret);
 
@@ -1228,17 +1228,17 @@ static int __nfs3_symlink_svc(const sockid_t *sockid, const sunrpc_request_t *re
 
         (void) sattr_tomode(&mode, &args->symlink.symlink_attributes);
 
-        ret = sdfs_symlink(parent, args->where.name, args->symlink.symlink_data,
+        ret = sdfs_symlink(NULL, parent, args->where.name, args->symlink.symlink_data,
                            mode, uid, gid);
         if (ret) {
                 if (ret == EEXIST) {
-                        ret = sdfs_lookup(parent, args->where.name, &fileid);
+                        ret = sdfs_lookup(NULL, parent, args->where.name, &fileid);
                         if (ret)
                                 GOTO(err_rep, ret);
 
                         buflen = MAX_BUF_LEN;
 
-                        ret = sdfs_readlink(&fileid, tmp, &buflen);
+                        ret = sdfs_readlink(NULL, &fileid, tmp, &buflen);
                         if (ret)
                                 GOTO(err_rep, ret);
 
@@ -1251,7 +1251,7 @@ static int __nfs3_symlink_svc(const sockid_t *sockid, const sunrpc_request_t *re
                 }
         }
 
-        ret = sdfs_lookup(parent, args->where.name, &fileid);
+        ret = sdfs_lookup(NULL, parent, args->where.name, &fileid);
         if (ret) {
                 DWARN("lookup %s form "FID_FORMAT"\n", args->where.name, FID_ARG(parent));
                 GOTO(err_rep, ret);
@@ -1332,7 +1332,7 @@ static int __nfs3_remove_svc(const sockid_t *sockid, const sunrpc_request_t *req
         DBUG("----NFS3---- parent "FID_FORMAT" name %s\n", FID_ARG(parent),
                         args->obj.name);
 
-        ret = sdfs_lookup(parent, args->obj.name, &fileid);
+        ret = sdfs_lookup(NULL, parent, args->obj.name, &fileid);
         if (ret) {
                 if (ret == ENOENT) {
                         goto remove_ok;
@@ -1349,7 +1349,7 @@ static int __nfs3_remove_svc(const sockid_t *sockid, const sunrpc_request_t *req
                 GOTO(err_rep, ret);
         }
 #else
-        ret = sdfs_unlink(parent, args->obj.name);
+        ret = sdfs_unlink(NULL, parent, args->obj.name);
         if (ret) {
                 if (ret == ENOENT) {
                         goto remove_ok;
@@ -1392,39 +1392,39 @@ static int __rename_proc(const fileid_t *fromdir, const char *fromname,
         fileid_t from_fileid, to_fileid;
         struct stat stfrom, stto;
 
-        ret = sdfs_rename(fromdir, fromname, todir, toname);
+        ret = sdfs_rename(NULL, fromdir, fromname, todir, toname);
         if (0 == ret)
                 return ret;
         if (EEXIST != ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_lookup(fromdir, fromname, &from_fileid);
+        ret = sdfs_lookup(NULL, fromdir, fromname, &from_fileid);
         if (ret)
                 GOTO(err_ret, ret);
-        ret = sdfs_getattr(&from_fileid, &stfrom);
+        ret = sdfs_getattr(NULL, &from_fileid, &stfrom);
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_lookup(todir, toname, &to_fileid);
+        ret = sdfs_lookup(NULL, todir, toname, &to_fileid);
         if (ret)
                 GOTO(err_ret, ret);
-        ret = sdfs_getattr(&to_fileid, &stto);
+        ret = sdfs_getattr(NULL, &to_fileid, &stto);
         if (ret)
                 GOTO(err_ret, ret);
 
         if (!S_ISDIR(stfrom.st_mode) && !S_ISDIR(stto.st_mode)) {
-                ret = sdfs_unlink(todir, toname);
+                ret = sdfs_unlink(NULL, todir, toname);
                 if (ret)
                         GOTO(err_ret, ret);
         }
         else if (S_ISDIR(stfrom.st_mode) && S_ISDIR(stto.st_mode)) {
                 uint64_t count = 0;
-                ret = sdfs_childcount(&to_fileid, &count);
+                ret = sdfs_childcount(NULL, &to_fileid, &count);
                 if (ret)
                         GOTO(err_ret, ret);
 
                 if (!count) {
-                        ret = sdfs_rmdir(todir, toname);
+                        ret = sdfs_rmdir(NULL, todir, toname);
                         if (ret)
                                 GOTO(err_ret, ret);
                 }
@@ -1438,7 +1438,7 @@ static int __rename_proc(const fileid_t *fromdir, const char *fromname,
 
         }
 
-        ret = sdfs_rename(fromdir, fromname, todir, toname);
+        ret = sdfs_rename(NULL, fromdir, fromname, todir, toname);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -1518,7 +1518,7 @@ static int __nfs3_link_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         DBUG("----NFS3---- parent "FID_FORMAT" name %s\n", FID_ARG(parent), args->link.name);
 
         //todo uid, gid
-        ret = sdfs_link2node(fileid, parent, args->link.name);
+        ret = sdfs_link2node(NULL, fileid, parent, args->link.name);
         if (ret)
                 GOTO(err_rep, ret);
 
@@ -1607,7 +1607,7 @@ static int __nfs3_read_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         DBUG("----NFS3---- read "FID_FORMAT" size %u offset %ju\n",
               FID_ARG(fileid), args->count, args->offset);
 
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (unlikely(ret)) {
                 ret = (ret == ENOENT) ? ESTALE : ret;
                 GOTO(err_rep, ret);
@@ -1636,7 +1636,7 @@ static int __nfs3_read_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                 args->count = nfs_read_max_size;
         }
 
-        ret = sdfs_read(fileid, &rbuf, args->count, args->offset);
+        ret = sdfs_read(NULL, fileid, &rbuf, args->count, args->offset);
         if (unlikely(ret))
                 GOTO(err_rep, ret);
 
@@ -1700,7 +1700,7 @@ static int __nfs3_write_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                 DWARN("write "FID_FORMAT" off %llu size %u\n",
                       FID_ARG(fileid), (LLU)args->offset, args->data.len);
         } else {
-                ret = sdfs_write(fileid, wbuf, args->data.len, args->offset);
+                ret = sdfs_write(NULL, fileid, wbuf, args->data.len, args->offset);
                 if (ret)
                         GOTO(err_rep, ret);
         }

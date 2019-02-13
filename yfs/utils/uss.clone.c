@@ -257,7 +257,7 @@ static int __clone_path_init_uss_source(struct clone_args *cargs)
                 goto err_ret;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret) {
                 fprintf(stderr, "can't stat uss: %s, %s\n",
                         cargs->source.path, strerror(ret));
@@ -289,14 +289,14 @@ static int __clone_path_init_uss_target(struct clone_args *cargs)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_create(&parent, name, &fileid, 0644, 0 ,0);
+        ret = sdfs_create(NULL, &parent, name, &fileid, 0644, 0 ,0);
         if (ret) {
                 fprintf(stderr, "can't create uss: %s, %s\n",
                         cargs->target.path, strerror(ret));
                 goto err_ret;
         }
 
-        ret = sdfs_truncate(&fileid, cargs->source.size);
+        ret = sdfs_truncate(NULL, &fileid, cargs->source.size);
         if (ret) {
                 fprintf(stderr, "can't truncate uss: %s, %s\n",
                         cargs->target.path, strerror(ret));
@@ -332,7 +332,7 @@ static int __clone_path_init_lun_source(struct clone_args *cargs)
                 goto err_ret;
         }
 
-        ret = sdfs_getattr(&fileid, &stbuf);
+        ret = sdfs_getattr(NULL, &fileid, &stbuf);
         if (ret) {
                 fprintf(stderr, "can't stat lun: %s, %s\n",
                         cargs->source.path, strerror(ret));
@@ -387,7 +387,7 @@ retry:
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_create(&parent, name, &fileid, 0755, 0, 0);
+        ret = sdfs_create(NULL, &parent, name, &fileid, 0755, 0, 0);
         if (ret) {
                 if (ret == EEXIST) {
                         DERROR("temporary file exists, retry ...\n");
@@ -396,7 +396,7 @@ retry:
                         GOTO(err_ret, ret);
         }
 
-        ret = sdfs_truncate(&fileid, cargs->source.size);
+        ret = sdfs_truncate(NULL, &fileid, cargs->source.size);
         if (ret)
                 GOTO(err_unlink, ret);
 
@@ -409,7 +409,7 @@ retry:
 
         return 0;
 err_unlink:
-        sdfs_unlink(&parent, name);
+        sdfs_unlink(NULL, &parent, name);
 err_ret:
         return ret;
 }
@@ -552,7 +552,7 @@ static int __cb_host2lun(void *arg, int ret)
 
         if (ctx->size != ret) {
                 fprintf(stderr, "callback return error: %d, %d\n", ret, ctx->size);
-                sdfs_unlink(&cargs->target.id.tmpfile.parent,
+                sdfs_unlink(NULL, &cargs->target.id.tmpfile.parent,
                            cargs->target.id.tmpfile.temp);
                 exit(EIO);
         }
@@ -617,7 +617,7 @@ static int __clone_host2lun(struct clone_args *cargs)
                 ctx->cargs = cargs;
                 ctx->size = cnt;
 
-                ret = sdfs_write_async(fileid, &ctx->buf, cnt, off, __cb_host2lun, ctx);
+                ret = sdfs_write_async(NULL, fileid, &ctx->buf, cnt, off, __cb_host2lun, ctx);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -640,14 +640,14 @@ next:
 
         percent_done();
 
-        ret = sdfs_rename(&cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp,
+        ret = sdfs_rename(NULL, &cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp,
                          &cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.real);
         if (ret)
                 GOTO(err_ret, ret);
 
         return 0;
 err_ret:
-        sdfs_unlink(&cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp);
+        sdfs_unlink(NULL, &cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp);
         return ret;
 }
 
@@ -725,7 +725,7 @@ static int __clone_lun2host(struct clone_args *cargs)
                 ctx->size = cnt;
                 ctx->off = off;
 
-                ret = sdfs_read_async(fileid, &ctx->buf, cnt, off, __cb_lun2host, ctx);
+                ret = sdfs_read_async(NULL, fileid, &ctx->buf, cnt, off, __cb_lun2host, ctx);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -760,7 +760,7 @@ static int __cb_uss2lun(void *arg, int ret)
 
         if (ctx->size != ret) {
                 fprintf(stderr, "callback return error: %d, %d\n", ret, ctx->size);
-                sdfs_unlink(&cargs->target.id.tmpfile.parent,
+                sdfs_unlink(NULL, &cargs->target.id.tmpfile.parent,
                            cargs->target.id.tmpfile.temp);
                 exit(EIO);
         }
@@ -803,7 +803,7 @@ static int __clone_uss2lun(struct clone_args *cargs)
                 if (ret)
                         GOTO(err_ret, ret);
 
-                len = sdfs_read_sync(sfd, &ctx->buf, cnt, off);
+                len = sdfs_read_sync(NULL, sfd, &ctx->buf, cnt, off);
                 if (len != cnt) {
                         fprintf(stderr, "read error: (%d,%d)\n", len, cnt);
                         ret = EIO;
@@ -828,7 +828,7 @@ static int __clone_uss2lun(struct clone_args *cargs)
                 ctx->cargs = cargs;
                 ctx->size = cnt;
 
-                ret = sdfs_write_async(tfd, &ctx->buf, cnt, off, __cb_uss2lun, ctx);
+                ret = sdfs_write_async(NULL, tfd, &ctx->buf, cnt, off, __cb_uss2lun, ctx);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -851,14 +851,14 @@ next:
 
         percent_done();
 
-        ret = sdfs_rename(&cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp,
+        ret = sdfs_rename(NULL, &cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp,
                          &cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.real);
         if (ret)
                 GOTO(err_ret, ret);
 
         return 0;
 err_ret:
-        sdfs_unlink(&cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp);
+        sdfs_unlink(NULL, &cargs->target.id.tmpfile.parent, cargs->target.id.tmpfile.temp);
         return ret;
 }
 
@@ -909,7 +909,7 @@ static int __clone_lun2uss(struct clone_args *cargs)
                 if (ret)
                         GOTO(err_ret, ret);
 
-                len = sdfs_read_sync(sfd, &ctx->buf, cnt, off);
+                len = sdfs_read_sync(NULL, sfd, &ctx->buf, cnt, off);
                 if (len != cnt) {
                         fprintf(stderr, "read error: (%d,%d)\n", len, cnt);
                         ret = EIO;
@@ -934,7 +934,7 @@ static int __clone_lun2uss(struct clone_args *cargs)
                 ctx->cargs = cargs;
                 ctx->size = cnt;
 
-                ret = sdfs_write_async(tfd, &ctx->buf, cnt, off, __cb_lun2uss, ctx);
+                ret = sdfs_write_async(NULL, tfd, &ctx->buf, cnt, off, __cb_lun2uss, ctx);
                 if (ret)
                         GOTO(err_ret, ret);
 

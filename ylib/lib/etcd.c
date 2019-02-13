@@ -1057,7 +1057,7 @@ int etcd_lock_watch(etcd_lock_t *lock, char *locker, nid_t *nid, uint32_t *magic
                 GOTO(err_ret, ret);
         }
         
-        ret = etcd_watch(sess, lock->key, idx, &node);
+        ret = etcd_watch(sess, lock->key, idx, &node, 0);
         if(ret != ETCD_OK){
                 ret = EPERM;
                 GOTO(err_close, ret);

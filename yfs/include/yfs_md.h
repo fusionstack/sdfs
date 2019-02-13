@@ -36,6 +36,7 @@
         uint32_t md_size;                       \
         uint32_t at_mode;                       \
         uint64_t md_version;                    \
+        uint64_t snapvers;                      \
         uint64_t wormid;                        \
         fileid_t quotaid;                       \
         fileid_t fileid;                        \
@@ -62,6 +63,7 @@
 typedef struct {
         chkid_t chkid;
         uint64_t md_version;
+        uint64_t snapversion;
         uint8_t status;
         uint32_t repnum;
         uint32_t size;

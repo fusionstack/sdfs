@@ -506,7 +506,7 @@ int main(int argc, char *argv[])
 
         if (SHARE_SET == oper_type) {
                 //oct 777 decimal 511
-                ret = sdfs_chmod(&dirid, 511);
+                ret = sdfs_chmod(NULL, &dirid, 511);
                 if(ret)
                         GOTO(err_ret, ret);
 

@@ -190,7 +190,7 @@ int raw_printfile(fileid_t *fileid, uint32_t _chkno)
         snprintf(key, MAX_BUF_LEN, USS_SYSTEM_ATTR_ENGINE);
         id2vid(fileid->volid, &volume_dir_id);
         size = sizeof(value);
-        ret = sdfs_getxattr(&volume_dir_id, key, value, &size);
+        ret = sdfs_getxattr(NULL, &volume_dir_id, key, value, &size);
         if (0 == ret) {
         }
 
@@ -322,7 +322,7 @@ int raw_is_dir(const fileid_t *fileid, int *is_dir)
         int ret;
         struct stat stbuf;
 
-        ret = sdfs_getattr(fileid, &stbuf);
+        ret = sdfs_getattr(NULL, fileid, &stbuf);
         if (ret)
                 GOTO(err_ret, ret);
 

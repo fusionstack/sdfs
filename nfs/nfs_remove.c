@@ -49,7 +49,7 @@ static int __sdfs_dir_itor1(const dirid_t *dirid, func1_t func, void *ctx)
         uint64_t count;
         
         while (srv_running) {
-                ret = sdfs_readdir1(dirid, offset, &de0, &delen);
+                ret = sdfs_readdir1(NULL, dirid, offset, &de0, &delen);
                 if (ret) {
                         GOTO(err_ret, ret);
                 }
@@ -86,7 +86,7 @@ static void __nfs_remove_file(void *_de, void *_arg)
 
         DINFO("remove %s @ "CHKID_FORMAT"\n", de->d_name, CHKID_ARG(parent));
         
-        ret = sdfs_unlink(parent, de->d_name);
+        ret = sdfs_unlink(NULL, parent, de->d_name);
         if (ret) {
                 DWARN("remove %s @ "CHKID_FORMAT" fail\n", de->d_name, CHKID_ARG(parent));
         }
@@ -109,7 +109,7 @@ static void __nfs_remove_bytime(void *_de, void *_arg)
 
         DINFO("name %s diff %u, remove it\n", de->d_name, now - t);
 
-        ret = sdfs_lookup(parent, de->d_name, &dirid);
+        ret = sdfs_lookup(NULL, parent, de->d_name, &dirid);
         if (ret) {
                 DWARN("lookup %s @ "CHKID_FORMAT" fail\n", de->d_name, CHKID_ARG(parent));
                 return;
@@ -121,7 +121,7 @@ static void __nfs_remove_bytime(void *_de, void *_arg)
                 return;
         }
 
-        ret = sdfs_rmdir(parent, de->d_name);
+        ret = sdfs_rmdir(NULL, parent, de->d_name);
         if (ret) {
                 DWARN("rmdir %s @ "CHKID_FORMAT" fail\n", de->d_name, CHKID_ARG(parent));
                 return;
@@ -200,7 +200,7 @@ static  int __nfs_remove_getvolid(const dirid_t *_dirid, dirid_t *volid)
         
         dirid = *_dirid;
         while (1) {
-                ret = sdfs_lookup(&dirid, "..", &parent);
+                ret = sdfs_lookup(NULL, &dirid, "..", &parent);
                 if (ret)
                         GOTO(err_ret, ret);
 
@@ -234,10 +234,10 @@ int nfs_remove(const fileid_t *parent, const char *name)
                 GOTO(err_ret, ret);
 
 retry:
-        ret = sdfs_lookup(&volid, NFS_REMOVED, &removed);
+        ret = sdfs_lookup(NULL, &volid, NFS_REMOVED, &removed);
         if (ret) {
                 if (ret == ENOENT) {
-                        ret = sdfs_mkdir(&volid, NFS_REMOVED, NULL, &removed, 0, 0, 0);
+                        ret = sdfs_mkdir(NULL, &volid, NFS_REMOVED, NULL, &removed, 0, 0, 0);
                         if (ret) {
                                 if (ret == EEXIST) {
                                         goto retry;
@@ -251,10 +251,10 @@ retry:
         now = time(NULL);
         snprintf(tname, MAX_NAME_LEN, "%d", ((int)now / 3600) * 3600);
 
-        ret = sdfs_lookup(&removed, tname, &workdir);
+        ret = sdfs_lookup(NULL, &removed, tname, &workdir);
         if (ret) {
                 if (ret == ENOENT) {
-                        ret = sdfs_mkdir(&removed, tname, NULL, &workdir, 0, 0, 0);
+                        ret = sdfs_mkdir(NULL, &removed, tname, NULL, &workdir, 0, 0, 0);
                         if (ret) {
                                 if (ret == EEXIST) {
                                         goto retry;
@@ -270,14 +270,14 @@ retry:
 
 #if ENABLE_MD_POSIX
         fileid_t fileid;
-        ret = sdfs_lookup(parent, name, &fileid);
+        ret = sdfs_lookup(NULL, parent, name, &fileid);
         if (ret)
                 GOTO(err_ret, ret);
 #endif
         
         
         DBUG("rename to %s\n", _uuid);
-        ret = sdfs_rename(parent, name, &workdir, _uuid);
+        ret = sdfs_rename(NULL, parent, name, &workdir, _uuid);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -285,8 +285,8 @@ retry:
 #if ENABLE_MD_POSIX
         struct timespec t;
         clock_gettime(CLOCK_REALTIME, &t);
-        sdfs_utime(parent, NULL, &t, &t);
-        sdfs_utime(&fileid, NULL, NULL, &t);
+        sdfs_utime(NULL, parent, NULL, &t, &t);
+        sdfs_utime(NULL, &fileid, NULL, NULL, &t);
 #endif
         
         return 0;

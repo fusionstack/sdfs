@@ -377,7 +377,7 @@ int check_cap_valid(const unsigned long cap)
                 GOTO(err_ret, ret);
         }
 
-        ret = sdfs_statvfs(&fileid, &vfs);
+        ret = sdfs_statvfs(NULL, &fileid, &vfs);
         if(ret) {
                 GOTO(err_ret, ret);
         }

@@ -433,7 +433,7 @@ int worm_remove()
         if(ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_getattr(&fileid, &st);
+        ret = sdfs_getattr(NULL, &fileid, &st);
         if(ret)
                 GOTO(err_ret, ret);
 

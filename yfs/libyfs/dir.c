@@ -10,6 +10,7 @@
 #include "sdfs_lib.h"
 #include "dbg.h"
 
+#if 1
 int ly_readdir(const char *path, off_t offset, void **de, int *delen, int prog_type)
 {
         int ret;
@@ -26,7 +27,7 @@ int ly_readdir(const char *path, off_t offset, void **de, int *delen, int prog_t
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = sdfs_readdir1(&fileid, offset, de, delen);
+        ret = sdfs_readdir1(NULL, &fileid, offset, de, delen);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -53,7 +54,7 @@ int ly_readdirplus(const char *path, off_t offset, void **de, int *delen, int pr
 
         DBUG("dir %s "FID_FORMAT"\n", path, FID_ARG(&fileid));
 
-        ret = sdfs_readdirplus(&fileid, offset, de, delen);
+        ret = sdfs_readdirplus(NULL, &fileid, offset, de, delen);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -62,7 +63,6 @@ err_ret:
         return ret;
 }
 
-#if 1
 int ly_readdirplus_with_filter(const char *path, off_t offset, void **de, int *delen,
                                const filter_t *filter)
 {
@@ -80,7 +80,7 @@ int ly_readdirplus_with_filter(const char *path, off_t offset, void **de, int *d
 
         DBUG("dir %s "FID_FORMAT"\n", path, FID_ARG(&fileid));
 
-        ret = sdfs_readdirplus_with_filter(&fileid, offset, de, delen, filter);
+        ret = sdfs_readdirplus_with_filter(NULL, &fileid, offset, de, delen, filter);
         if (ret)
                 GOTO(err_ret, ret);
 

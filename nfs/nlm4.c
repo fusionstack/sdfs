@@ -158,7 +158,7 @@ static int __nlm4_test_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         __nlock2slock(args->exclusive, &args->alock, lock);
 
         memcpy(owner, lock, SDFS_LOCK_SIZE(lock));
-        ret = sdfs_getlock(fileid, owner);
+        ret = sdfs_getlock(NULL, fileid, owner);
         if (ret) {
                 if (ret == ENOENT) {
                         res.test_stat.status = NLM4_GRANTED;
@@ -211,7 +211,7 @@ static int __nlm4_lock_grace(const fileid_t *fileid, const sdfs_lock_t *lock)
 
         owner = (void *)_owner;
         memcpy(owner, lock, SDFS_LOCK_SIZE(lock));
-        ret = sdfs_getlock(fileid, owner);
+        ret = sdfs_getlock(NULL, fileid, owner);
         if (ret) {
                 GOTO(err_ret, ret);
         }
@@ -250,7 +250,7 @@ static int __nlm4_lock_wait(const fileid_t *_fileid, const sdfs_lock_t *_lock_)
                         GOTO(err_reg, ret);
                 }
 
-                ret = sdfs_setlock(&fileid, lock);
+                ret = sdfs_setlock(NULL, &fileid, lock);
                 if (ret) {
                         if (ret == EWOULDBLOCK) {
                                 schedule_sleep("nlm", 100 * 1000);
@@ -314,7 +314,7 @@ static int __nlm4_lock_svc(const sockid_t *sockid, const sunrpc_request_t *req,
                         GOTO(err_rep, ret);
                 }
         } else {
-                ret = sdfs_setlock(fileid, lock);
+                ret = sdfs_setlock(NULL, fileid, lock);
                 if (ret) {
                         if (ret == EWOULDBLOCK) {
                                 if (!args->block) {
@@ -406,7 +406,7 @@ static int __nlm4_unlock_svc(const sockid_t *sockid, const sunrpc_request_t *req
         __nlock2slock(0, &args->alock, lock);
         lock->type = SDFS_UNLOCK;
         
-        ret = sdfs_setlock(fileid, lock);
+        ret = sdfs_setlock(NULL, fileid, lock);
         if (ret) {
                 GOTO(err_rep, ret);
         }
