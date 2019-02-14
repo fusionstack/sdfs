@@ -26,6 +26,7 @@
 #include "rpc_table.h"
 #include "configure.h"
 #include "core.h"
+#include "redis_pipeline.h"
 #if ENABLE_CORENET
 #include "corenet_maping.h"
 #include "corenet_connect.h"
@@ -239,6 +240,8 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
         corerpc_scan();
 #endif
 
+        redis_pipline_run();
+        
         schedule_scan(core->schedule);
 
 #if ENABLE_CORENET
@@ -394,6 +397,12 @@ static int __core_worker_init(core_t *core)
         }
 #endif
 
+        if (core->flag & CORE_FLAG_REDIS) {
+                ret = redis_pipeline_init();
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
+        
         variable_set(VARIABLE_CORE, core);
         //core_register_tls(VARIABLE_CORE, private_mem);
 
@@ -1224,6 +1233,10 @@ void core_worker_exit(core_t *core)
         }
 #endif
 
+        if (core->flag & CORE_FLAG_REDIS) {
+                redis_pipeline_destroy();
+        }
+        
         if (core->main_core) {
                 cpuset_unset(core->main_core->cpu_id);
         }

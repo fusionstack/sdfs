@@ -181,7 +181,7 @@ static int __sunrpc_pack_handler(const nid_t *nid, const sockid_t *sockid, buffe
         return 0;
 }
 
-#if NFS_CO
+#if ENABLE_CO_WORKER
 
 typedef struct {
         sockid_t sockid;
@@ -281,7 +281,7 @@ int sunrpc_accept(int srv_sd)
         if (ret)
                 GOTO(err_sd, ret);
         
-        ret = core_create(&core, 0, CORE_FLAG_ACTIVE);
+        ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_REDIS);
         if (ret)
                 GOTO(err_sd, ret);
 

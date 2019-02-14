@@ -42,15 +42,16 @@ typedef struct {
 } redis_worker_t;
 
 static int __seq__ = 0;
-__thread int __redis_workerid__ = -1;
+static __thread int __redis_workerid__ = -1;
 static redis_worker_t *__redis_worker__;
 static int __worker_count__ = 0;
 int __redis_conn_pool__ = -1;
-static int __use_pipline__ = 0;
+__thread int __use_pipline__ = 0;
 
 static int __redis_request(const int hash, const char *name, func_va_t exec, ...);
 
-static int __hget__(const volid_t *volid, const fileid_t *fileid, const char *name, char *value, size_t *size)
+static int __hget__(const volid_t *volid, const fileid_t *fileid, const char *name,
+                    char *value, size_t *size)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
@@ -1114,14 +1115,10 @@ err_ret:
         return ret;
 }
 
-int redis_init(int worker_count, int use_pipeline)
+int redis_init(int worker_count)
 {
         int ret;
         redis_worker_t *worker;
-
-#if 0
-        worker_count = ng.daemon ? gloconf.polling_core : 1;
-#endif
 
         ret = ymalloc((void **)&__redis_worker__, sizeof(*__redis_worker__) * worker_count);
         if (unlikely(ret))
@@ -1159,18 +1156,11 @@ int redis_init(int worker_count, int use_pipeline)
 
         __worker_count__ = worker_count;
         __redis_conn_pool__ = worker_count;
-        __use_pipline__ = use_pipeline;
 
         ret = redis_conn_init();
         if(ret)
                 GOTO(err_ret, ret);
 
-        if (use_pipeline) {
-                ret = redis_pipeline_init();
-                if(ret)
-                        GOTO(err_ret, ret);
-        }
-        
         return 0;
 err_ret:
         return ret;

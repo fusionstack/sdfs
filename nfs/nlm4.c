@@ -35,7 +35,6 @@
 #define DBG_SUBSYS S_YNFS
 
 #include "yfs_conf.h"
-#include "ynfs_conf.h"
 #include "attr.h"
 #include "error.h"
 #include "nlm_job_context.h"

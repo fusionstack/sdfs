@@ -73,7 +73,7 @@ int sunrpc_reply(const sockid_t *sockid, const sunrpc_request_t *req,
 
         DBUG("buf len %llu\n", (LLU)(buf.len - sizeof(uint32_t)));
 
-#if NFS_CO
+#if ENABLE_CO_WORKER
         ret = corenet_tcp_send(sockid, &buf, 0);
         if (unlikely(ret))
                 GOTO(err_free, ret);

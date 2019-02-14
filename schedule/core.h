@@ -89,9 +89,10 @@ typedef struct __core {
         struct list_head poller_list;
 } core_t;
 
-#define CORE_FLAG_ACTIVE 0x0001
+#define CORE_FLAG_ACTIVE  0x0001
 #define CORE_FLAG_PASSIVE 0x0002
 #define CORE_FLAG_AIO     0x0004
+#define CORE_FLAG_REDIS   0x0008
 
 int core_create(core_t **_core, int hash, int flag);
 int core_init(int polling_core, int polling_timeout, int flag);

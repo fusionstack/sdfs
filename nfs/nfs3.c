@@ -16,7 +16,6 @@
 #define DBG_SUBSYS S_YNFS
 
 #include "yfs_conf.h"
-#include "ynfs_conf.h"
 #include "network.h"
 #include "attr.h"
 #include "error.h"
@@ -1741,7 +1740,7 @@ err_ret:
         return ret;
 }
 
-#if !NFS_CO
+#if !ENABLE_CO_WORKER
 
 static int __core_handler(va_list ap)
 {
@@ -1935,7 +1934,7 @@ int nfs_ver3(const sockid_t *sockid, const sunrpc_request_t *req,
 
         (void) hash_args;
         
-#if NFS_CO
+#if ENABLE_CO_WORKER
         ret = handler(sockid, req, uid, gid, &nfsarg, buf);
         if (ret)
                 GOTO(err_ret, ret);
