@@ -4,6 +4,8 @@
 #include "sdfs_conf.h"
 #include "yfscli_conf.h"
 
+#define NFS_CO 1
+
 typedef enum {
         ACCEPT_STATE_OK, /* 0 */
         ACCEPT_STATE_ERROR, /* 1 */

@@ -93,11 +93,12 @@ typedef struct __core {
 #define CORE_FLAG_PASSIVE 0x0002
 #define CORE_FLAG_AIO     0x0004
 
+int core_create(core_t **_core, int hash, int flag);
 int core_init(int polling_core, int polling_timeout, int flag);
 
 int core_spdk_init(int flag);
 int core_init_register(func_t init, void *_ctx, const char *name);
-void core_check_register(int hash, const char *name, void *opaque, func1_t func);
+void core_check_register(core_t *core, const char *name, void *opaque, func1_t func);
 
 int core_hash(const fileid_t *fileid);
 int core_attach(int hash, const sockid_t *sockid, const char *name, void *ctx,
@@ -107,6 +108,7 @@ core_t *core_self();
 
 int core_request_async(int hash, int priority, const char *name, func_t exec, void *arg);
 int core_request(int hash, int priority, const char *name, func_va_t exec, ...);
+int core_request_new(core_t *core, int priority, const char *name, func_va_t exec, ...);
 void core_check_dereg(const char *name, void *opaque);
 void core_register_tls(int type, void *ptr);
 

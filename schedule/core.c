@@ -435,7 +435,7 @@ typedef struct {
 #define REQUEST_SEM 1
 #define REQUEST_TASK 2
 
-static int __core_create__(core_t **_core, int hash, int flag)
+int core_create(core_t **_core, int hash, int flag)
 {
         int ret;
         core_t *core;
@@ -507,7 +507,7 @@ int core_init(int polling_core, int polling_timeout, int flag)
 
         DINFO("core global latency inited\n");
         for (i = 0; i < cpuset_useable(); i++) {
-                ret = __core_create__(&core, i, flag);
+                ret = core_create(&core, i, flag);
                 if (unlikely(ret))
                         UNIMPLEMENTED(__DUMP__);
 
@@ -653,14 +653,56 @@ err_ret:
         return ret;
 }
 
-void core_check_register(int hash, const char *name, void *opaque, func1_t func)
+int core_request_new(core_t *core, int priority, const char *name, func_va_t exec, ...)
+{
+        int ret;
+        schedule_t *schedule;
+        arg1_t ctx;
+
+        schedule = core->schedule;
+        if (unlikely(schedule == NULL)) {
+                ret = ENOSYS;
+                GOTO(err_ret, ret);
+        }
+
+        ctx.exec = exec;
+        va_start(ctx.ap, exec);
+
+        if (schedule_running()) {
+                ctx.type = REQUEST_TASK;
+                ctx.task = schedule_task_get();
+        } else {
+                ctx.type = REQUEST_SEM;
+                ret = sem_init(&ctx.sem, 0, 0);
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
+        }
+
+        ret = schedule_request(schedule, priority, __core_request, &ctx, name);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        if (schedule_running()) {
+                ret = schedule_yield1(name, NULL, NULL, NULL, -1);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
+        } else {
+                ret = _sem_wait(&ctx.sem);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
+        }
+
+        return ctx.retval;
+err_ret:
+        return ret;
+}
+
+void core_check_register(core_t *core, const char *name, void *opaque, func1_t func)
 {
         int ret;
         core_check_t *core_check;
-        core_t *core = __core_array__[hash % cpuset_useable()];
-	if (core_self()) {
-		YASSERT(core == core_self());
-	}
 
         YASSERT(strlen(name) < MAX_NAME_LEN);
 
@@ -668,7 +710,7 @@ void core_check_register(int hash, const char *name, void *opaque, func1_t func)
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
-	DWARN("%s register core check %p\n", name, opaque);
+	DINFO("%s register core check %p\n", name, opaque);
         core_check->func = func;
         core_check->opaque = opaque;
         strcpy(core_check->name, name);

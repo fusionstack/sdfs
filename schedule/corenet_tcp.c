@@ -1162,6 +1162,7 @@ int corenet_tcp_send(const sockid_t *sockid, buffer_t *buf, int flag)
         node = &__corenet__->array[sockid->sd];
         if (node->sockid.seq != sockid->seq || node->sockid.sd == -1) {
                 ret = ECONNRESET;
+                DWARN("seq %d %d, sd %d\n", node->sockid.seq, sockid->seq, node->sockid.sd);
                 GOTO(err_ret, ret);
         }
 

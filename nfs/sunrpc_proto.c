@@ -14,12 +14,15 @@
 #include "../net/net_events.h"
 #include "../../ynet/sock/sock_tcp.h"
 #include "ynet_rpc.h"
-#include "dbg.h"
 #include "xdr.h"
+#include "core.h"
+#include "corenet.h"
 #include "nfs_job_context.h"
 #include "nfs_events.h"
+#include "nfs_conf.h"
 #include "nfs_state_machine.h"
 #include "xdr_nfs.h"
+#include "dbg.h"
 
 const char job_sunrpc_request[] = "sunrpc_request";
 
@@ -27,8 +30,6 @@ extern event_job_t sunrpc_nfs3_handler;
 extern event_job_t sunrpc_mount_handler;
 extern event_job_t sunrpc_acl_handler;
 extern event_job_t sunrpc_nlm_handler;
-
-jobtracker_t *sunrpc_jobtracker;
 
 #define NFS3_WRITE 7
 
@@ -180,46 +181,136 @@ static int __sunrpc_pack_handler(const nid_t *nid, const sockid_t *sockid, buffe
         return 0;
 }
 
-int sunrpc_accept_handler(void *_sock, void *context)
+#if NFS_CO
+
+typedef struct {
+        sockid_t sockid;
+        int running;
+        char host[MAX_NAME_LEN];
+} sunrpc_ctx_t;
+
+static void __sunrpc_close(void *_ctx)
 {
-        int ret;
-        net_proto_t proto;
-        net_handle_t nh;
-        ynet_sock_conn_t *sock = _sock;
-        int fd = sock->nh.u.sd.sd;
-        
-        (void) context;
+        sunrpc_ctx_t *ctx = _ctx;
 
-        DBUG("new conn for sd %d\n", fd);
+        ctx->running = 0;
+}
 
-        _memset(&proto, 0x0, sizeof(net_proto_t));
+static int __sunrpc_recv(void *_ctx, void *buf, int *_count)
+{
+        int msg_len, io_len, count = 0;
+        char tmp[MAX_BUF_LEN];
+        buffer_t _buf, *mbuf = buf;
+        sunrpc_ctx_t *ctx = _ctx;
 
-        proto.head_len = sizeof(sunrpc_request_t);
-        proto.reader = net_events_handle_read;
-        proto.writer = net_events_handle_write;
-        proto.pack_len = sunrpc_pack_len;
-        proto.pack_handler = __sunrpc_pack_handler;
-        //proto.prog[0].handler = sunrpc_request_handler;
-        proto.jobtracker = sunrpc_jobtracker;
+        DBUG("recv %u\n", mbuf->len);
 
-        ret = sdevent_accept(fd, &nh, &proto, YNET_RPC_NONBLOCK);
-        if (ret)
-                GOTO(err_ret, ret);
+        while (mbuf->len >= sizeof(sunrpc_request_t)) {
+                mbuffer_get(buf, tmp, sizeof(sunrpc_request_t));
+                sunrpc_pack_len(tmp, sizeof(sunrpc_request_t), &msg_len, &io_len);
 
-#if 0
-        ret = sdevents_align(&nh, 4);
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
+                DBUG("msg len %u\n", msg_len + io_len);
+ 
+                if (msg_len + io_len > (int)mbuf->len) {
+                        DWARN("wait %u %u\n", msg_len + io_len, mbuf->len);
+                        break;
+                }
 
-        ret = sdevent_add(&nh, NULL, Y_EPOLL_EVENTS, NULL, NULL);
-        if (ret)
-                GOTO(err_ret, ret);
+                mbuffer_init(&_buf, 0);
+                mbuffer_pop(buf, &_buf, msg_len + io_len);
+
+                __sunrpc_pack_handler(NULL, &ctx->sockid, &_buf);
+                count++;
+        }
+
+        *_count = count;
 
         return 0;
+}
+
+void __sunrpc_check__(void *arg1, void *arg2)
+{
+        sunrpc_ctx_t *ctx = arg1;
+        
+        (void) arg2;
+
+        DINFO("sunrpc check check, host %s, running %d\n", ctx->host, ctx->running);
+        
+        return;
+}
+
+static int __sunrpc_check(va_list ap)
+{
+        sunrpc_ctx_t *ctx = va_arg(ap, sunrpc_ctx_t *);
+        core_t *core = core_self();
+
+        va_end(ap);
+
+        core_check_register(core, "sunrpc_check", ctx, __sunrpc_check__);
+
+        return 0;
+}
+
+int sunrpc_accept(int srv_sd)
+{
+        int ret, sd;
+        struct sockaddr_in sin;
+        socklen_t alen;
+        sunrpc_ctx_t *ctx;
+        core_t *core;
+
+        _memset(&sin, 0, sizeof(sin));
+        alen = sizeof(struct sockaddr_in);
+
+        sd = accept(srv_sd, &sin, &alen);
+        if (sd < 0 ) {
+                ret = errno; 
+                GOTO(err_ret, ret);
+        }
+
+        ret = tcp_sock_tuning(sd, 1, YNET_RPC_NONBLOCK);
+        if (ret)
+                GOTO(err_sd, ret);
+        
+        ret = core_create(&core, 0, CORE_FLAG_ACTIVE);
+        if (ret)
+                GOTO(err_sd, ret);
+
+        ret = _sem_wait(&core->sem);
+        if (unlikely(ret))
+                GOTO(err_sd, ret);
+        
+        ret = ymalloc((void**)&ctx, sizeof(*ctx));
+        if (ret)
+                GOTO(err_sd, ret);
+        
+        ctx->sockid.sd = sd;
+        ctx->sockid.type = SOCKID_CORENET;
+        ctx->sockid.seq = _random();
+        ctx->sockid.addr = sin.sin_addr.s_addr;
+        ctx->running = 1;
+        strcpy(ctx->host, _inet_ntoa(ctx->sockid.addr));
+       
+        corenet_tcp_t *corenet;
+        corenet = core->tcp_net;
+        ret = corenet_tcp_add(corenet, &ctx->sockid, ctx, __sunrpc_recv, __sunrpc_close, NULL, NULL, "sunrpc");
+        if (unlikely(ret))
+                UNIMPLEMENTED(__DUMP__);
+
+        schedule_post(core->schedule);
+
+        ret = core_request_new(core, -1, "sunrpc_check", __sunrpc_check, ctx);
+        if (unlikely(ret))
+                GOTO(err_sd, ret);
+        
+        return 0;
+err_sd:
+        close(sd);
 err_ret:
         return ret;
 }
+
+#else
 
 int sunrpc_accept(int srv_sd)
 {
@@ -248,8 +339,6 @@ int sunrpc_accept(int srv_sd)
         proto.writer = net_events_handle_write;
         proto.pack_len = sunrpc_pack_len;
         proto.pack_handler = __sunrpc_pack_handler;
-        //proto.prog[0].handler = sunrpc_request_handler;
-        proto.jobtracker = sunrpc_jobtracker;
 
         nh.type = NET_HANDLE_TRANSIENT;
         nh.u.sd.sd = sd;
@@ -269,6 +358,7 @@ err_sd:
 err_ret:
         return ret;
 }
+#endif
 
 static int __sunrpc_request_handler(const sockid_t *sockid,
                                     buffer_t *buf)
