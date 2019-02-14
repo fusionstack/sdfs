@@ -17,7 +17,6 @@
 
 #define PIPELINE_PARALLEL 0
 
-#if ENABLE_REDIS_PIPELINE
 typedef struct {
         struct list_head hook;
         fileid_t fileid;
@@ -25,20 +24,12 @@ typedef struct {
         const char *format;
         va_list ap;
         redisReply *reply;
-
         task_t task;
-
         void *pipeline;
 } redis_pipline_ctx_t;
 
-#if 0
-static schedule_t *__schedule__ = NULL;
-static sy_spinlock_t __lock__;
-static struct list_head __list__;
-#endif
 extern __thread int __redis_workerid__;
 extern int __redis_conn_pool__;
-//static redis_ctx_array_t *__redis_ctx_array__;
 
 typedef struct {
         schedule_t *schedule;
@@ -147,7 +138,17 @@ STATIC int __redis_pipeline_request(pipeline_t *pipeline, func_va_t exec, ...)
                         UNIMPLEMENTED(__DUMP__);
         }
 
+#if NFS_CO
+        if (schedule_running()) {
+                ret = schedule_request(schedule_self(), -1, __redis_pipeline_request__,
+                                       &ctx, "redis_request");
+        } else {
+                ret = schedule_request(schedule, -1, __redis_pipeline_request__,
+                                       &ctx, "redis_request");
+        }
+#else
         ret = schedule_request(schedule, -1, __redis_pipeline_request__, &ctx, "redis_request");
+#endif
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -342,12 +343,11 @@ STATIC int __redis_exec(va_list ap)
         fileid_t *fileid = &arg2->fileid;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
 
         DBUG(CHKID_FORMAT"\n", CHKID_ARG(fileid));
 
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&arg2->volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -478,7 +478,8 @@ err_ret:
         return ret;
 }
 
-int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key, void *buf, size_t *len)
+int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
+                  void *buf, size_t *len)
 {
         int ret;
         redisReply *reply;
@@ -521,7 +522,8 @@ err_ret:
         return ret;
 }
 
-int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key, const void *value, size_t size, int flag)
+int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key,
+                  const void *value, size_t size, int flag)
 {
         int ret;
         redisReply *reply;
@@ -791,8 +793,10 @@ retry:
         if(ret) {
                 if (ret == EEXIST && block) {
                         if (retry > 500 && retry % 100 == 0 ) {
-                                DWARN("lock "CHKID_FORMAT", retry %u\n", CHKID_ARG(fileid), retry);
+                                DWARN("lock "CHKID_FORMAT", retry %u\n",
+                                      CHKID_ARG(fileid), retry);
                         }
+
                         USLEEP_RETRY(err_ret, ret, retry, retry, 1000, (1 * 1000));
                 } else {
                         GOTO(err_ret, ret);
@@ -849,5 +853,3 @@ int pipeline_kdel(const volid_t *volid, const fileid_t *fileid)
         
         return __pipeline_kdel(volid, fileid, key);
 }
-
-#endif

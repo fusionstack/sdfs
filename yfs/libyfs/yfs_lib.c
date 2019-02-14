@@ -593,7 +593,7 @@ err_ret:
         return ret;
 }
 
-int init_stage2(const char *name, int noroot, int redis_conn)
+int init_stage2(const char *name, int noroot, int redis_conn, int redis_pipeline)
 {
         int ret, thread;
         char home[MAX_PATH_LEN], path[MAX_PATH_LEN];
@@ -602,7 +602,7 @@ int init_stage2(const char *name, int noroot, int redis_conn)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = redis_init(redis_conn);
+        ret = redis_init(redis_conn, redis_pipeline);
         if (ret)
                 GOTO(err_ret, ret);
         
@@ -683,7 +683,7 @@ int ly_init(int daemon, const char *name, int64_t maxopenfile)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = init_stage2(name, __no_root__, 1);
+        ret = init_stage2(name, __no_root__, 1, 0);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -935,7 +935,7 @@ int sdfs_init_verbose(const char *name, int redis_conn)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = init_stage2(name, __no_root__, redis_conn);
+        ret = init_stage2(name, __no_root__, redis_conn, 1);
         if (ret)
                 GOTO(err_ret, ret);
 
