@@ -106,6 +106,7 @@ int core_attach(int hash, const sockid_t *sockid, const char *name, void *ctx,
 core_t *core_get(int hash);
 core_t *core_self();
 
+void core_worker_exit(core_t *core);
 int core_request_async(int hash, int priority, const char *name, func_t exec, void *arg);
 int core_request(int hash, int priority, const char *name, func_va_t exec, ...);
 int core_request_new(core_t *core, int priority, const char *name, func_va_t exec, ...);
@@ -119,7 +120,10 @@ int core_dump_memory(uint64_t *memory);
 
 int core_poller_register(core_t *core, const char *name, void (*poll)(void *,void*), void *user_data);
 int core_poller_unregister(core_t *core, void (*poll)());
+
+#if ENABLE_CORE_PIPELINE
 int core_pipeline_send(const sockid_t *sockid, buffer_t *buf, int flag);
+#endif
 
 #define CORE_ANALYSIS_BEGIN(mark)               \
         struct timeval t1##mark, t2##mark;      \

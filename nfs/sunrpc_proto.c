@@ -193,6 +193,8 @@ static void __sunrpc_close(void *_ctx)
 {
         sunrpc_ctx_t *ctx = _ctx;
 
+        DINFO("sunrpc close host %s\n", ctx->host);
+        
         ctx->running = 0;
 }
 
@@ -231,12 +233,19 @@ static int __sunrpc_recv(void *_ctx, void *buf, int *_count)
 void __sunrpc_check__(void *arg1, void *arg2)
 {
         sunrpc_ctx_t *ctx = arg1;
+        core_t *core = core_self();
         
         (void) arg2;
 
-        DINFO("sunrpc check check, host %s, running %d\n", ctx->host, ctx->running);
-        
-        return;
+        DINFO("sunrpc check, host %s, running %d\n", ctx->host, ctx->running);
+
+        if (ctx->running)
+                return;
+
+        core_worker_exit(core);
+        DINFO("sunrpc host %s, exit\n", ctx->host);
+        yfree((void**)&ctx);
+        pthread_exit(NULL);
 }
 
 static int __sunrpc_check(va_list ap)
@@ -293,7 +302,8 @@ int sunrpc_accept(int srv_sd)
        
         corenet_tcp_t *corenet;
         corenet = core->tcp_net;
-        ret = corenet_tcp_add(corenet, &ctx->sockid, ctx, __sunrpc_recv, __sunrpc_close, NULL, NULL, "sunrpc");
+        ret = corenet_tcp_add(corenet, &ctx->sockid, ctx, __sunrpc_recv,
+                              __sunrpc_close, NULL, NULL, "sunrpc");
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 

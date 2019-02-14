@@ -516,3 +516,19 @@ void analysis_merge()
                 __analysis__(__private_analysis__, NULL);
         }
 }
+
+
+static void __analysis_destroy(analysis_t *ana)
+{
+        hash_destroy_table(ana->tab, NULL);
+        yfree((void **)&ana->queue);
+        yfree((void **)&ana->new_queue);
+        yfree((void **)&ana);
+}
+
+void analysis_private_destroy()
+{
+        YASSERT(__private_analysis__);
+        __analysis_destroy(__private_analysis__);
+        __private_analysis__ = NULL;
+}

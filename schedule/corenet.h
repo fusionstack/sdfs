@@ -149,6 +149,7 @@ typedef struct {
 
 
 int corenet_tcp_init(int max, corenet_tcp_t **corenet);
+void corenet_tcp_destroy();
 
 int corenet_tcp_add(corenet_tcp_t *corenet, const sockid_t *sockid, void *ctx,
                     core_exec exec, func_t reset, func_t check, func_t recv, const char *name);

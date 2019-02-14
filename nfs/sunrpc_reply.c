@@ -83,7 +83,7 @@ int sunrpc_reply(const sockid_t *sockid, const sunrpc_request_t *req,
 #else
         
         net_handle_t nh;
-#if 1
+#if ENABLE_CORE_PIPELINE
         ret = core_pipeline_send(sockid, &buf, 0);
         if (unlikely(ret)) {
                 ret = _errno_net(ret);

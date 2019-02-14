@@ -243,6 +243,29 @@ err_ret:
         return ret;
 }
 
+static int __timer_destroy(void *arg)
+{
+        entry_t *ent = arg;
+
+        ent->func(ent->obj);
+        mem_cache_free(MEM_CACHE_64, ent);
+
+        return 0;
+}
+
+void timer_destroy()
+{
+        ytimer_t *timer;
+        group_t *group;
+        
+        timer = variable_get(VARIABLE_TIMER);
+        group = &timer->group;
+
+        skiplist_iterate_del(group->list, __timer_destroy);
+
+        variable_unset(VARIABLE_TIMER);
+}
+
 static int __timer_insert(group_t *group, suseconds_t usec, void *obj, func_t func)
 {
         int ret, retry = 0;

@@ -602,6 +602,7 @@ int mem_cache_private_destroy()
 
         yfree((void**)&__mem_cache_private__);
 
+        variable_unset(VARIABLE_MEMCACHE);
         DINFO("mem cache destroy\n");
 
         return 0;

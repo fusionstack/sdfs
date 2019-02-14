@@ -767,3 +767,12 @@ void corerpc_reset(const sockid_t *sockid)
                 rpc_table_reset(__rpc_table_private__, sockid, NULL);
         }
 }
+
+void corerpc_destroy(rpc_table_t **_rpc_table)
+{
+        rpc_table_t *__rpc_table_private__ = corerpc_self();
+        
+        rpc_table_destroy(&__rpc_table_private__);
+        *_rpc_table = NULL;
+        variable_unset(VARIABLE_CORERPC);
+}

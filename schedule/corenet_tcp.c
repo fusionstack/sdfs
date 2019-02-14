@@ -1410,7 +1410,6 @@ int corenet_tcp_init(int max, corenet_tcp_t **_corenet)
         if (_corenet)
                 *_corenet = corenet;
 
-        
 #if ENABLE_TCP_THREAD
         ret = __corenet_tcp_thread_init();
         if (unlikely(ret))
@@ -1424,4 +1423,34 @@ err_free:
         yfree((void **)&corenet);
 err_ret:
         return ret;
+}
+
+void corenet_tcp_destroy(corenet_tcp_t **_corenet)
+{
+        corenet_tcp_t *corenet = __corenet_get();
+
+        struct list_head *pos, *n;
+        corenet_fwd_t *corenet_fwd;
+        list_for_each_safe(pos, n, &corenet->corenet.forward_list) {
+                list_del(pos);
+                corenet_fwd = (void *)pos;
+                mbuffer_free(&corenet_fwd->buf);
+                mem_cache_free(MEM_CACHE_128, corenet_fwd);
+        }
+
+        corenet_node_t *node;
+        for (int i = 0; i < corenet->corenet.size; i++) {
+                node = &corenet->array[i];
+                
+                if (node->sockid.sd != -1) {
+                        __corenet_close__(&node->sockid);
+                }
+        }
+        
+        close(corenet->corenet.epoll_fd);
+        
+        yfree((void **)&corenet);
+        *_corenet = NULL;
+
+        variable_unset(VARIABLE_CORENET_TCP);
 }

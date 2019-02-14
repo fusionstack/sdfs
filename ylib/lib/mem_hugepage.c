@@ -301,3 +301,38 @@ int mem_hugepage_private_init()
 err_ret:
         return ret;
 }
+
+
+static int __mem_hugepage_destroy(mem_hugepage_t *mem)
+{
+        int i;
+        entry_t *ent;
+
+        if (use_memcache == 0) {
+                DINFO("disable memcache\n");
+                return 0;
+        }
+        
+        for (i = 0; i < gloconf.memcache_count; i++) {
+                ent = &mem->array[i];
+                if (ent->ref == 0) {
+                        yfree((void **)&ent->addr);
+                } else {
+                        UNIMPLEMENTED(__DUMP__);
+                }
+        }
+
+        yfree((void **)&mem);
+        
+	return 0;
+}
+
+int mem_hugepage_private_destoy()
+{
+        mem_hugepage_t *__mem_hugepage_private__ = mem_self();
+
+        __mem_hugepage_destroy(__mem_hugepage_private__);
+        variable_unset(VARIABLE_HUGEPAGE);
+        
+        return 0;
+}

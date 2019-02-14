@@ -32,7 +32,6 @@
 #include "adt.h"
 #include "dbg.h"
 
-
 #define __CPU_PATH__ "/sys/devices/system/cpu"
 #define __CPUSET_INIT__       1
 #define __CPUSET_UNINIT__     0
@@ -437,4 +436,15 @@ int cpuset(const char *name, int cpu)
         return 0;
 err_ret:
         return ret;
+}
+
+void cpuset_unset(int cpu)
+{
+        coreinfo_t *coreinfo = &__coreinfo__[cpu];
+
+        YASSERT(coreinfo->used);
+        DINFO("unset cpu %u\n", cpu);
+        close(coreinfo->lockfd);
+        coreinfo->used = 0;
+        coreinfo->lockfd = -1;
 }

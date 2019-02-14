@@ -93,8 +93,10 @@ static core_latency_list_t *core_latency_list;
 
 static int __core_latency_init();
 static int __core_latency_private_init();
+#if ENABLE_CORE_PIPELINE
 static void  __core_pipeline_forward();
 static int __core_pipeline_create();
+#endif
 #endif
 
 static core_t *__core_array__[256];
@@ -217,7 +219,9 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 
         schedule_run(core->schedule);
 
+#if ENABLE_CORE_PIPELINE
         __core_pipeline_forward();
+#endif
         
 #if ENABLE_CORENET
         if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
@@ -393,9 +397,11 @@ static int __core_worker_init(core_t *core)
         variable_set(VARIABLE_CORE, core);
         //core_register_tls(VARIABLE_CORE, private_mem);
 
+#if ENABLE_CORE_PIPELINE
         ret = __core_pipeline_create();
         if (unlikely(ret))
                 GOTO(err_ret, ret);
+#endif
         
         sem_post(&core->sem);
 
@@ -779,6 +785,12 @@ err_ret:
         return ret;
 }
 
+static void __core_latency_private_destroy()
+{
+        YASSERT(core_latency);
+        yfree((void **)&core_latency);
+}
+
 static int __core_latency_worker__()
 {
         int ret;
@@ -1048,32 +1060,8 @@ int core_poller_unregister(core_t *core, void (*poll)(void *,void*))
 }
 #endif 
 
+#if ENABLE_CORE_PIPELINE
 typedef struct __vm {
-#if 0
-        int sd; //io socket
-        int interrupt_eventfd;
-        int idx;
-        int stop;
-        int exiting;
-        char name[MAX_NAME_LEN];
-
-        sem_t sem;
-        
-        schedule_t *schedule;
-
-        buffer_t send_buf;
-        buffer_t recv_buf;
-        struct iovec iov[VM_IOV_MAX]; //iov for send/recv
-
-        /*callback  and ctx */
-        vm_exec exec; 
-        vm_exit exit;
-        vm_func init;
-        vm_func check;
-        vm_reconnect reconnect;
-        void *ctx;
-#endif
-
         /*forward*/
         struct list_head forward_list;
 
@@ -1194,6 +1182,7 @@ static int __core_pipeline_create()
 err_ret:
         return ret;
 }
+#endif
 
 int core_request_async(int hash, int priority, const char *name, func_t exec, void *arg)
 {
@@ -1221,3 +1210,45 @@ int core_request_async(int hash, int priority, const char *name, func_t exec, vo
 err_ret:
         return ret;
 }
+
+#if 1
+void core_worker_exit(core_t *core)
+{
+        DINFO("core[%u] destroy begin\n", core->hash);
+
+        corenet_tcp_destroy(&core->tcp_net);
+
+#if ENABLE_COREAIO
+        if (core->flag & CORE_FLAG_AIO) {
+                aio_destroy();
+        }
+#endif
+
+        if (core->main_core) {
+                cpuset_unset(core->main_core->cpu_id);
+        }
+        
+        timer_destroy();
+        analysis_private_destroy();
+
+#if ENABLE_CORERPC
+        corerpc_destroy((void *)&core->rpc_table);
+
+        if (core->flag & CORE_FLAG_ACTIVE) {
+                corenet_maping_destroy((corenet_maping_t **)&core->maping);
+        }
+#endif
+
+        __core_latency_private_destroy();
+
+#if ENABLE_CORE_PIPELINE
+        UNIMPLEMENTED(__DUMP__);
+#endif
+
+        variable_unset(VARIABLE_CORE);
+        
+        mem_cache_private_destroy();
+        mem_hugepage_private_destoy();
+        schedule_destroy();
+}
+#endif

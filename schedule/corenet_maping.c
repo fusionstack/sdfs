@@ -678,3 +678,10 @@ void corenet_maping_check(const ynet_net_info_t *info)
                 core_iterator(__corenet_maping_check, info);
         }
 }
+
+void corenet_maping_destroy(corenet_maping_t **maping)
+{
+        yfree((void **)maping);
+        variable_unset(VARIABLE_MAPING);
+        *maping = NULL;
+}

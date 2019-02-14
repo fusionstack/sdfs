@@ -552,3 +552,26 @@ int rpc_table_init(const char *name, rpc_table_t **rpc_table, int scan)
 err_ret:
         return ret;
 }
+
+
+void rpc_table_destroy(rpc_table_t **_rpc_table)
+{
+        solt_t *solt;
+        rpc_table_t *rpc_table = *_rpc_table;
+        uint64_t latency = -1;
+        int retval = ECONNRESET;
+
+        for (int i = 0; i < (int)rpc_table->count; i++) {
+                solt = &rpc_table->solt[i];
+
+                if (!__rpc_table_used(solt)) {
+                        continue;
+                }
+
+                solt->func(solt->arg, &retval, NULL, &latency);
+                __rpc_table_free(solt);
+                
+        }
+
+        yfree((void **)&rpc_table);
+}

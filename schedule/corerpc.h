@@ -1,6 +1,7 @@
 #ifndef __CORERPC_H__
 #define __CORERPC_H__
 #include "core.h"
+#include "rpc_table.h"
 
 /**
  * @file CORERPC
@@ -61,6 +62,7 @@ void corerpc_scan();
 // callback
 void corerpc_close(void *ctx);
 void corerpc_reset(const sockid_t *sockid);
+void corerpc_destroy(rpc_table_t **_rpc_table);
 
 
 //rpc table
