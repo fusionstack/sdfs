@@ -1,11 +1,14 @@
 #ifndef __NFS_JOB_CONTEXT_H__
 #define __NFS_JOB_CONTEXT_H__
 
-
-
 #include "sdfs_buffer.h"
 #include "nlm_state_machine.h"
 #include "file_proto.h"
+
+typedef struct {
+        fileid_t fileid;
+        uint32_t sessid;
+} nfs_handler_t;
 
 typedef union {
         setattr3_args setattr3_arg;

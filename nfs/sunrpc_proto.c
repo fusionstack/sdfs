@@ -253,6 +253,7 @@ int sunrpc_accept(int srv_sd)
 
         nh.type = NET_HANDLE_TRANSIENT;
         nh.u.sd.sd = sd;
+        nh.u.sd.addr = sin.sin_addr.s_addr;
 
         ret = sdevent_open(&nh, &proto);
         if (ret)

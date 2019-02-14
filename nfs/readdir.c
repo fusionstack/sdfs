@@ -1,5 +1,3 @@
-
-
 #include <sys/types.h>
 #include <stdint.h>
 #include <dirent.h>

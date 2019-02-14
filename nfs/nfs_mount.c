@@ -249,18 +249,15 @@ static int __mount_umnt_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 {
         int ret;
         char **args = &_args->umnt_arg;
+        char remoteip[MAX_NAME_LEN];
 
-        /* RPC times out if we use a NULL pointer */
+        snprintf(remoteip, MAX_NAME_LEN, "%s", inet_ntoa(__get_remote(sockid)));
         
         (void) uid;
         (void) gid;
         (void) buf;
 
-        DINFO("umount\n");
-
-        /* if no more mounts are active, flush all open file descriptors */
-        //        if (mlist.mount_cnt == 0)
-        //                fd_cache_purge();
+        DINFO("umount %s %s\n", *args, remoteip);
 
         ret = sunrpc_reply(sockid, req, ACCEPT_STATE_OK, NULL,
                            NULL);
