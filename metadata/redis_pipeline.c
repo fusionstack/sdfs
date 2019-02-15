@@ -196,7 +196,8 @@ err_ret:
         return ret;
 }
 
-STATIC int __redis_utils_pipeline1(const arg2_t *arg2, redis_handler_t *handler, struct list_head *list)
+STATIC int __redis_utils_pipeline1(const arg2_t *arg2, redis_handler_t *handler,
+                                   struct list_head *list)
 {
         int ret;
         struct list_head *pos, *n;
@@ -222,6 +223,10 @@ STATIC int __redis_utils_pipeline1(const arg2_t *arg2, redis_handler_t *handler,
                 if ((unlikely(ret)))
                         UNIMPLEMENTED(__DUMP__);
         }
+
+        int done;
+        ret = redisBufferWrite(conn->ctx, &done);
+        DBUG("ret %d %d\n", ret, done);
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
         

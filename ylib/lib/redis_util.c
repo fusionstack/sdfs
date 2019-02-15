@@ -1327,8 +1327,7 @@ err_ret:
 
 }
 
-int
-redis_disconnect(redis_conn_t *conn)
+int redis_disconnect(redis_conn_t *conn)
 {
         int ret;
         
