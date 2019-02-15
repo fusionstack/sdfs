@@ -28,19 +28,20 @@ typedef struct {
 
 typedef struct {
         struct list_head list;
+        fileid_t fileid;
+        volid_t volid;
+        int finished;
+} arg2_t;
+
+typedef struct {
+        sy_spinlock_t lock;
+        struct list_head list;
 } pipeline_t;
 
 static __thread pipeline_t *__pipeline__ = NULL;
 extern __thread int __use_pipline__;
 
-typedef struct {
-        task_t task;
-        sem_t sem;
-        func_va_t exec;
-        va_list ap;
-        int type;
-        int retval;
-} arg1_t;
+#define REDIS_PIPLINE_THREAD 1
 
 int redis_pipeline_init()
 {
@@ -58,6 +59,10 @@ int redis_pipeline_init()
         __pipeline__ = pipeline;
         __use_pipline__ = 1;
 
+        ret = sy_spin_init(&pipeline->lock);
+        if (ret)
+                UNIMPLEMENTED(__WARN__);
+        
         ret = redis_vol_private_init();
         if (ret)
                 GOTO(err_ret, ret);
@@ -75,63 +80,6 @@ void redis_pipeline_destroy()
         redis_vol_private_destroy(redis_conn_vol_close);
 }
 
-STATIC void __redis_pipeline_request__(void *_ctx)
-{
-        arg1_t *ctx = _ctx;
-
-        ctx->retval = ctx->exec(ctx->ap);
-
-        schedule_resume(&ctx->task, 0, NULL);
-}
-
-STATIC int __redis_pipeline_request(func_va_t exec, ...)
-{
-        int ret;
-        arg1_t ctx;
-
-        va_start(ctx.ap, exec);
-        ctx.exec = exec;
-        ctx.task = schedule_task_get();
-
-        ret = schedule_request(schedule_self(), -1, __redis_pipeline_request__,
-                               &ctx, "redis_request");
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        ret = schedule_yield1("redis_request", NULL, NULL, NULL, -1);
-        if (unlikely(ret)) {
-                GOTO(err_ret, ret);
-        }
-
-        return ctx.retval;
-err_ret:
-        return ret;
-}
-
-STATIC int __redis_pipeline(va_list ap)
-{
-        int ret;
-        redis_pipline_ctx_t *ctx = va_arg(ap, redis_pipline_ctx_t *);
-        pipeline_t *pipeline = ctx->pipeline;
-
-        va_end(ap);
-
-        DBUG("%s\n", ctx->format);
-        YASSERT(ctx->fileid.type);
-        
-        ctx->task = schedule_task_get();
-        
-        list_add_tail(&ctx->hook, &pipeline->list);
-
-        ret = schedule_yield1("redis_pipline", NULL, NULL, NULL, -1);
-        if (ret)
-                GOTO(err_ret, ret);
-        
-        return 0;
-err_ret:
-        return ret;
-}
-
 int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
                    const char *format, ...)
 {
@@ -143,11 +91,14 @@ int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **re
         ctx.fileid = *fileid;
         ctx.volid = *volid;
         ctx.pipeline = pipeline;
+        ctx.task = schedule_task_get();
         va_start(ctx.ap, format);
 
+        list_add_tail(&ctx.hook, &pipeline->list);
+
         DBUG("%s\n", format);
-        
-        ret = __redis_pipeline_request(__redis_pipeline, &ctx);
+
+        ret = schedule_yield1("redis_pipline", NULL, NULL, NULL, -1);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -158,37 +109,49 @@ err_ret:
         return ret;
 }
 
-STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
+STATIC int __redis_utils_pipeline1(const arg2_t *arg2, redis_handler_t *handler, struct list_head *list)
 {
         int ret;
         struct list_head *pos, *n;
         redis_pipline_ctx_t *ctx;
+        redis_conn_t *conn;
 
+        ret = redis_conn_get(&arg2->volid, arg2->fileid.sharding, 0, handler);
+        if(ret)
+                UNIMPLEMENTED(__DUMP__);
+
+        conn = handler->conn;
+        
         ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
-                GOTO(err_ret, ret);
+                UNIMPLEMENTED(__DUMP__);
 
         ANALYSIS_BEGIN(0);
         
         list_for_each_safe(pos, n, list) {
                 ctx = (redis_pipline_ctx_t *)pos;
  
-#if 0
-                const char *hash = va_arg(ctx->ap, const char *);
-                const char *key = va_arg(ctx->ap, const char *);
-                const void *value = va_arg(ctx->ap, const void *);
-                size_t size = va_arg(ctx->ap, size_t);
-                DWARN("fmt %s, hash %s, key %s, %u\n", ctx->format, hash, key, size);
-                YASSERT(ctx->format);
-                ret = redisAppendCommand(conn->ctx, ctx->format, hash, key, value, size);
-#else
                 ret = redisvAppendCommand(conn->ctx, ctx->format, ctx->ap);
-#endif
-                
                 if ((unlikely(ret)))
-                        GOTO(err_lock, ret);
+                        UNIMPLEMENTED(__DUMP__);
         }
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
+        return 0;
+}
+
+STATIC void __redis_utils_pipeline2(redis_handler_t *handler, struct list_head *list)
+{
+        int ret;
+        struct list_head *pos, *n;
+        redis_pipline_ctx_t *ctx;
+        redis_conn_t *conn;
+
+        ANALYSIS_BEGIN(0);
+
+        conn = handler->conn;
+        
         list_for_each_safe(pos, n, list) {
                 ctx = (redis_pipline_ctx_t *)pos;
                 list_del(pos);
@@ -199,103 +162,39 @@ STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
         }
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
-        
         pthread_rwlock_unlock(&conn->rwlock);
-
-        return 0;
-err_lock:
-        pthread_rwlock_unlock
-                (&conn->rwlock);
-err_ret:
-        return ret;
+        redis_conn_release(handler);
 }
 
-typedef struct {
-        struct list_head list;
-        fileid_t fileid;
-        volid_t volid;
-        int finished;
-} arg2_t;
-
-#if 0
-STATIC int __redis_exec(va_list ap)
+STATIC int __redis_exec(arg2_t *array, int count)
 {
-        arg2_t *arg2 = va_arg(ap, arg2_t *);
+        int ret, i;
+        redis_handler_t handler_array[512], *handler;
+        arg2_t *arg2;
 
-        va_end(ap);
-
-        int ret, retry = 0;
-        char key[MAX_PATH_LEN];
-        redis_handler_t handler;
-        fileid_t *fileid = &arg2->fileid;
-
-        id2key(ftype(fileid), fileid, key);
-
-        DBUG(CHKID_FORMAT"\n", CHKID_ARG(fileid));
-
-retry:
-        ret = redis_conn_get(&arg2->volid, fileid->sharding, 0, &handler);
-        if(ret)
-                GOTO(err_ret, ret);
+        ANALYSIS_BEGIN(0);
         
-        ret = __redis_utils_pipeline(handler.conn, &arg2->list);
-        if(ret) {
-                if (ret == ECONNRESET) {
-                        redis_conn_close(&handler);
-                        redis_conn_release(&handler);
-                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (100 * 1000));
-                }
-                
-                GOTO(err_release, ret);
-        }
+        for (i = 0; i < count; i++) {
+                handler = &handler_array[i];
+                arg2 = &array[i];
 
-        redis_conn_release(&handler);
+                ret = __redis_utils_pipeline1(arg2, handler, &arg2->list);
+                if ((unlikely(ret)))
+                        UNIMPLEMENTED(__DUMP__);
+       }
+
+        
+        for (i = 0; i < count; i++) {
+                handler = &handler_array[i];
+                arg2 = &array[i];
+
+                __redis_utils_pipeline2(handler, &arg2->list);
+        }        
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
-err_release:
-        redis_conn_release(&handler);
-err_ret:
-        return ret;
 }
-
-#else
-STATIC int __redis_exec(arg2_t *arg2)
-{
-        int ret, retry = 0;
-        char key[MAX_PATH_LEN];
-        redis_handler_t handler;
-        fileid_t *fileid = &arg2->fileid;
-
-        id2key(ftype(fileid), fileid, key);
-
-        DBUG(CHKID_FORMAT"\n", CHKID_ARG(fileid));
-
-retry:
-        ret = redis_conn_get(&arg2->volid, fileid->sharding, 0, &handler);
-        if(ret)
-                GOTO(err_ret, ret);
-        
-        ret = __redis_utils_pipeline(handler.conn, &arg2->list);
-        if(ret) {
-                if (ret == ECONNRESET) {
-                        redis_conn_close(&handler);
-                        redis_conn_release(&handler);
-                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (100 * 1000));
-                }
-                
-                GOTO(err_release, ret);
-        }
-
-        redis_conn_release(&handler);
-        
-        return 0;
-err_release:
-        redis_conn_release(&handler);
-err_ret:
-        return ret;
-}
-
-#endif
 
 int redis_pipline_run()
 {
@@ -345,18 +244,12 @@ int redis_pipline_run()
                 }
 
                 DBUG("submit %u\n", submit);
-
-#if 0
-                ret = redis_exec(&arg->fileid, __redis_exec, arg);
-                if (unlikely(ret))
-                        GOTO(err_ret, ret);
-#else
-                ret = __redis_exec(arg);
-                if (unlikely(ret))
-                        GOTO(err_ret, ret);
-#endif
         }
 
+        ret = __redis_exec(array, count);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
         return 0;
 err_ret:
         return ret;

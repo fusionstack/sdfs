@@ -282,7 +282,7 @@ int sunrpc_accept(int srv_sd)
                 GOTO(err_sd, ret);
         
         //ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_REDIS);
-        ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE);
+        ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE | CORE_FLAG_REDIS);
         if (ret)
                 GOTO(err_sd, ret);
 
