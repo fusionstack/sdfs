@@ -304,7 +304,7 @@ void hash_filter_table_entries(hashtable_t t, int (*handler)(void *, void *),
  *                   most likely free()
  * Returns: nothing
  */
-void hash_destroy_table(hashtable_t t, void (*thunk)(void *))
+void hash_destroy_table(hashtable_t t, void (*thunk)(void *, void *arg), void *arg)
 {
         unsigned int i;
         hashtable_entry_t entry, next;
@@ -314,7 +314,7 @@ void hash_destroy_table(hashtable_t t, void (*thunk)(void *))
                         next = entry->next;
 
                         if (thunk)
-                                (*thunk)(entry->value);
+                                (*thunk)(entry->value, arg);
                         else
                                 yfree((void **)&entry->value);
 

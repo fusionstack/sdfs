@@ -26,7 +26,7 @@ typedef struct {
         sy_spinlock_t lock;
         struct list_head list;
 #endif
-        sy_rwlock_t rwlock;
+        pthread_rwlock_t rwlock;
         char key[MAX_PATH_LEN];
         redis_ctx_t *ctx;
 } redis_conn_t;

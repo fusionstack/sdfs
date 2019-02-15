@@ -34,7 +34,7 @@ typedef struct {
         int sequence;
         int sharding;
         __conn_sharding_t *shardings;
-        const volid_t *volid;
+        volid_t volid;
         char volume[MAX_NAME_LEN];
 } redis_vol_t;
 
@@ -170,12 +170,14 @@ static int __redis_vol_connect(const volid_t *volid, const char *volume, int sha
         if(ret)
                 GOTO(err_ret, ret);
 
-        DINFO("connect to vol %d, sharding %u\n", volid, sharding);
+        DINFO("connect to vol %d, sharding %u\n", volid->volid, sharding);
         
         vol->sharding = sharding;
-        vol->volid = volid;
+        vol->volid = *volid;
         strcpy(vol->volume, volume);
 
+        YASSERT(vol->sharding);
+        
         ret = ymalloc((void **)&vol->shardings, sizeof(*vol->shardings) * vol->sharding);
         if(ret)
                 UNIMPLEMENTED(__DUMP__);
@@ -588,14 +590,16 @@ static void __redis_close_sharding(__conn_sharding_t *sharding)
         yfree((void **)&sharding->conn);
 }
 
-static void __redis_vol_close(redis_vol_t *vol)
+void redis_conn_vol_close(void *_vol)
 {
         int i;
+        redis_vol_t *vol = _vol;
 
         for (i = 0; i < vol->sharding; i++) {
                 __redis_close_sharding(&vol->shardings[i]);
         }
 
+        YASSERT(vol->sharding);
         yfree((void **)&vol->shardings);
         yfree((void **)&vol);
 }
@@ -614,6 +618,8 @@ int redis_conn_vol(const volid_t *volid)
         if(ret)
                 GOTO(err_ret, ret);
 
+        YASSERT(vol->sharding);
+        YASSERT(vol->shardings);
         ret = redis_vol_insert(volid, vol);
         if(ret) {
                 GOTO(err_close, ret);
@@ -621,7 +627,7 @@ int redis_conn_vol(const volid_t *volid)
 
         return 0;
 err_close:
-        __redis_vol_close(vol);
+        redis_conn_vol_close(vol);
 err_ret:
         return ret;
 }

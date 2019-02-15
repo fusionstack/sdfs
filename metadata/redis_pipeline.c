@@ -57,15 +57,22 @@ int redis_pipeline_init()
 
         __pipeline__ = pipeline;
         __use_pipline__ = 1;
+
+        ret = redis_vol_private_init();
+        if (ret)
+                GOTO(err_ret, ret);
         
         return 0;
 err_ret:
         return ret;
 }
 
+
 void redis_pipeline_destroy()
 {
         UNIMPLEMENTED(__WARN__);
+
+        redis_vol_private_destroy(redis_conn_vol_close);
 }
 
 STATIC void __redis_pipeline_request__(void *_ctx)
@@ -157,7 +164,7 @@ STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
         struct list_head *pos, *n;
         redis_pipline_ctx_t *ctx;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -193,11 +200,12 @@ STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         return 0;
 err_lock:
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock
+                (&conn->rwlock);
 err_ret:
         return ret;
 }
@@ -209,6 +217,7 @@ typedef struct {
         int finished;
 } arg2_t;
 
+#if 0
 STATIC int __redis_exec(va_list ap)
 {
         arg2_t *arg2 = va_arg(ap, arg2_t *);
@@ -248,6 +257,45 @@ err_release:
 err_ret:
         return ret;
 }
+
+#else
+STATIC int __redis_exec(arg2_t *arg2)
+{
+        int ret, retry = 0;
+        char key[MAX_PATH_LEN];
+        redis_handler_t handler;
+        fileid_t *fileid = &arg2->fileid;
+
+        id2key(ftype(fileid), fileid, key);
+
+        DBUG(CHKID_FORMAT"\n", CHKID_ARG(fileid));
+
+retry:
+        ret = redis_conn_get(&arg2->volid, fileid->sharding, 0, &handler);
+        if(ret)
+                GOTO(err_ret, ret);
+        
+        ret = __redis_utils_pipeline(handler.conn, &arg2->list);
+        if(ret) {
+                if (ret == ECONNRESET) {
+                        redis_conn_close(&handler);
+                        redis_conn_release(&handler);
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (100 * 1000));
+                }
+                
+                GOTO(err_release, ret);
+        }
+
+        redis_conn_release(&handler);
+        
+        return 0;
+err_release:
+        redis_conn_release(&handler);
+err_ret:
+        return ret;
+}
+
+#endif
 
 int redis_pipline_run()
 {
@@ -298,9 +346,15 @@ int redis_pipline_run()
 
                 DBUG("submit %u\n", submit);
 
+#if 0
                 ret = redis_exec(&arg->fileid, __redis_exec, arg);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
+#else
+                ret = __redis_exec(arg);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+#endif
         }
 
         return 0;

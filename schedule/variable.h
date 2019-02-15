@@ -13,7 +13,7 @@ typedef enum {
         VARIABLE_AIO,
         VARIABLE_CLOCK,
         VARIABLE_TIMER,
-        VARIABLE_DISK_SLOT,
+        VARIABLE_REDIS,
         VARIABLE_MAX,
 } variable_type_t;
 

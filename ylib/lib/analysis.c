@@ -520,7 +520,7 @@ void analysis_merge()
 
 static void __analysis_destroy(analysis_t *ana)
 {
-        hash_destroy_table(ana->tab, NULL);
+        hash_destroy_table(ana->tab, NULL, NULL);
         yfree((void **)&ana->queue);
         yfree((void **)&ana->new_queue);
         yfree((void **)&ana);

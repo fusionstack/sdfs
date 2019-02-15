@@ -241,7 +241,7 @@ int redis_connect(redis_conn_t **_conn, const char *addr, const int *port, const
         INIT_LIST_HEAD(&conn->list);
 #endif
 
-        ret = sy_rwlock_init(&conn->rwlock, "redis_session");
+        ret = pthread_rwlock_init(&conn->rwlock, NULL);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -260,7 +260,7 @@ int redis_hget(redis_conn_t *conn, const char *hash, const char *key, void *buf,
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -272,7 +272,7 @@ int redis_hget(redis_conn_t *conn, const char *hash, const char *key, void *buf,
         reply = redisCommand(conn->ctx, "HGET %s %s", hash, key);
 #endif
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -308,7 +308,7 @@ int redis_kget(redis_conn_t *conn, const char *key, void *buf, size_t *len)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -320,7 +320,7 @@ int redis_kget(redis_conn_t *conn, const char *key, void *buf, size_t *len)
         reply = redisCommand(conn->ctx, "GET %s", key);
 #endif
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -357,7 +357,7 @@ int redis_kset(redis_conn_t *conn, const char *key, const void *value,
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -376,7 +376,7 @@ int redis_kset(redis_conn_t *conn, const char *key, const void *value,
                 }
         }
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -417,7 +417,7 @@ int redis_hset(redis_conn_t *conn, const char *hash, const char *key, const void
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -427,7 +427,7 @@ int redis_hset(redis_conn_t *conn, const char *hash, const char *key, const void
                 reply = redisCommand(conn->ctx, "HSET %s %s %b", hash, key, value, size);
         }
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -460,13 +460,13 @@ int redis_hdel(redis_conn_t *conn, const char *hash, const char *key)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
         reply = redisCommand(conn->ctx, "HDEL %s %s", hash, key);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -499,13 +499,13 @@ int redis_hexist(redis_conn_t *conn, const char *hash, const char *key, int *exi
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
         reply = redisCommand(conn->ctx, "HEXISTS %s %s", hash, key);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -538,7 +538,7 @@ static int __redis_hiterator(redis_conn_t *conn, const char *hash, size_t *_cur,
 
         //DINFO("HSCAN cur %u\n", cur);
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -558,7 +558,7 @@ static int __redis_hiterator(redis_conn_t *conn, const char *hash, size_t *_cur,
         }
 #endif
         
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -633,7 +633,7 @@ redisReply *redis_hscan(redis_conn_t *conn, const char *key, const char *match,
 
         DBUG("scan %s, cursor %ju count %ju\n", key, cursor, count);
         
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -645,7 +645,7 @@ redisReply *redis_hscan(redis_conn_t *conn, const char *key, const char *match,
                                      key, cursor, count);
         }
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
         
         if(reply == NULL){
                 DERROR("HSCAN failed\n");
@@ -663,13 +663,13 @@ int redis_keys(redis_conn_t *conn, func1_t func, void *arg)
         redisReply *reply, *e;
         size_t i;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
         
         reply = redisCommand(conn->ctx, "KEYS *");
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -700,7 +700,7 @@ static int __redis_siterator(redis_conn_t *conn, const char *set, size_t *_cur, 
         size_t i, cur = *_cur;
         
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -712,7 +712,7 @@ static int __redis_siterator(redis_conn_t *conn, const char *set, size_t *_cur, 
         reply = redisCommand(conn->ctx, "SSCAN %s %b count 100", set, cur);
 #endif
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = EAGAIN;
@@ -776,13 +776,13 @@ int redis_sset(redis_conn_t *conn, const char *set, const char *key)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
         
         reply = redisCommand(conn->ctx, "SADD %s %s", set, key);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -809,13 +809,13 @@ int redis_sdel(redis_conn_t *conn, const char *set, const char *key)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
         
         reply = redisCommand(conn->ctx, "SREM %s %s", set, key);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -842,13 +842,13 @@ int redis_scount(redis_conn_t *conn, const char *set, uint64_t *count)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
         
         reply = redisCommand(conn->ctx, "SCARD %s", set);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -877,13 +877,13 @@ int redis_hlen(redis_conn_t *conn, const char *key, uint64_t *count)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
         
         reply = redisCommand(conn->ctx, "HLEN %s", key);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply != NULL && reply->type == REDIS_REPLY_INTEGER) {
                 *count = reply->integer;
@@ -908,13 +908,13 @@ int redis_exec(redis_conn_t *conn, const char *buf)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
         
         reply = redisCommand(conn->ctx, buf);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -947,7 +947,7 @@ int redis_multi(redis_conn_t *conn, ...)
 
         va_start(ap, conn);
         
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -977,7 +977,7 @@ int redis_multi(redis_conn_t *conn, ...)
         //YASSERT(strcmp(reply->str, "OK") == 0);
         freeReplyObject(reply);
         
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         return 0;
 err_ret:
@@ -990,7 +990,7 @@ int redis_exec_array(redis_conn_t *conn, const char **array, int count)
         redisReply *reply;
         const char *pos;
         
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -1017,7 +1017,7 @@ int redis_exec_array(redis_conn_t *conn, const char **array, int count)
         //YASSERT(strcmp(reply->str, "OK") == 0);
         freeReplyObject(reply);
         
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         return 0;
 err_ret:
@@ -1088,7 +1088,7 @@ void redis_trans_begin(redis_conn_t *conn)
         int ret;
         redisReply *reply;
         
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 UNIMPLEMENTED(__DUMP__);
 
@@ -1108,7 +1108,7 @@ void redis_trans_end(redis_conn_t *conn)
         YASSERT(reply->type == REDIS_REPLY_ARRAY);
         freeReplyObject(reply);
         
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 }
 
 void redis_trans_end1(redis_conn_t *conn, func1_t func, void *arg, int count)
@@ -1120,7 +1120,7 @@ void redis_trans_end1(redis_conn_t *conn, func1_t func, void *arg, int count)
         YASSERT(reply->type == REDIS_REPLY_ARRAY);
         YASSERT(reply->elements == count);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         for (int i = 0; i < reply->elements; i++) {
                 e = reply->element[i];
@@ -1185,7 +1185,7 @@ int redis_multi_exec(redis_conn_t *conn, const char *op, const char *tab,
 
         count = i;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 UNIMPLEMENTED(__DUMP__);
         
@@ -1193,7 +1193,7 @@ int redis_multi_exec(redis_conn_t *conn, const char *op, const char *tab,
         reply = redisCommandArgv(conn->ctx, count, argv, arglen);
         ANALYSIS_END(0, 0, NULL);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
         
         YASSERT(reply);
         if (reply->type == REDIS_REPLY_STATUS) {
@@ -1293,13 +1293,13 @@ int redis_kdel(redis_conn_t *conn, const char *key)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
         reply = redisCommand(conn->ctx, "DEL %s", key);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -1332,13 +1332,13 @@ redis_disconnect(redis_conn_t *conn)
 {
         int ret;
         
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
         
         redisFree(conn->ctx);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         yfree((void **) &conn);
 
@@ -1352,13 +1352,13 @@ int redis_del(redis_conn_t *conn, const char *key)
         int ret;
         redisReply *reply;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
         reply = redisCommand(conn->ctx, "DEL %s", key);
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
@@ -1395,7 +1395,7 @@ static int __redis_iterator(redis_conn_t *conn, const char *match, size_t *_cur,
 
         //DINFO("HSCAN cur %u\n", cur);
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -1417,7 +1417,7 @@ static int __redis_iterator(redis_conn_t *conn, const char *match, size_t *_cur,
        }
 #endif
 
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         if (reply == NULL) {
                 ret = ECONNRESET;
