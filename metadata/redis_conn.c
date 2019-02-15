@@ -226,6 +226,11 @@ static int __redis_conn_get__(__conn_t *conn, redis_handler_t *handler)
                 GOTO(err_ret, ret);
         }
 
+        if (conn->used) {
+                ret = EBUSY;
+                GOTO(err_ret, ret);
+        }
+
         YASSERT(conn->used == 0);
         conn->used = 1;
         handler->conn = conn->conn;
@@ -245,8 +250,8 @@ static int __redis_conn_get_sharding(__conn_sharding_t *sharding, int worker,
         if(ret)
                 GOTO(err_ret, ret);
 
-        YASSERT(worker <= sharding->count && worker >= 0);
-        ret = __redis_conn_get__(&sharding->conn[worker], handler);
+        //YASSERT(worker <= sharding->count && worker >= 0);
+        ret = __redis_conn_get__(&sharding->conn[worker % __redis_conn_pool__], handler);
         if(ret)
                 GOTO(err_lock, ret);
 

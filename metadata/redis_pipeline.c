@@ -3,6 +3,7 @@
 #include <poll.h>
 #include <string.h>
 #include <stdarg.h>
+#include <sys/eventfd.h>
 #include <errno.h>
 
 #define DBG_SUBSYS S_LIBYLIB
@@ -35,6 +36,8 @@ typedef struct {
 
 typedef struct {
         sy_spinlock_t lock;
+        int eventfd;
+        int running;
         struct list_head list;
 } pipeline_t;
 
@@ -43,11 +46,54 @@ extern __thread int __use_pipline__;
 
 #define REDIS_PIPLINE_THREAD 1
 
+static int __redis_pipline_run(struct list_head *list);
+
+static void *__redis_pipeline_worker(void *arg)
+{
+        int ret;
+        pipeline_t *pipeline = arg;
+        struct list_head list;
+
+        ret = redis_vol_private_init();
+        if (ret)
+                UNIMPLEMENTED(__DUMP__);
+
+        DINFO("pipeline worker start %u\n", pipeline->running);
+
+        while (pipeline->running) {
+                eventfd_poll(pipeline->eventfd, 1, NULL);
+
+                if (pipeline->running == 0) {
+                        DINFO("destroyed\n");
+                        break;
+                }
+
+                INIT_LIST_HEAD(&list);
+
+                ret = sy_spin_lock(&pipeline->lock);
+                if (ret)
+                        UNIMPLEMENTED(__DUMP__);
+                
+                list_splice_init(&pipeline->list, &list);
+
+                sy_spin_unlock(&pipeline->lock);
+        
+                __redis_pipline_run(&list);
+        }
+
+        redis_vol_private_destroy(redis_conn_vol_close);
+        
+        pthread_exit(NULL);
+}
+        
+
 int redis_pipeline_init()
 {
         int ret;
         pipeline_t *pipeline;
 
+        DINFO("pipeline start\n");
+        
         ret = ymalloc((void **)&pipeline, sizeof(*pipeline));
         if (ret)
                 GOTO(err_ret, ret);
@@ -55,29 +101,57 @@ int redis_pipeline_init()
         memset(pipeline, 0x0, sizeof(*pipeline));
 
         INIT_LIST_HEAD(&pipeline->list);
-
-        __pipeline__ = pipeline;
-        __use_pipline__ = 1;
+        pipeline->running = 1;
 
         ret = sy_spin_init(&pipeline->lock);
         if (ret)
                 UNIMPLEMENTED(__WARN__);
-        
+
+#if !REDIS_PIPLINE_THREAD
         ret = redis_vol_private_init();
         if (ret)
                 GOTO(err_ret, ret);
+#endif
+
+        int fd = eventfd(0, EFD_CLOEXEC);
+        if (fd < 0) {
+                ret = errno;
+                GOTO(err_ret, ret);
+        }
+
+        pipeline->eventfd = fd;
+        
+        ret = sy_thread_create2(__redis_pipeline_worker, pipeline, "__core_worker");
+        if (ret)
+                GOTO(err_ret, ret);
+
+        __pipeline__ = pipeline;
+        __use_pipline__ = 1;
         
         return 0;
 err_ret:
         return ret;
 }
 
-
 void redis_pipeline_destroy()
 {
+        int ret;
+        uint64_t e;
+
         UNIMPLEMENTED(__WARN__);
 
+#if !REDIS_PIPLINE_THREAD
         redis_vol_private_destroy(redis_conn_vol_close);
+#endif
+        
+        pipeline_t *pipeline = __pipeline__;
+        pipeline->running = 0;
+
+        ret = write(pipeline->eventfd, &e, sizeof(e));
+        if (ret < 0) {
+                ret = errno;
+                UNIMPLEMENTED(__WARN__);
+        }
 }
 
 int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
@@ -87,6 +161,8 @@ int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **re
         redis_pipline_ctx_t ctx;
         pipeline_t *pipeline = __pipeline__;
 
+        YASSERT(fileid->type);
+        
         ctx.format = format;
         ctx.fileid = *fileid;
         ctx.volid = *volid;
@@ -94,7 +170,13 @@ int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **re
         ctx.task = schedule_task_get();
         va_start(ctx.ap, format);
 
+        ret = sy_spin_lock(&pipeline->lock);
+        if (ret)
+                UNIMPLEMENTED(__WARN__);
+
         list_add_tail(&ctx.hook, &pipeline->list);
+
+        sy_spin_unlock(&pipeline->lock);
 
         DBUG("%s\n", format);
 
@@ -196,29 +278,20 @@ STATIC int __redis_exec(arg2_t *array, int count)
         return 0;
 }
 
-int redis_pipline_run()
+static int __redis_pipline_run(struct list_head *list)
 {
         int ret, count = 0;
-        struct list_head list, *pos, *n;
+        struct list_head *pos, *n;
         redis_pipline_ctx_t *ctx;
         arg2_t *arg, array[512];
-        pipeline_t *pipeline = __pipeline__;    
-
-        if (pipeline == NULL) {
-                return 0;
-        }
-        
-        INIT_LIST_HEAD(&list);
-
-        list_splice_init(&pipeline->list, &list);
 
         count = 0;
-        while (!list_empty(&list)) {
+        while (!list_empty(list)) {
                 arg = &array[count];
                 count++;
                 YASSERT(count < 512);
 
-                pos = (void *)list.next;
+                pos = (void *)list->next;
                 ctx = (redis_pipline_ctx_t *)pos;
                 arg->fileid = ctx->fileid;
                 arg->volid = ctx->volid;
@@ -229,7 +302,7 @@ int redis_pipline_run()
                 YASSERT(ctx->fileid.type);
 
                 int submit = 1;
-                list_for_each_safe(pos, n, &list) {
+                list_for_each_safe(pos, n, list) {
                         ctx = (redis_pipline_ctx_t *)pos;
 
                         if (ctx->fileid.sharding == arg->fileid.sharding
@@ -254,6 +327,56 @@ int redis_pipline_run()
 err_ret:
         return ret;
 }
+
+#if REDIS_PIPLINE_THREAD
+int redis_pipline_run()
+{
+        int ret;
+        uint64_t e;
+        pipeline_t *pipeline = __pipeline__;
+
+        if (pipeline && !list_empty(&pipeline->list)) {
+                ret = write(pipeline->eventfd, &e, sizeof(e));
+                if (ret < 0) {
+                        ret = errno;
+                        UNIMPLEMENTED(__WARN__);
+                }
+        }
+
+        return 0;
+}
+
+#else
+
+int redis_pipline_run()
+{
+        int ret;
+        struct list_head list;
+        pipeline_t *pipeline = __pipeline__;    
+
+        if (pipeline == NULL) {
+                return 0;
+        }
+        
+        INIT_LIST_HEAD(&list);
+
+        ret = sy_spin_lock(&pipeline->lock);
+        if (ret)
+                UNIMPLEMENTED(__DUMP__);
+        
+        list_splice_init(&pipeline->list, &list);
+
+        sy_spin_unlock(&pipeline->lock);
+        
+        ret = __redis_pipline_run(&list);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        return 0;
+err_ret:
+        return ret;
+}
+#endif
 
 int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
                   void *buf, size_t *len)

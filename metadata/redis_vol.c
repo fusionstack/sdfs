@@ -21,6 +21,7 @@ typedef struct {
 } vol_tab_t;
 
 static vol_tab_t *__vol_tab__;
+static __thread vol_tab_t *__vol_tab_private__;
 
 typedef struct {
         volid_t volid;
@@ -29,7 +30,7 @@ typedef struct {
 
 static vol_tab_t *__redis_vol_self()
 {
-        return variable_get(VARIABLE_REDIS);
+        return __vol_tab_private__;
 }
 
 #if 1
@@ -102,7 +103,7 @@ int redis_vol_private_init()
         if(ret)
                 GOTO(err_ret, ret);
 
-        variable_set(VARIABLE_REDIS, vol_tab);
+        __vol_tab_private__ = vol_tab;
         
         return 0;
 err_ret:
@@ -129,10 +130,10 @@ void redis_vol_private_destroy(func_t func)
                 UNIMPLEMENTED(__WARN__);
 
         hash_destroy_table(vol_tab->tab, __redis_vol_private_destroy, func);
-        
+
         pthread_rwlock_unlock(&vol_tab->lock);
-        
-        variable_unset(VARIABLE_REDIS);
+
+        __vol_tab_private__ = NULL;
 }
 
 int redis_vol_get(const volid_t *volid, void **conn)
@@ -141,6 +142,8 @@ int redis_vol_get(const volid_t *volid, void **conn)
         entry_t *ent;
         vol_tab_t *vol_tab_private = __redis_vol_self();
         vol_tab_t  *vol_tab = vol_tab_private ? vol_tab_private : __vol_tab__;
+
+        DBUG("private table %p\n", vol_tab_private);
         
         YASSERT(!schedule_running());
         
