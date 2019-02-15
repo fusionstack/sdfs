@@ -46,7 +46,8 @@ static __thread int __redis_workerid__ = -1;
 static redis_worker_t *__redis_worker__;
 static int __worker_count__ = 0;
 int __redis_conn_pool__ = -1;
-__thread int __use_pipline__ = 0;
+__thread int __redis_conn_pool_private__ = -1;
+__thread int __use_pipeline__ = 0;
 
 static int __redis_request(const int hash, const char *name, func_va_t exec, ...);
 
@@ -117,7 +118,7 @@ int hget(const volid_t *volid, const fileid_t *fileid, const char *name,
 
         ANALYSIS_BEGIN(0);
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 ret = pipeline_hget(volid, fileid, name, value, size);
         } else {
                 ret =  __redis_request(fileid_hash(fileid), "hget", __hget,
@@ -200,7 +201,7 @@ int hset(const volid_t *volid, const fileid_t *fileid, const char *name,
                 volid = &_volid;
         }
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 ret = pipeline_hset(volid, fileid, name, value, size, flag);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "hset", __hset,
@@ -266,7 +267,7 @@ int hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
                 volid = &_volid;
         }
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 ret = pipeline_hlen(volid, fileid, count);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "hlen", __hlen,
@@ -279,7 +280,8 @@ int hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
         return ret;
 }
 
-redisReply *__hscan__(const volid_t *volid, const fileid_t *fileid, const char *match, uint64_t cursor, uint64_t count)
+redisReply *__hscan__(const volid_t *volid, const fileid_t *fileid,
+                      const char *match, uint64_t cursor, uint64_t count)
 {
         int ret, retry = 0;
         char key[MAX_PATH_LEN];
@@ -289,13 +291,17 @@ redisReply *__hscan__(const volid_t *volid, const fileid_t *fileid, const char *
         id2key(ftype(fileid), fileid, key);
 retry:
         ret = redis_conn_get(volid, fileid->sharding, ++__seq__, &handler);
-        if(ret)
+        if(ret) {
+                DWARN("retry %u\n", retry);
+                USLEEP_RETRY(err_ret, ret, retry, retry, 100, (100 * 1000));
                 GOTO(err_ret, ret);
+        }
         
         reply = redis_hscan(handler.conn, key, match, cursor, count);
         if (reply == NULL) {
                 redis_conn_close(&handler);
                 redis_conn_release(&handler);
+                DWARN("retry %u\n", retry);
                 USLEEP_RETRY(err_ret, ret, retry, retry, 100, (100 * 1000));
         }
 
@@ -303,6 +309,7 @@ retry:
         
         return reply;
 err_ret:
+        UNIMPLEMENTED(__DUMP__);
         return NULL;
 }
 
@@ -330,6 +337,7 @@ redisReply *hscan(const volid_t *volid, const fileid_t *fileid, const char *matc
                 volid_t _volid = {fileid->volid, 0};
                 volid = &_volid;
         }
+
         __redis_request(fileid_hash(fileid), "hscan", __hscan,
                         volid, fileid, match, cursor, count, &reply);
 
@@ -388,7 +396,7 @@ int hdel(const volid_t *volid, const fileid_t *fileid, const char *name)
                 volid = &_volid;
         }
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 return pipeline_hdel(volid, fileid, name);
         } else {
                 return __redis_request(fileid_hash(fileid), "hdel", __hdel,
@@ -450,7 +458,7 @@ int kget(const volid_t *volid, const fileid_t *fileid, void *value, size_t *size
                 volid = &_volid;
         }
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 ret = pipeline_kget(volid, fileid, value, size);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "kget", __kget,
@@ -516,7 +524,7 @@ int kset(const volid_t *volid, const fileid_t *fileid, const void *value, size_t
                 volid = &_volid;
         }
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 ret = pipeline_kset(volid, fileid, value, size, flag, -1);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "kset", __kset,
@@ -576,7 +584,7 @@ int kdel(const volid_t *volid, const fileid_t *fileid)
                 volid = &_volid;
         }
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 return pipeline_kdel(volid, fileid);
         } else {
                 return __redis_request(fileid_hash(fileid), "kdel", __kdel,
@@ -664,7 +672,7 @@ int klock(const volid_t *volid, const fileid_t *fileid, int ttl, int block)
         
         ANALYSIS_BEGIN(0);
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 ret = pipeline_klock(volid, fileid, ttl, block);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "klock", __klock,
@@ -736,7 +744,7 @@ int kunlock(const volid_t *volid, const fileid_t *fileid)
 
         ANALYSIS_BEGIN(0);
 
-        if (__use_pipline__) {
+        if (__use_pipeline__) {
                 ret = pipeline_kunlock(volid, fileid);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "kunlock", __kunlock,

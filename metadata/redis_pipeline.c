@@ -42,7 +42,7 @@ typedef struct {
 } pipeline_t;
 
 static __thread pipeline_t *__pipeline__ = NULL;
-extern __thread int __use_pipline__;
+extern __thread int __use_pipeline__;
 
 #define REDIS_PIPLINE_THREAD 1
 
@@ -60,6 +60,7 @@ static void *__redis_pipeline_worker(void *arg)
 
         DINFO("pipeline worker start %u\n", pipeline->running);
 
+        __use_pipeline__ = 1;        
         while (pipeline->running) {
                 eventfd_poll(pipeline->eventfd, 1, NULL);
 
@@ -126,7 +127,7 @@ int redis_pipeline_init()
                 GOTO(err_ret, ret);
 
         __pipeline__ = pipeline;
-        __use_pipline__ = 1;
+        __use_pipeline__ = 1;
         
         return 0;
 err_ret:
@@ -161,6 +162,8 @@ int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **re
         redis_pipline_ctx_t ctx;
         pipeline_t *pipeline = __pipeline__;
 
+        ANALYSIS_BEGIN(0);
+        
         YASSERT(fileid->type);
         
         ctx.format = format;
@@ -186,6 +189,8 @@ int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **re
 
         *reply = ctx.reply;
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return 0;
 err_ret:
         return ret;
@@ -285,6 +290,7 @@ static int __redis_pipline_run(struct list_head *list)
         redis_pipline_ctx_t *ctx;
         arg2_t *arg, array[512];
 
+        ANALYSIS_BEGIN(0);
         count = 0;
         while (!list_empty(list)) {
                 arg = &array[count];
@@ -322,6 +328,8 @@ static int __redis_pipline_run(struct list_head *list)
         ret = __redis_exec(array, count);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 err_ret:
@@ -385,6 +393,8 @@ int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
         redisReply *reply;
         char hash[MAX_NAME_LEN];
 
+        ANALYSIS_BEGIN(0);
+        
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s %s\n", hash, key);
@@ -414,6 +424,8 @@ int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
         memcpy(buf, reply->str, reply->len);
 
         freeReplyObject(reply);
+        
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         return 0;
 
 err_free:
@@ -429,6 +441,8 @@ int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key,
         redisReply *reply;
         char hash[MAX_NAME_LEN];
 
+        ANALYSIS_BEGIN(0);
+        
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s %s, flag 0x%o\n", hash, key, flag);
@@ -460,6 +474,8 @@ int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key,
         
         freeReplyObject(reply);
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return 0;
 err_free:
         freeReplyObject(reply);
@@ -472,7 +488,9 @@ int pipeline_hdel(const volid_t *volid, const fileid_t *fileid, const char *key)
         int ret;
         redisReply *reply;
         char hash[MAX_NAME_LEN];
- 
+
+        ANALYSIS_BEGIN(0);
+
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s %s\n", hash, key);
@@ -498,6 +516,7 @@ int pipeline_hdel(const volid_t *volid, const fileid_t *fileid, const char *key)
         }
         
         freeReplyObject(reply);
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
         return 0;
 err_free:
@@ -645,6 +664,7 @@ int pipeline_hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
         redisReply *reply;
         char hash[MAX_NAME_LEN];
 
+        ANALYSIS_BEGIN(0);
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s\n", hash);
@@ -661,7 +681,7 @@ int pipeline_hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
         }
 
         freeReplyObject(reply);
-
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         return 0;
 err_free:
         freeReplyObject(reply);
@@ -690,6 +710,7 @@ int pipeline_klock(const volid_t *volid, const fileid_t *fileid, int ttl, int bl
 {
         int ret, retry = 0;
 
+        ANALYSIS_BEGIN(0);
 retry:
         ret = __pipeline_klock(volid, fileid, ttl);
         if(ret) {
@@ -705,6 +726,8 @@ retry:
                 }
         }
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
         return 0;
 err_ret:
         ret = ret == EEXIST ? EAGAIN : ret;
@@ -715,13 +738,16 @@ int pipeline_kunlock(const volid_t *volid, const fileid_t *fileid)
 {
         int ret;
         char key[MAX_PATH_LEN];
-
+        
+        ANALYSIS_BEGIN(0);
         snprintf(key, MAX_NAME_LEN, "lock:"CHKID_FORMAT, CHKID_ARG(fileid));
         ret = __pipeline_kdel(volid, fileid, key);
         if(ret) {
                 GOTO(err_ret, ret);
         }
-        
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
         return 0;
 err_ret: 
         ret = ret == ENOENT ? EAGAIN : ret;
@@ -730,28 +756,46 @@ err_ret:
 
 int pipeline_kget(const volid_t *volid, const fileid_t *fileid, void *buf, size_t *len)
 {
+        int ret;
         char key[MAX_NAME_LEN];
 
+        ANALYSIS_BEGIN(0);
         id2key(ftype(fileid), fileid, key);
         
-        return __pipeline_kget(volid, fileid, key, buf, len);
+        ret = __pipeline_kget(volid, fileid, key, buf, len);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        return ret;
 }
 
 int pipeline_kset(const volid_t *volid, const fileid_t *fileid, const void *value,
                   size_t size, int flag, int _ttl)
 {
+        int ret;
         char key[MAX_NAME_LEN];
- 
+
+        ANALYSIS_BEGIN(0);
         id2key(ftype(fileid), fileid, key);
         
-        return __pipeline_kset(volid, fileid, key, value, size, flag, _ttl);
+        ret = __pipeline_kset(volid, fileid, key, value, size, flag, _ttl);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        return ret;
 }
 
 int pipeline_kdel(const volid_t *volid, const fileid_t *fileid)
 {
+        int ret;
         char key[MAX_NAME_LEN];
 
+        ANALYSIS_BEGIN(0);
         id2key(ftype(fileid), fileid, key);
         
-        return __pipeline_kdel(volid, fileid, key);
+        ret = __pipeline_kdel(volid, fileid, key);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        return ret;
 }

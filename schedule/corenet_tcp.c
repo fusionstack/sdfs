@@ -246,10 +246,12 @@ static int __corenet_add(corenet_tcp_t *corenet, const sockid_t *sockid, void *c
         ret = _epoll_ctl(corenet->corenet.epoll_fd, EPOLL_CTL_ADD, sd, &ev);
         if (ret == -1) {
                 ret = errno;
+                DERROR("%d, %d\n", ret, corenet->corenet.epoll_fd);
                 UNIMPLEMENTED(__DUMP__);//remove checklist
         }
 
-        DINFO("corenet_tcp connect %s[%u] %s sd %d, ev %o:%o\n", schedule->name, schedule->id, node->name, sd, node->ev, event);
+        DINFO("corenet_tcp connect %s[%u] %s sd %d, ev %o:%o\n", schedule->name,
+              schedule->id, node->name, sd, node->ev, event);
 
         return 0;
 err_ret:
@@ -1450,6 +1452,7 @@ void corenet_tcp_destroy(corenet_tcp_t **_corenet)
         }
         
         close(corenet->corenet.epoll_fd);
+        corenet->corenet.epoll_fd = -1;
         
         yfree((void **)&corenet);
         *_corenet = NULL;

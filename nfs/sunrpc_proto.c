@@ -237,7 +237,8 @@ void __sunrpc_check__(void *arg1, void *arg2)
         
         (void) arg2;
 
-        DINFO("sunrpc check, host %s, running %d\n", ctx->host, ctx->running);
+        DINFO("sunrpc check, host %s, running %d, socked %d\n",
+              ctx->host, ctx->running, ctx->sockid.sd);
 
         if (ctx->running)
                 return;

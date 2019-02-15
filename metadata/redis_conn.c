@@ -41,6 +41,7 @@ typedef struct {
 //static redis_vol_t *__conn__;
 static int __conn_magic__ = 0;
 extern int __redis_conn_pool__;
+extern __thread int __use_pipeline__;
 
 static int __redis_vol_get(const volid_t *volid, redis_vol_t **_vol, int flag);
 
@@ -127,12 +128,7 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
         int ret, count, i;
         __conn_t *conn;
 
-        //count = ng.daemon ? REDIS_CONN_POOL : 1;
-#if 0
-        count = ng.daemon ? gloconf.polling_core : 1;
-#else
-        count = __redis_conn_pool__;
-#endif
+        count = __use_pipeline__ ? 1 : __redis_conn_pool__;
         YASSERT(count);
 
         ret = ymalloc((void **)&conn, sizeof(*conn) * count);
@@ -244,18 +240,19 @@ err_ret:
 static int __redis_conn_get_sharding(__conn_sharding_t *sharding, int worker,
                                      redis_handler_t *handler)
 {
-        int ret;
+        int ret, idx;
 
         ret = pthread_rwlock_wrlock(&sharding->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
         //YASSERT(worker <= sharding->count && worker >= 0);
-        ret = __redis_conn_get__(&sharding->conn[worker % __redis_conn_pool__], handler);
+        idx = worker % __redis_conn_pool__;
+        ret = __redis_conn_get__(&sharding->conn[idx], handler);
         if(ret)
                 GOTO(err_lock, ret);
 
-        handler->idx = worker;
+        handler->idx = idx;
 
         pthread_rwlock_unlock(&sharding->lock);
         
