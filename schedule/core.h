@@ -93,11 +93,14 @@ typedef struct __core {
 #define CORE_FLAG_PASSIVE 0x0002
 #define CORE_FLAG_AIO     0x0004
 #define CORE_FLAG_REDIS   0x0008
+#define CORE_FLAG_PRIVATE 0x0010
 
 int core_create(core_t **_core, int hash, int flag);
 int core_init(int polling_core, int polling_timeout, int flag);
 
+#if 0
 int core_spdk_init(int flag);
+#endif
 int core_init_register(func_t init, void *_ctx, const char *name);
 void core_check_register(core_t *core, const char *name, void *opaque, func1_t func);
 

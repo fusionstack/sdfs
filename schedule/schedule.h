@@ -26,17 +26,23 @@
 #include "configure.h"
 #include "analysis.h"
 
+#define ENABLE_SCHEDULE_SELF_DEBUG 1
+#define ENABLE_SCHEDULE_STACK_ASSERT 1
+
 #define SCHEDULE_CHECK_RUNTIME ENABLE_SCHEDULE_CHECK_RUNTIME
 
 #define TASK_MAX (8192)
 
 #define REQUEST_QUEUE_STEP 128
-#define REQUEST_QUEUE_MAX TASK_MAX * 4
+#define REQUEST_QUEUE_MAX (TASK_MAX * 1)
 
 #define REPLY_QUEUE_STEP 128
 #define REPLY_QUEUE_MAX TASK_MAX
+#define SCHE_NAME_LEN 32
 
+#if 1
 #define NEW_SCHED
+#endif
 
 #ifndef NEW_SCHED
 #define swapcontext1 swapcontext
@@ -134,7 +140,7 @@ typedef struct {
         void *buf;
         int8_t priority;
         task_t parent;
-        char name[32];
+        char name[SCHE_NAME_LEN];
 } request_t;
 
 typedef struct {
@@ -228,7 +234,7 @@ typedef enum {
 } task_type_t;
 
 int schedule_init();
-void schedule_destroy();
+void schedule_destroy(schedule_t *schedule);
 
 int schedule_create(int *eventfd, const char *name, int *idx, schedule_t **_schedule, void *private_mem);
 

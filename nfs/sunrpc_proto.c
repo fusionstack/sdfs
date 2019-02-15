@@ -214,7 +214,7 @@ static int __sunrpc_recv(void *_ctx, void *buf, int *_count)
                 DBUG("msg len %u\n", msg_len + io_len);
  
                 if (msg_len + io_len > (int)mbuf->len) {
-                        DWARN("wait %u %u\n", msg_len + io_len, mbuf->len);
+                        DBUG("wait %u %u\n", msg_len + io_len, mbuf->len);
                         break;
                 }
 
@@ -281,7 +281,8 @@ int sunrpc_accept(int srv_sd)
         if (ret)
                 GOTO(err_sd, ret);
         
-        ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_REDIS);
+        //ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_REDIS);
+        ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE);
         if (ret)
                 GOTO(err_sd, ret);
 

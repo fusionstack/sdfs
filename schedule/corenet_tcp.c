@@ -409,8 +409,9 @@ static int __corenet_tcp_local(int fd, buffer_t *buf, int op)
         iov_count = CORE_IOV_MAX;
         ret = mbuffer_trans(__corenet__->iov, &iov_count,  buf);
         //YASSERT(ret == (int)buf->len);
-        if(unlikely(ret != (int)buf->len))
-                DWARN("for bug test tcp send %d, buf->len:%u\n", ret, buf->len);
+        if(unlikely(ret != (int)buf->len)) {
+                DBUG("for bug test tcp send %d, buf->len:%u\n", ret, buf->len);
+        }
 
         memset(&msg, 0x0, sizeof(msg));
         msg.msg_iov = __corenet__->iov;
@@ -427,6 +428,7 @@ static int __corenet_tcp_local(int fd, buffer_t *buf, int op)
         if (ret < 0) {
                 ret = -ret;
                 DWARN("sd %u %u %s\n", fd, ret, strerror(ret));
+                YASSERT(ret != EMSGSIZE);
                 GOTO(err_ret, ret);
         }
 
@@ -1259,7 +1261,7 @@ void corenet_tcp_commit()
 
 #else
 
-static void __corenet_tcp_exec_send_nowait(void *_node)
+inline static void __corenet_tcp_exec_send_nowait(void *_node)
 {
         int ret;
         corenet_node_t *node = _node;

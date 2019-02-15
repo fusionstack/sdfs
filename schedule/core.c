@@ -128,7 +128,7 @@ static void __core_interrupt_eventfd_func(void *arg)
 #endif
 
 #define CORE_CHECK_KEEPALIVE_INTERVAL 1
-#define CORE_CHECK_CALLBACK_INTERVAL 30
+#define CORE_CHECK_CALLBACK_INTERVAL 5
 #define CORE_CHECK_HEALTH_INTERVAL 30
 #define CORE_CHECK_HEALTH_TIMEOUT 180
 
@@ -228,6 +228,8 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
         if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
                 corenet_tcp_commit();
         }
+
+        //schedule_run(NULL);
 #endif
 
 #if ENABLE_COREAIO
@@ -292,12 +294,9 @@ static int __core_worker_init(core_t *core)
                 GOTO(err_ret, ret);
         }
 
-        corenet_tcp_t *tcp_net;
-        ret = corenet_tcp_init(32768, &tcp_net);
+        ret = corenet_tcp_init(32768, (corenet_tcp_t **)&core->tcp_net);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
-                
-        core->tcp_net = tcp_net;
 
         if (interrupt) {
                 sockid_t sockid;
@@ -305,7 +304,7 @@ static int __core_worker_init(core_t *core)
                 sockid.seq = _random();
                 sockid.type = SOCKID_CORENET;
                 sockid.addr = 123;
-                ret = corenet_tcp_add(tcp_net, &sockid, NULL, NULL, NULL, NULL,
+                ret = corenet_tcp_add(core->tcp_net, &sockid, NULL, NULL, NULL, NULL,
                                       __core_interrupt_eventfd_func, "interrupt_fd");
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
@@ -327,20 +326,22 @@ static int __core_worker_init(core_t *core)
         DINFO("core[%u] timer inited\n", core->hash);
         
 #if 1
-        ret = mem_cache_private_init();
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (core->flag & CORE_FLAG_PRIVATE) {
+                ret = mem_cache_private_init();
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
 
-        ret = mem_hugepage_private_init();
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+                ret = mem_hugepage_private_init();
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
         
-        DINFO("core[%u] mem inited\n", core->hash);
+                DINFO("core[%u] mem inited\n", core->hash);
 
-        snprintf(name, sizeof(name), "core[%u]", core->idx);
-        ret = analysis_private_create(name);
-        if (unlikely(ret)) {
-                GOTO(err_ret, ret);
+                snprintf(name, sizeof(name), "core[%u]", core->idx);
+                ret = analysis_private_create(name);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
         }
 
         DINFO("core[%u] analysis inited\n", core->hash);
@@ -1241,8 +1242,6 @@ void core_worker_exit(core_t *core)
                 cpuset_unset(core->main_core->cpu_id);
         }
         
-        timer_destroy();
-        analysis_private_destroy();
 
 #if ENABLE_CORERPC
         corerpc_destroy((void *)&core->rpc_table);
@@ -1259,9 +1258,15 @@ void core_worker_exit(core_t *core)
 #endif
 
         variable_unset(VARIABLE_CORE);
-        
-        mem_cache_private_destroy();
-        mem_hugepage_private_destoy();
-        schedule_destroy();
+
+        timer_destroy();
+
+        if (core->flag & CORE_FLAG_PRIVATE) {
+                analysis_private_destroy();
+                mem_cache_private_destroy();
+                mem_hugepage_private_destoy();
+        }
+
+        schedule_destroy(core->schedule);
 }
 #endif

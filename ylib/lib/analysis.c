@@ -396,6 +396,11 @@ int analysis_private_create(const char *_name)
         int ret;
         analysis_t *ana;
 
+#if 1
+        DWARN("analysis private disabled\n");
+        return 0;
+#endif
+        
         YASSERT(__private_analysis__ == NULL);
         
         ret = analysis_create(&ana, _name, 1);
@@ -528,7 +533,11 @@ static void __analysis_destroy(analysis_t *ana)
 
 void analysis_private_destroy()
 {
-        YASSERT(__private_analysis__);
+        if (__private_analysis__ == NULL) {
+                DWARN("analysis private disabled\n");
+                return;
+        }
+
         __analysis_destroy(__private_analysis__);
         __private_analysis__ = NULL;
 }

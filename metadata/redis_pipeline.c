@@ -30,7 +30,7 @@ typedef struct {
         struct list_head list;
 } pipeline_t;
 
-static pipeline_t *__pipeline__ = NULL;
+static __thread pipeline_t *__pipeline__ = NULL;
 extern __thread int __use_pipline__;
 
 typedef struct {
@@ -303,7 +303,7 @@ int redis_pipline_run()
         struct list_head list, *pos, *n;
         redis_pipline_ctx_t *ctx;
         arg2_t *arg, array[512];
-        pipeline_t *pipeline = __pipeline__;        
+        pipeline_t *pipeline = __pipeline__;    
 
         if (pipeline == NULL) {
                 return 0;

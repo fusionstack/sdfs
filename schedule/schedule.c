@@ -1051,6 +1051,7 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
         taskctx = &(tasks[idx]);
 #endif
 
+        DBUG("%s\n", name);
         strcpy(taskctx->name, name);
         taskctx->state = TASK_STAT_RUNNABLE;
         taskctx->func = func;
@@ -1180,8 +1181,8 @@ static int __schedule_create__(schedule_t **_schedule, const char *name, int idx
                 }
 
                 DINFO("schedule stack size: %d, mem hugepage count: %d\n", TASK_MAX * DEFAULT_STACK_SIZE,
-                                TASK_MAX * DEFAULT_STACK_SIZE / MEMPAGE_SIZE);
-           //     core_register_tls(VARIABLE_SCHEDULE, (void *)schedule);
+                      TASK_MAX * DEFAULT_STACK_SIZE / MEMPAGE_SIZE);
+                //     core_register_tls(VARIABLE_SCHEDULE, (void *)schedule);
         } else {
                 ret = ymalloc((void **)&schedule, sizeof(*schedule));
                 if (unlikely(ret))
@@ -1621,7 +1622,9 @@ static void __schedule_run(schedule_t *_schedule)
                 _gettimeofday(&t1, NULL);
 #endif
 
-                ret = (__schedule_reply_local_run(_schedule) || __schedule_reply_remote_run(_schedule) || __schedule_task_run(_schedule));
+                ret = (__schedule_reply_local_run(_schedule)
+                       || __schedule_reply_remote_run(_schedule)
+                       || __schedule_task_run(_schedule));
 
 #if SCHEDULE_CHECK_RUNTIME
                 _gettimeofday(&t2, NULL);
@@ -1681,6 +1684,7 @@ void schedule_post(schedule_t *schedule)
                 ret = write(schedule->eventfd, &e, sizeof(e));
                 if (ret < 0) {
                         ret = errno;
+                        DERROR("errno %u\n", ret);
                         YASSERT(0);
                 }
         }
@@ -1707,6 +1711,8 @@ int schedule_request(schedule_t *schedule, int priority, func_t exec, void *buf,
         request_queue_t *request_queue = &schedule->request_queue;
         request_t *request;
 
+        YASSERT(strlen(name) + 1 <= SCHE_NAME_LEN);
+        
         ret = sy_spin_lock(&request_queue->lock);
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
@@ -1736,7 +1742,7 @@ int schedule_request(schedule_t *schedule, int priority, func_t exec, void *buf,
         request->buf = buf;
         request->priority = priority;
         schedule_task_given(&request->parent);
-        snprintf(request->name, 32, "%s", name);
+        snprintf(request->name, SCHE_NAME_LEN, "%s", name);
         request_queue->count++;
 
         sy_spin_unlock(&request_queue->lock);
@@ -2114,10 +2120,10 @@ static int __schedule_task_cleanup()
         return !waiting;
 }
 
-void schedule_destroy()
+void schedule_destroy(schedule_t *_schedule)
 {
         int ret, retry = 0;
-        schedule_t *schedule = schedule_self();
+        schedule_t *schedule = __schedule_self(_schedule);
 
         schedule->running = 0;
 
@@ -2129,7 +2135,7 @@ void schedule_destroy()
                               schedule->reply_local.count);
                 }
 
-                __schedule_run(NULL);
+                __schedule_run(schedule);
 
                 if (__schedule_task_cleanup()) {
                         break;

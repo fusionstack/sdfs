@@ -66,6 +66,8 @@ static int __mem_hugepage_init(mem_hugepage_t **_mem)
                         UNIMPLEMENTED(__DUMP__);
                 }
 
+                //memset(ptr, 0x0, gloconf.memcache_seg);
+                
                 ent->ref = 0;
                 ent->idx = i;
                 ent->addr = ptr;

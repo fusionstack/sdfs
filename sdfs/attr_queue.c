@@ -107,7 +107,7 @@ static int __attr_queue(const volid_t *volid, const fileid_t *fileid, int op, co
         DBUG("queue "CHKID_FORMAT"\n", CHKID_ARG(fileid));
 
         if (unlikely(volid == NULL)) {
-                UNIMPLEMENTED(__WARN__);
+                //UNIMPLEMENTED(__WARN__);
                 volid_t _volid = {fileid->volid, 0};
                 volid = &_volid;
         }

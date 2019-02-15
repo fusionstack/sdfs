@@ -1115,10 +1115,11 @@ err_ret:
         return ret;
 }
 
-int redis_init(int worker_count)
+int redis_init(int _worker_count)
 {
         int ret;
         redis_worker_t *worker;
+        int worker_count = _worker_count * 4;
 
         ret = ymalloc((void **)&__redis_worker__, sizeof(*__redis_worker__) * worker_count);
         if (unlikely(ret))

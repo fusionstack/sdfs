@@ -52,12 +52,12 @@ static int __redis_connect(const char *volume, int sharding, int magic, __conn_t
         char *list[2];
         time_t ctime;
 
+        snprintf(key, MAX_NAME_LEN, "%s/slot/%d/master", volume, sharding);
         snprintf(id, MAX_NAME_LEN, "%s/%d", volume, sharding);
         ret = maping_get(NAME2ADDR, id, addr, &ctime);
         if(ret) {
                 if (ret == ENOENT) {
                 retry:
-                        snprintf(key, MAX_NAME_LEN, "%s/slot/%d/master", volume, sharding);
                         ret = etcd_get_text(ETCD_VOLUME, key, addr, NULL);
                         if(ret) {
                                 DBUG("%s not found\n", key);
