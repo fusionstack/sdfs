@@ -6,7 +6,7 @@
 #include "ylib.h"
 #include "dbg.h"
 
-#define ENABLE_ATTR_QUEUE 1
+#define ENABLE_ATTR_QUEUE 0
 
 int attr_queue_init();
 int attr_queue_update(const volid_t *volid, const fileid_t *fileid, md_proto_t *md);
