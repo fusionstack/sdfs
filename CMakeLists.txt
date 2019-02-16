@@ -185,6 +185,7 @@ add_library(sdfs SHARED
 
     #${CMAKE_CURRENT_SOURCE_DIR}/license/src/aes.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_co.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_pipeline.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_vol.c
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata/redis_conn.c

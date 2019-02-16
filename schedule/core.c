@@ -26,7 +26,7 @@
 #include "rpc_table.h"
 #include "configure.h"
 #include "core.h"
-#include "redis_pipeline.h"
+#include "redis_co.h"
 #if ENABLE_CORENET
 #include "corenet_maping.h"
 #include "corenet_connect.h"
@@ -242,7 +242,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
         corerpc_scan();
 #endif
 
-        redis_pipline_run();
+        redis_co_run();
         
         schedule_scan(core->schedule);
 
@@ -399,7 +399,7 @@ static int __core_worker_init(core_t *core)
 #endif
 
         if (core->flag & CORE_FLAG_REDIS) {
-                ret = redis_pipeline_init();
+                ret = redis_co_init();
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
@@ -1074,7 +1074,6 @@ int core_poller_unregister(core_t *core, void (*poll)(void *,void*))
 typedef struct __vm {
         /*forward*/
         struct list_head forward_list;
-
         /*aio cb*/
         //aio_context_t  ioctx;
         int iocb_count;
@@ -1235,7 +1234,7 @@ void core_worker_exit(core_t *core)
 #endif
 
         if (core->flag & CORE_FLAG_REDIS) {
-                redis_pipeline_destroy();
+                redis_co_destroy();
         }
         
         if (core->main_core) {

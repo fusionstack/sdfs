@@ -3,7 +3,6 @@
 #include <poll.h>
 #include <string.h>
 #include <stdarg.h>
-#include <sys/eventfd.h>
 #include <errno.h>
 
 #define DBG_SUBSYS S_LIBYLIB
@@ -16,6 +15,9 @@
 #include "schedule.h"
 #include "dbg.h"
 
+#define PIPELINE_PARALLEL 0
+
+#if ENABLE_REDIS_PIPELINE
 typedef struct {
         struct list_head hook;
         fileid_t fileid;
@@ -23,136 +25,225 @@ typedef struct {
         const char *format;
         va_list ap;
         redisReply *reply;
+
         task_t task;
+
         void *pipeline;
 } redis_pipline_ctx_t;
 
-typedef struct {
-        struct list_head list;
-        fileid_t fileid;
-        volid_t volid;
-        int finished;
-} arg2_t;
+#if 0
+static schedule_t *__schedule__ = NULL;
+static sy_spinlock_t __lock__;
+static struct list_head __list__;
+#endif
+extern __thread int __redis_workerid__;
+extern int __redis_conn_pool__;
+//static redis_ctx_array_t *__redis_ctx_array__;
 
 typedef struct {
+        schedule_t *schedule;
         sy_spinlock_t lock;
-        int eventfd;
-        int running;
         struct list_head list;
+        sem_t sem;
 } pipeline_t;
 
-static __thread pipeline_t *__pipeline__ = NULL;
-extern __thread int __use_pipeline__;
+static pipeline_t *__pipeline_array__ = NULL;
+static int __count__ = 0;
 
-#define REDIS_PIPLINE_THREAD 1
+STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd);
 
-static int __redis_pipline_run(struct list_head *list);
+typedef struct {
+        task_t task;
+        sem_t sem;
+        func_va_t exec;
+        va_list ap;
+        int type;
+        int retval;
+} arg1_t;
 
-static void *__redis_pipeline_worker(void *arg)
-{
-        int ret;
-        pipeline_t *pipeline = arg;
-        struct list_head list;
+#define REQUEST_SEM 1
+#define REQUEST_TASK 2
 
-        ret = redis_vol_private_init();
-        if (ret)
-                UNIMPLEMENTED(__DUMP__);
-
-        DINFO("pipeline worker start %u\n", pipeline->running);
-
-        __use_pipeline__ = 1;        
-        while (pipeline->running) {
-                eventfd_poll(pipeline->eventfd, 1, NULL);
-
-                if (pipeline->running == 0) {
-                        DINFO("destroyed\n");
-                        break;
-                }
-
-                INIT_LIST_HEAD(&list);
-
-                ret = sy_spin_lock(&pipeline->lock);
-                if (ret)
-                        UNIMPLEMENTED(__DUMP__);
-                
-                list_splice_init(&pipeline->list, &list);
-
-                sy_spin_unlock(&pipeline->lock);
-        
-                __redis_pipline_run(&list);
-        }
-
-        redis_vol_private_destroy(redis_conn_vol_close);
-        
-        pthread_exit(NULL);
-}
-        
+STATIC void *__redis_schedule(void *arg);
 
 int redis_pipeline_init()
 {
-        int ret;
+        int ret, count;
         pipeline_t *pipeline;
 
-        DINFO("pipeline start\n");
-        
-        ret = ymalloc((void **)&pipeline, sizeof(*pipeline));
-        if (ret)
-                GOTO(err_ret, ret);
-
-        memset(pipeline, 0x0, sizeof(*pipeline));
-
-        INIT_LIST_HEAD(&pipeline->list);
-        pipeline->running = 1;
-
-        ret = sy_spin_init(&pipeline->lock);
-        if (ret)
-                UNIMPLEMENTED(__WARN__);
-
-#if !REDIS_PIPLINE_THREAD
-        ret = redis_vol_private_init();
-        if (ret)
-                GOTO(err_ret, ret);
+#if 0
+        count = ng.daemon ? gloconf.polling_core : 1;
+#else
+        count = __redis_conn_pool__;
 #endif
-
-        int fd = eventfd(0, EFD_CLOEXEC);
-        if (fd < 0) {
-                ret = errno;
+        ret = ymalloc((void **)&__pipeline_array__, sizeof(*__pipeline_array__) * count);
+        if (ret)
                 GOTO(err_ret, ret);
+
+        memset(__pipeline_array__, 0x0, sizeof(*__pipeline_array__) * count);
+
+        for (int i = 0; i < count; i++) {
+                pipeline = &__pipeline_array__[i];
+                
+                ret = sy_spin_init(&pipeline->lock);
+                if (ret)
+                        GOTO(err_ret, ret);
+
+                INIT_LIST_HEAD(&pipeline->list);
+
+                ret = sem_init(&pipeline->sem, 0, 0);
+                if (ret < 0) {
+                        ret = errno;
+                        GOTO(err_ret, ret);
+                }
+                
+                ret = sy_thread_create2(__redis_schedule, pipeline, "redis_schedule");
+                if(ret)
+                        GOTO(err_ret, ret);
+
+                ret = _sem_wait(&pipeline->sem);
+                if(ret) {
+                        GOTO(err_ret, ret);
+                }
         }
 
-        pipeline->eventfd = fd;
-        
-        ret = sy_thread_create2(__redis_pipeline_worker, pipeline, "__core_worker");
-        if (ret)
-                GOTO(err_ret, ret);
-
-        __pipeline__ = pipeline;
-        __use_pipeline__ = 1;
+        __count__ = count;
         
         return 0;
 err_ret:
         return ret;
 }
 
-void redis_pipeline_destroy()
+
+STATIC void __redis_pipeline_request__(void *_ctx)
+{
+        arg1_t *ctx = _ctx;
+
+        ctx->retval = ctx->exec(ctx->ap);
+
+        if (ctx->type == REQUEST_SEM) {
+                sem_post(&ctx->sem);
+        } else {
+                schedule_resume(&ctx->task, 0, NULL);
+        }
+}
+
+STATIC int __redis_pipeline_request(pipeline_t *pipeline, func_va_t exec, ...)
 {
         int ret;
-        uint64_t e;
+        schedule_t *schedule = pipeline->schedule;
+        arg1_t ctx;
 
-        UNIMPLEMENTED(__WARN__);
+        ctx.exec = exec;
+        va_start(ctx.ap, exec);
 
-#if !REDIS_PIPLINE_THREAD
-        redis_vol_private_destroy(redis_conn_vol_close);
-#endif
-        
-        pipeline_t *pipeline = __pipeline__;
-        pipeline->running = 0;
-
-        ret = write(pipeline->eventfd, &e, sizeof(e));
-        if (ret < 0) {
-                ret = errno;
-                UNIMPLEMENTED(__WARN__);
+        if (schedule_running()) {
+                ctx.type = REQUEST_TASK;
+                ctx.task = schedule_task_get();
+        } else {
+                ctx.type = REQUEST_SEM;
+                ret = sem_init(&ctx.sem, 0, 0);
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
         }
+
+        ret = schedule_request(schedule, -1, __redis_pipeline_request__, &ctx, "redis_request");
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        if (schedule_running()) {
+                ret = schedule_yield1("redis_request", NULL, NULL, NULL, -1);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
+        } else {
+                ret = _sem_wait(&ctx.sem);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
+        }
+
+        return ctx.retval;
+err_ret:
+        return ret;
+}
+
+STATIC void *__redis_schedule(void *arg)
+{
+        int ret, interrupt_eventfd, idx;
+        char name[MAX_NAME_LEN];
+        pipeline_t *pipeline = arg;
+
+        snprintf(name, sizeof(name), "redis");
+        ret = schedule_create(&interrupt_eventfd, name, &idx, &pipeline->schedule, NULL);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        snprintf(name, sizeof(name), "redis[%u]", idx);
+        ret = analysis_private_create(name);
+        if (unlikely(ret)) {
+                GOTO(err_ret, ret);
+        }
+        
+        sem_post(&pipeline->sem);
+        
+        while (1) {
+                ret = eventfd_poll(interrupt_eventfd, 1, NULL);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+
+                DBUG("poll return\n");
+
+#if PIPELINE_PARALLEL
+                while (!list_empty(&pipeline->list)) {
+                        schedule_run(pipeline->schedule);
+                        __redis_pipline_run(pipeline, interrupt_eventfd);
+                        schedule_run(pipeline->schedule);
+                }
+#else
+                schedule_run(pipeline->schedule);
+                __redis_pipline_run(pipeline, interrupt_eventfd);
+                schedule_run(pipeline->schedule);
+#endif
+
+                analysis_merge();
+                schedule_scan(pipeline->schedule);
+        }
+
+        pthread_exit(NULL);
+err_ret:
+        UNIMPLEMENTED(__DUMP__);
+        pthread_exit(NULL);
+}
+
+STATIC int __redis_pipeline(va_list ap)
+{
+        int ret;
+        redis_pipline_ctx_t *ctx = va_arg(ap, redis_pipline_ctx_t *);
+        pipeline_t *pipeline = ctx->pipeline;
+
+        va_end(ap);
+
+        DBUG("%s\n", ctx->format);
+        YASSERT(ctx->fileid.type);
+        
+        ctx->task = schedule_task_get();
+        
+        ret = sy_spin_lock(&pipeline->lock);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        list_add_tail(&ctx->hook, &pipeline->list);
+        
+        sy_spin_unlock(&pipeline->lock);
+
+        ret = schedule_yield1("redis_pipline", NULL, NULL, NULL, -1);
+        if (ret)
+                GOTO(err_ret, ret);
+        
+        return 0;
+err_ret:
+        return ret;
 }
 
 int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
@@ -160,90 +251,46 @@ int redis_pipeline(const volid_t *volid, const fileid_t *fileid, redisReply **re
 {
         int ret;
         redis_pipline_ctx_t ctx;
-        pipeline_t *pipeline = __pipeline__;
+        pipeline_t *pipeline = &__pipeline_array__[fileid->sharding % __count__];
 
-        ANALYSIS_BEGIN(0);
-        
-        YASSERT(fileid->type);
-        
         ctx.format = format;
         ctx.fileid = *fileid;
         ctx.volid = *volid;
         ctx.pipeline = pipeline;
-        ctx.task = schedule_task_get();
         va_start(ctx.ap, format);
 
-        ret = sy_spin_lock(&pipeline->lock);
-        if (ret)
-                UNIMPLEMENTED(__WARN__);
-
-        list_add_tail(&ctx.hook, &pipeline->list);
-
-        sy_spin_unlock(&pipeline->lock);
-
         DBUG("%s\n", format);
-
-        ret = schedule_yield1("redis_pipline", NULL, NULL, NULL, -1);
+        
+        ret = __redis_pipeline_request(pipeline, __redis_pipeline, &ctx);
         if (ret)
                 GOTO(err_ret, ret);
 
         *reply = ctx.reply;
 
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-        
         return 0;
 err_ret:
         return ret;
 }
 
-STATIC int __redis_utils_pipeline1(const arg2_t *arg2, redis_handler_t *handler,
-                                   struct list_head *list)
+STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
 {
         int ret;
         struct list_head *pos, *n;
         redis_pipline_ctx_t *ctx;
-        redis_conn_t *conn;
 
-        ret = redis_conn_get(&arg2->volid, arg2->fileid.sharding, 0, handler);
-        if(ret)
-                UNIMPLEMENTED(__DUMP__);
-
-        conn = handler->conn;
-        
         ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
-                UNIMPLEMENTED(__DUMP__);
+                GOTO(err_ret, ret);
 
         ANALYSIS_BEGIN(0);
         
         list_for_each_safe(pos, n, list) {
                 ctx = (redis_pipline_ctx_t *)pos;
- 
                 ret = redisvAppendCommand(conn->ctx, ctx->format, ctx->ap);
                 if ((unlikely(ret)))
-                        UNIMPLEMENTED(__DUMP__);
+                        GOTO(err_lock, ret);
         }
 
-        int done;
-        ret = redisBufferWrite(conn->ctx, &done);
-        DBUG("ret %d %d\n", ret, done);
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-        
-        return 0;
-}
-
-STATIC void __redis_utils_pipeline2(redis_handler_t *handler, struct list_head *list)
-{
-        int ret;
-        struct list_head *pos, *n;
-        redis_pipline_ctx_t *ctx;
-        redis_conn_t *conn;
-
-        ANALYSIS_BEGIN(0);
-
-        conn = handler->conn;
-        
         list_for_each_safe(pos, n, list) {
                 ctx = (redis_pipline_ctx_t *)pos;
                 list_del(pos);
@@ -254,55 +301,102 @@ STATIC void __redis_utils_pipeline2(redis_handler_t *handler, struct list_head *
         }
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         pthread_rwlock_unlock(&conn->rwlock);
-        redis_conn_release(handler);
+
+        return 0;
+err_lock:
+        pthread_rwlock_unlock(&conn->rwlock);
+err_ret:
+        return ret;
 }
 
-STATIC int __redis_exec(arg2_t *array, int count)
+typedef struct {
+        struct list_head list;
+        fileid_t fileid;
+        volid_t volid;
+        int finished;
+} arg2_t;
+
+STATIC int __redis_exec(va_list ap)
 {
-        int ret, i;
-        redis_handler_t handler_array[512], *handler;
-        arg2_t *arg2;
+        arg2_t *arg2 = va_arg(ap, arg2_t *);
 
-        ANALYSIS_BEGIN(0);
+        va_end(ap);
+
+        int ret, retry = 0;
+        char key[MAX_PATH_LEN];
+        redis_handler_t handler;
+        fileid_t *fileid = &arg2->fileid;
+
+        id2key(ftype(fileid), fileid, key);
+
+        DBUG(CHKID_FORMAT"\n", CHKID_ARG(fileid));
+
+retry:
+        ret = redis_conn_get(&arg2->volid, fileid->sharding, __redis_workerid__, &handler);
+        if(ret)
+                GOTO(err_ret, ret);
         
-        for (i = 0; i < count; i++) {
-                handler = &handler_array[i];
-                arg2 = &array[i];
+        ret = __redis_utils_pipeline(handler.conn, &arg2->list);
+        if(ret) {
+                if (ret == ECONNRESET) {
+                        redis_conn_close(&handler);
+                        redis_conn_release(&handler);
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 100, (100 * 1000));
+                }
+                
+                GOTO(err_release, ret);
+        }
 
-                ret = __redis_utils_pipeline1(arg2, handler, &arg2->list);
-                if ((unlikely(ret)))
-                        UNIMPLEMENTED(__DUMP__);
-       }
-
-        
-        for (i = 0; i < count; i++) {
-                handler = &handler_array[i];
-                arg2 = &array[i];
-
-                __redis_utils_pipeline2(handler, &arg2->list);
-        }        
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        redis_conn_release(&handler);
         
         return 0;
+err_release:
+        redis_conn_release(&handler);
+err_ret:
+        return ret;
 }
 
-static int __redis_pipline_run(struct list_head *list)
+inline STATIC void __redis_pipline_run__(void *_arg)
+{
+        int ret;
+        arg2_t *arg = _arg;
+
+        ret = redis_exec(&arg->fileid, __redis_exec, arg);
+        if (unlikely(ret))
+                UNIMPLEMENTED(__DUMP__);
+
+        DBUG("-------------return-------------\n");
+
+        arg->finished = 1;
+        
+        //yfree((void **)&arg);
+}
+
+STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd)
 {
         int ret, count = 0;
-        struct list_head *pos, *n;
+        struct list_head list, *pos, *n;
         redis_pipline_ctx_t *ctx;
         arg2_t *arg, array[512];
 
-        ANALYSIS_BEGIN(0);
+        INIT_LIST_HEAD(&list);
+        ret = sy_spin_lock(&pipeline->lock);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        list_splice_init(&pipeline->list, &list);
+
+        sy_spin_unlock(&pipeline->lock);
+
         count = 0;
-        while (!list_empty(list)) {
+        while (!list_empty(&list)) {
                 arg = &array[count];
                 count++;
                 YASSERT(count < 512);
 
-                pos = (void *)list->next;
+                pos = (void *)list.next;
                 ctx = (redis_pipline_ctx_t *)pos;
                 arg->fileid = ctx->fileid;
                 arg->volid = ctx->volid;
@@ -313,7 +407,7 @@ static int __redis_pipline_run(struct list_head *list)
                 YASSERT(ctx->fileid.type);
 
                 int submit = 1;
-                list_for_each_safe(pos, n, list) {
+                list_for_each_safe(pos, n, &list) {
                         ctx = (redis_pipline_ctx_t *)pos;
 
                         if (ctx->fileid.sharding == arg->fileid.sharding
@@ -328,78 +422,55 @@ static int __redis_pipline_run(struct list_head *list)
                 }
 
                 DBUG("submit %u\n", submit);
+
+#if PIPELINE_PARALLEL
+                schedule_task_new("pipeline_run", __redis_pipline_run__, arg, -1);
+#else
+                (void) interrupt_eventfd;
+                
+                ret = redis_exec(&arg->fileid, __redis_exec, arg);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+#endif
         }
 
-        ret = __redis_exec(array, count);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+#if PIPELINE_PARALLEL
+        while (1) {
+                schedule_run(pipeline->schedule);
+                
+                ret = eventfd_poll(interrupt_eventfd, 1, NULL);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
 
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-        
-        return 0;
-err_ret:
-        return ret;
-}
+                schedule_run(pipeline->schedule);
 
-#if REDIS_PIPLINE_THREAD
-int redis_pipline_run()
-{
-        int ret;
-        uint64_t e;
-        pipeline_t *pipeline = __pipeline__;
+                int finished = 0;
+                for (int i = 0; i < count; i++) {
+                        arg = &array[i];
 
-        if (pipeline && !list_empty(&pipeline->list)) {
-                ret = write(pipeline->eventfd, &e, sizeof(e));
-                if (ret < 0) {
-                        ret = errno;
-                        UNIMPLEMENTED(__WARN__);
+                        if (arg->finished) {
+                                finished++;
+                        }
+                }
+
+                DBUG("finished %u count %u\n", finished, count);
+                if (finished == count) {
+                        break;
                 }
         }
+#endif
 
-        return 0;
-}
-
-#else
-
-int redis_pipline_run()
-{
-        int ret;
-        struct list_head list;
-        pipeline_t *pipeline = __pipeline__;    
-
-        if (pipeline == NULL) {
-                return 0;
-        }
-        
-        INIT_LIST_HEAD(&list);
-
-        ret = sy_spin_lock(&pipeline->lock);
-        if (ret)
-                UNIMPLEMENTED(__DUMP__);
-        
-        list_splice_init(&pipeline->list, &list);
-
-        sy_spin_unlock(&pipeline->lock);
-        
-        ret = __redis_pipline_run(&list);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-        
         return 0;
 err_ret:
         return ret;
 }
-#endif
 
-int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
-                  void *buf, size_t *len)
+int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key, void *buf, size_t *len)
 {
         int ret;
         redisReply *reply;
         char hash[MAX_NAME_LEN];
 
-        ANALYSIS_BEGIN(0);
-        
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s %s\n", hash, key);
@@ -429,8 +500,6 @@ int pipeline_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
         memcpy(buf, reply->str, reply->len);
 
         freeReplyObject(reply);
-        
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         return 0;
 
 err_free:
@@ -439,15 +508,12 @@ err_ret:
         return ret;
 }
 
-int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key,
-                  const void *value, size_t size, int flag)
+int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key, const void *value, size_t size, int flag)
 {
         int ret;
         redisReply *reply;
         char hash[MAX_NAME_LEN];
 
-        ANALYSIS_BEGIN(0);
-        
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s %s, flag 0x%o\n", hash, key, flag);
@@ -479,8 +545,6 @@ int pipeline_hset(const volid_t *volid, const fileid_t *fileid, const char *key,
         
         freeReplyObject(reply);
 
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-        
         return 0;
 err_free:
         freeReplyObject(reply);
@@ -493,9 +557,7 @@ int pipeline_hdel(const volid_t *volid, const fileid_t *fileid, const char *key)
         int ret;
         redisReply *reply;
         char hash[MAX_NAME_LEN];
-
-        ANALYSIS_BEGIN(0);
-
+ 
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s %s\n", hash, key);
@@ -521,7 +583,6 @@ int pipeline_hdel(const volid_t *volid, const fileid_t *fileid, const char *key)
         }
         
         freeReplyObject(reply);
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
         return 0;
 err_free:
@@ -530,8 +591,7 @@ err_ret:
         return ret;
 }
 
-STATIC int __pipeline_kget(const volid_t *volid, const fileid_t *fileid,
-                           const char *key, void *buf, size_t *len)
+STATIC int __pipeline_kget(const volid_t *volid, const fileid_t *fileid, const char *key, void *buf, size_t *len)
 {
         int ret;
         redisReply *reply;
@@ -571,9 +631,8 @@ err_ret:
         return ret;
 }
 
-STATIC int __pipeline_kset(const volid_t *volid, const fileid_t *fileid,
-                           const char *key, const void *value,
-                           size_t size, int flag, int _ttl)
+STATIC int __pipeline_kset(const volid_t *volid, const fileid_t *fileid, const char *key, const void *value,
+                  size_t size, int flag, int _ttl)
 {
         int ret;
         redisReply *reply;
@@ -610,7 +669,6 @@ STATIC int __pipeline_kset(const volid_t *volid, const fileid_t *fileid,
 
         if (flag & O_EXCL && reply->type == REDIS_REPLY_NIL) {
                 ret = EEXIST;
-                DBUG("exist\n");
                 GOTO(err_free, ret);
         }
 
@@ -670,7 +728,6 @@ int pipeline_hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
         redisReply *reply;
         char hash[MAX_NAME_LEN];
 
-        ANALYSIS_BEGIN(0);
         id2key(ftype(fileid), fileid, hash);
 
         DBUG("%s\n", hash);
@@ -687,7 +744,7 @@ int pipeline_hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
         }
 
         freeReplyObject(reply);
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
         return 0;
 err_free:
         freeReplyObject(reply);
@@ -716,23 +773,18 @@ int pipeline_klock(const volid_t *volid, const fileid_t *fileid, int ttl, int bl
 {
         int ret, retry = 0;
 
-        ANALYSIS_BEGIN(0);
 retry:
         ret = __pipeline_klock(volid, fileid, ttl);
         if(ret) {
                 if (ret == EEXIST && block) {
                         if (retry > 500 && retry % 100 == 0 ) {
-                                DWARN("lock "CHKID_FORMAT", retry %u\n",
-                                      CHKID_ARG(fileid), retry);
+                                DWARN("lock "CHKID_FORMAT", retry %u\n", CHKID_ARG(fileid), retry);
                         }
-
                         USLEEP_RETRY(err_ret, ret, retry, retry, 1000, (1 * 1000));
                 } else {
                         GOTO(err_ret, ret);
                 }
         }
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
         return 0;
 err_ret:
@@ -744,16 +796,13 @@ int pipeline_kunlock(const volid_t *volid, const fileid_t *fileid)
 {
         int ret;
         char key[MAX_PATH_LEN];
-        
-        ANALYSIS_BEGIN(0);
+
         snprintf(key, MAX_NAME_LEN, "lock:"CHKID_FORMAT, CHKID_ARG(fileid));
         ret = __pipeline_kdel(volid, fileid, key);
         if(ret) {
                 GOTO(err_ret, ret);
         }
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-
+        
         return 0;
 err_ret: 
         ret = ret == ENOENT ? EAGAIN : ret;
@@ -762,46 +811,30 @@ err_ret:
 
 int pipeline_kget(const volid_t *volid, const fileid_t *fileid, void *buf, size_t *len)
 {
-        int ret;
         char key[MAX_NAME_LEN];
 
-        ANALYSIS_BEGIN(0);
         id2key(ftype(fileid), fileid, key);
         
-        ret = __pipeline_kget(volid, fileid, key, buf, len);
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-
-        return ret;
+        return __pipeline_kget(volid, fileid, key, buf, len);
 }
 
 int pipeline_kset(const volid_t *volid, const fileid_t *fileid, const void *value,
                   size_t size, int flag, int _ttl)
 {
-        int ret;
         char key[MAX_NAME_LEN];
-
-        ANALYSIS_BEGIN(0);
+ 
         id2key(ftype(fileid), fileid, key);
         
-        ret = __pipeline_kset(volid, fileid, key, value, size, flag, _ttl);
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-
-        return ret;
+        return __pipeline_kset(volid, fileid, key, value, size, flag, _ttl);
 }
 
 int pipeline_kdel(const volid_t *volid, const fileid_t *fileid)
 {
-        int ret;
         char key[MAX_NAME_LEN];
 
-        ANALYSIS_BEGIN(0);
         id2key(ftype(fileid), fileid, key);
         
-        ret = __pipeline_kdel(volid, fileid, key);
-
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
-
-        return ret;
+        return __pipeline_kdel(volid, fileid, key);
 }
+
+#endif

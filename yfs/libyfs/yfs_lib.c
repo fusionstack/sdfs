@@ -927,15 +927,19 @@ err_ret:
         return ret;
 }
 
-int sdfs_init_verbose(const char *name, int redis_conn)
+int sdfs_init_verbose(const char *name, int polling_core)
 {
         int ret;
 
+#if ENABLE_CO_WORKER
+        polling_core = 1;
+#endif
+        
         ret = init_stage1();
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = init_stage2(name, __no_root__, redis_conn);
+        ret = init_stage2(name, __no_root__, polling_core);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -962,7 +966,7 @@ int sdfs_init_verbose(const char *name, int redis_conn)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = core_init(gloconf.polling_core, gloconf.polling_timeout,
+        ret = core_init(polling_core, gloconf.polling_timeout,
                         CORE_FLAG_ACTIVE);
         if (ret)
                 GOTO(err_ret, ret);

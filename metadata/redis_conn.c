@@ -222,10 +222,12 @@ static int __redis_conn_get__(__conn_t *conn, redis_handler_t *handler)
                 GOTO(err_ret, ret);
         }
 
+#if 0
         if (conn->used) {
                 ret = EBUSY;
                 GOTO(err_ret, ret);
         }
+#endif
 
         YASSERT(conn->used == 0);
         conn->used = 1;
