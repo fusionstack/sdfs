@@ -254,9 +254,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 
         __core_check(core);
 
-#if 0
         gettime_refresh();
-#endif
         timer_expire();
         analysis_merge();
 }
@@ -324,7 +322,11 @@ static int __core_worker_init(core_t *core)
                 GOTO(err_ret, ret);
 
         DINFO("core[%u] timer inited\n", core->hash);
-        
+
+        ret = gettime_private_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
 #if ENABLE_CO_WORKER
         if (core->flag & CORE_FLAG_PRIVATE) {
                 ret = mem_cache_private_init();

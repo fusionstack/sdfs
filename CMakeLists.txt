@@ -141,6 +141,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/corerpc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/cpuset.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/schedule.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/schedule/gettime.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/schedule_thread.c
     ${CMAKE_CURRENT_SOURCE_DIR}/schedule/variable.c
     #${CMAKE_CURRENT_SOURCE_DIR}/schedule/vm.c

@@ -156,16 +156,6 @@ int is_digit_str(const char *str)
         return 1;
 }
 
-time_t gettime()
-{
-        return time(NULL);
-}
-
-int _gettimeofday(struct timeval *tv, struct timezone *tz)
-{
-        return gettimeofday(tv, tz);
-}
-
 int date_check(const char *date_time)
 {
         int ret;
