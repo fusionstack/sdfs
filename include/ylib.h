@@ -107,7 +107,7 @@ extern void hash_iterate_table_entries(hashtable_t,
                                        void *arg);
 extern void hash_filter_table_entries(hashtable_t, int (*handler)(void *, void *),
                                       void *arg, void (*thunk)(void *));
-extern void hash_destroy_table(hashtable_t, void (*thunk)(void *));
+extern void hash_destroy_table(hashtable_t, void (*thunk)(void *, void *arg), void *arg);
 int hashtable_resize(hashtable_t t, int size);
 int hashtable_size(hashtable_t t);
 

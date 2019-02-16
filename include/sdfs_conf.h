@@ -223,7 +223,6 @@ typedef struct {
 
 #define ENABLE_HEARTBEAT 1
 
-#define ENABLE_NEWMD 1
 #define ENABLE_CORENET 1
 #define ENABLE_CORERPC 1
 #define ENABLE_COREAIO 1
@@ -235,5 +234,15 @@ typedef struct {
 #define SDFS_SYSTEM_VOL "system"
 
 #define REDIS_CONN_POOL 64
+
+#define ENABLE_CO_WORKER 0
+
+#if ENABLE_CO_WORKER
+#define ENABLE_REDIS_CO 1
+#else
+#define ENABLE_CORE_PIPELINE 1
+#endif
+
+#define ENABLE_REDIS_PIPELINE 0
 
 #endif

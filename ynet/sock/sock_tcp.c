@@ -294,11 +294,11 @@ int tcp_sock_tuning(int sd, int tuning, int nonblock)
         }
 
         if (xmit_buf != gloconf.wmem_max * 2) {
-                SERROR(0, "Can't set tcp send buf to %d (got %d)\n",
+                DERROR("Can't set tcp send buf to %d (got %d)\n",
                        gloconf.wmem_max, xmit_buf);
         }
 
-        DBUG("send buf %u\n", xmit_buf);
+        DINFO("sock %u, send buf %u\n", sd, xmit_buf);
 
         xmit_buf = 0;
         size = sizeof(int);
@@ -311,11 +311,11 @@ int tcp_sock_tuning(int sd, int tuning, int nonblock)
         }
 
         if (xmit_buf != gloconf.rmem_max * 2) {
-                SERROR(1, "Can't set tcp recv buf to %d (got %d)\n",
+                DERROR("Can't set tcp recv buf to %d (got %d)\n",
                        gloconf.rmem_max, xmit_buf);
         }
 
-        DBUG("recv buf %u\n", xmit_buf);
+        DBUG("sock %u, recv buf %u\n", sd, xmit_buf);
 
         return 0;
 err_ret:

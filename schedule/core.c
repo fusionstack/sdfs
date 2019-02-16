@@ -26,6 +26,7 @@
 #include "rpc_table.h"
 #include "configure.h"
 #include "core.h"
+#include "redis_co.h"
 #if ENABLE_CORENET
 #include "corenet_maping.h"
 #include "corenet_connect.h"
@@ -93,8 +94,10 @@ static core_latency_list_t *core_latency_list;
 
 static int __core_latency_init();
 static int __core_latency_private_init();
+#if ENABLE_CORE_PIPELINE
 static void  __core_pipeline_forward();
 static int __core_pipeline_create();
+#endif
 #endif
 
 static core_t *__core_array__[256];
@@ -125,7 +128,7 @@ static void __core_interrupt_eventfd_func(void *arg)
 #endif
 
 #define CORE_CHECK_KEEPALIVE_INTERVAL 1
-#define CORE_CHECK_CALLBACK_INTERVAL 30
+#define CORE_CHECK_CALLBACK_INTERVAL 5
 #define CORE_CHECK_HEALTH_INTERVAL 30
 #define CORE_CHECK_HEALTH_TIMEOUT 180
 
@@ -206,27 +209,26 @@ static void __core_check(core_t *core)
         __core_check_callback(core, now);
 }
 
-static inline void IO_FUNC __core_worker_run(core_t *core)
+static inline void IO_FUNC __core_worker_run(core_t *core, void *ctx)
 {
 #if ENABLE_CORENET
-        if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
-                int tmo = core->main_core ? 0 : 1;
-                corenet_tcp_poll(tmo);
-        }
+        int tmo = core->main_core ? 0 : 1;
+        corenet_tcp_poll(ctx, tmo);
 #endif
 
         schedule_run(core->schedule);
 
+#if ENABLE_CORE_PIPELINE
         __core_pipeline_forward();
+#endif
         
 #if ENABLE_CORENET
-        if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
-                corenet_tcp_commit();
-        }
+        corenet_tcp_commit(ctx);
+        schedule_run(core->schedule);
 #endif
 
 #if ENABLE_COREAIO
-        if (likely(core->flag & CORE_FLAG_AIO)) {
+        if (core->flag & CORE_FLAG_AIO) {
                 aio_submit();
         }
 #endif
@@ -235,21 +237,21 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
         corerpc_scan();
 #endif
 
+        redis_co_run(ctx);
+        
         schedule_scan(core->schedule);
 
 #if ENABLE_CORENET
-        if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
+        if (!gloconf.rdma || sanconf.tcp_discovery) {
                 corenet_tcp_check();
         }
 #endif
 
         __core_check(core);
 
-#if 0
-        gettime_refresh();
-#endif
-        timer_expire();
-        analysis_merge();
+        gettime_refresh(ctx);
+        timer_expire(ctx);
+        analysis_merge(ctx);
 }
 
 static int __core_worker_init(core_t *core)
@@ -285,12 +287,9 @@ static int __core_worker_init(core_t *core)
                 GOTO(err_ret, ret);
         }
 
-        corenet_tcp_t *tcp_net;
-        ret = corenet_tcp_init(32768, &tcp_net);
+        ret = corenet_tcp_init(32768, (corenet_tcp_t **)&core->tcp_net);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
-                
-        core->tcp_net = tcp_net;
 
         if (interrupt) {
                 sockid_t sockid;
@@ -298,7 +297,7 @@ static int __core_worker_init(core_t *core)
                 sockid.seq = _random();
                 sockid.type = SOCKID_CORENET;
                 sockid.addr = 123;
-                ret = corenet_tcp_add(tcp_net, &sockid, NULL, NULL, NULL, NULL,
+                ret = corenet_tcp_add(core->tcp_net, &sockid, NULL, NULL, NULL, NULL,
                                       __core_interrupt_eventfd_func, "interrupt_fd");
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
@@ -318,8 +317,30 @@ static int __core_worker_init(core_t *core)
                 GOTO(err_ret, ret);
 
         DINFO("core[%u] timer inited\n", core->hash);
+
+        ret = gettime_private_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+#if ENABLE_CO_WORKER
+        if (core->flag & CORE_FLAG_PRIVATE) {
+                ret = mem_cache_private_init();
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+
+                ret = mem_hugepage_private_init();
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
         
-#if 1
+                DINFO("core[%u] mem inited\n", core->hash);
+
+                snprintf(name, sizeof(name), "core[%u]", core->idx);
+                ret = analysis_private_create(name);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
+        }
+#else
         ret = mem_cache_private_init();
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -390,12 +411,22 @@ static int __core_worker_init(core_t *core)
         }
 #endif
 
+#if ENABLE_REDIS_CO
+        if (core->flag & CORE_FLAG_REDIS) {
+                ret = redis_co_init();
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
+#endif
+        
         variable_set(VARIABLE_CORE, core);
         //core_register_tls(VARIABLE_CORE, private_mem);
 
+#if ENABLE_CORE_PIPELINE
         ret = __core_pipeline_create();
         if (unlikely(ret))
                 GOTO(err_ret, ret);
+#endif
         
         sem_post(&core->sem);
 
@@ -416,8 +447,11 @@ static void * IO_FUNC __core_worker(void *_args)
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
+        void *ctx = variable_get_ctx();
+        YASSERT(ctx);
+        
         while (1) {
-                __core_worker_run(core);
+                __core_worker_run(core, ctx);
         }
 
         DFATAL("name %s idx %d hash %d\n", core->name, core->idx, core->hash);
@@ -435,7 +469,7 @@ typedef struct {
 #define REQUEST_SEM 1
 #define REQUEST_TASK 2
 
-static int __core_create__(core_t **_core, int hash, int flag)
+int core_create(core_t **_core, int hash, int flag)
 {
         int ret;
         core_t *core;
@@ -507,7 +541,7 @@ int core_init(int polling_core, int polling_timeout, int flag)
 
         DINFO("core global latency inited\n");
         for (i = 0; i < cpuset_useable(); i++) {
-                ret = __core_create__(&core, i, flag);
+                ret = core_create(&core, i, flag);
                 if (unlikely(ret))
                         UNIMPLEMENTED(__DUMP__);
 
@@ -653,14 +687,56 @@ err_ret:
         return ret;
 }
 
-void core_check_register(int hash, const char *name, void *opaque, func1_t func)
+int core_request_new(core_t *core, int priority, const char *name, func_va_t exec, ...)
+{
+        int ret;
+        schedule_t *schedule;
+        arg1_t ctx;
+
+        schedule = core->schedule;
+        if (unlikely(schedule == NULL)) {
+                ret = ENOSYS;
+                GOTO(err_ret, ret);
+        }
+
+        ctx.exec = exec;
+        va_start(ctx.ap, exec);
+
+        if (schedule_running()) {
+                ctx.type = REQUEST_TASK;
+                ctx.task = schedule_task_get();
+        } else {
+                ctx.type = REQUEST_SEM;
+                ret = sem_init(&ctx.sem, 0, 0);
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
+        }
+
+        ret = schedule_request(schedule, priority, __core_request, &ctx, name);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        if (schedule_running()) {
+                ret = schedule_yield1(name, NULL, NULL, NULL, -1);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
+        } else {
+                ret = _sem_wait(&ctx.sem);
+                if (unlikely(ret)) {
+                        GOTO(err_ret, ret);
+                }
+        }
+
+        return ctx.retval;
+err_ret:
+        return ret;
+}
+
+void core_check_register(core_t *core, const char *name, void *opaque, func1_t func)
 {
         int ret;
         core_check_t *core_check;
-        core_t *core = __core_array__[hash % cpuset_useable()];
-	if (core_self()) {
-		YASSERT(core == core_self());
-	}
 
         YASSERT(strlen(name) < MAX_NAME_LEN);
 
@@ -668,7 +744,7 @@ void core_check_register(int hash, const char *name, void *opaque, func1_t func)
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
-	DWARN("%s register core check %p\n", name, opaque);
+	DINFO("%s register core check %p\n", name, opaque);
         core_check->func = func;
         core_check->opaque = opaque;
         strcpy(core_check->name, name);
@@ -735,6 +811,12 @@ static int __core_latency_private_init()
         return 0;
 err_ret:
         return ret;
+}
+
+static void __core_latency_private_destroy()
+{
+        YASSERT(core_latency);
+        yfree((void **)&core_latency);
 }
 
 static int __core_latency_worker__()
@@ -1006,35 +1088,10 @@ int core_poller_unregister(core_t *core, void (*poll)(void *,void*))
 }
 #endif 
 
+#if ENABLE_CORE_PIPELINE
 typedef struct __vm {
-#if 0
-        int sd; //io socket
-        int interrupt_eventfd;
-        int idx;
-        int stop;
-        int exiting;
-        char name[MAX_NAME_LEN];
-
-        sem_t sem;
-        
-        schedule_t *schedule;
-
-        buffer_t send_buf;
-        buffer_t recv_buf;
-        struct iovec iov[VM_IOV_MAX]; //iov for send/recv
-
-        /*callback  and ctx */
-        vm_exec exec; 
-        vm_exit exit;
-        vm_func init;
-        vm_func check;
-        vm_reconnect reconnect;
-        void *ctx;
-#endif
-
         /*forward*/
         struct list_head forward_list;
-
         /*aio cb*/
         //aio_context_t  ioctx;
         int iocb_count;
@@ -1152,6 +1209,7 @@ static int __core_pipeline_create()
 err_ret:
         return ret;
 }
+#endif
 
 int core_request_async(int hash, int priority, const char *name, func_t exec, void *arg)
 {
@@ -1179,3 +1237,54 @@ int core_request_async(int hash, int priority, const char *name, func_t exec, vo
 err_ret:
         return ret;
 }
+
+#if 1
+void core_worker_exit(core_t *core)
+{
+        DINFO("core[%u] destroy begin\n", core->hash);
+
+        corenet_tcp_destroy(&core->tcp_net);
+        gettime_private_destroy();
+
+#if ENABLE_COREAIO
+        if (core->flag & CORE_FLAG_AIO) {
+                aio_destroy();
+        }
+#endif
+
+        if (core->flag & CORE_FLAG_REDIS) {
+                redis_co_destroy();
+        }
+        
+        if (core->main_core) {
+                cpuset_unset(core->main_core->cpu_id);
+        }
+        
+
+#if ENABLE_CORERPC
+        corerpc_destroy((void *)&core->rpc_table);
+
+        if (core->flag & CORE_FLAG_ACTIVE) {
+                corenet_maping_destroy((corenet_maping_t **)&core->maping);
+        }
+#endif
+
+        __core_latency_private_destroy();
+
+#if ENABLE_CORE_PIPELINE
+        UNIMPLEMENTED(__DUMP__);
+#endif
+
+        variable_unset(VARIABLE_CORE);
+
+        timer_destroy();
+
+        if (core->flag & CORE_FLAG_PRIVATE) {
+                analysis_private_destroy();
+                mem_cache_private_destroy();
+                mem_hugepage_private_destoy();
+        }
+
+        schedule_destroy(core->schedule);
+}
+#endif

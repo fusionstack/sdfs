@@ -5,6 +5,7 @@
 
 int mem_hugepage_init();
 int mem_hugepage_private_init();  // used by core thread mbuffer_t
+int mem_hugepage_private_destoy();
 
 int mem_hugepage_new(uint32_t size, mem_handler_t *mem_handler);
 

@@ -53,6 +53,11 @@ static void *__corenet_get()
         return variable_get(VARIABLE_CORENET_TCP);
 }
 
+static void *__corenet_get_byctx(void *ctx)
+{
+        return variable_get_byctx(ctx, VARIABLE_CORENET_TCP);
+}
+
 static void __corenet_set_out(corenet_node_t *node)
 {
         int ret, event;
@@ -246,10 +251,12 @@ static int __corenet_add(corenet_tcp_t *corenet, const sockid_t *sockid, void *c
         ret = _epoll_ctl(corenet->corenet.epoll_fd, EPOLL_CTL_ADD, sd, &ev);
         if (ret == -1) {
                 ret = errno;
+                DERROR("%d, %d\n", ret, corenet->corenet.epoll_fd);
                 UNIMPLEMENTED(__DUMP__);//remove checklist
         }
 
-        DINFO("corenet_tcp connect %s[%u] %s sd %d, ev %o:%o\n", schedule->name, schedule->id, node->name, sd, node->ev, event);
+        DINFO("corenet_tcp connect %s[%u] %s sd %d, ev %o:%o\n", schedule->name,
+              schedule->id, node->name, sd, node->ev, event);
 
         return 0;
 err_ret:
@@ -409,8 +416,9 @@ static int __corenet_tcp_local(int fd, buffer_t *buf, int op)
         iov_count = CORE_IOV_MAX;
         ret = mbuffer_trans(__corenet__->iov, &iov_count,  buf);
         //YASSERT(ret == (int)buf->len);
-        if(unlikely(ret != (int)buf->len))
-                DWARN("for bug test tcp send %d, buf->len:%u\n", ret, buf->len);
+        if(unlikely(ret != (int)buf->len)) {
+                DBUG("for bug test tcp send %d, buf->len:%u\n", ret, buf->len);
+        }
 
         memset(&msg, 0x0, sizeof(msg));
         msg.msg_iov = __corenet__->iov;
@@ -427,6 +435,7 @@ static int __corenet_tcp_local(int fd, buffer_t *buf, int op)
         if (ret < 0) {
                 ret = -ret;
                 DWARN("sd %u %u %s\n", fd, ret, strerror(ret));
+                YASSERT(ret != EMSGSIZE);
                 GOTO(err_ret, ret);
         }
 
@@ -471,7 +480,8 @@ err_ret:
 
 static int __corenet_tcp_recv(corenet_node_t *node, int *count)
 {
-        int ret, toread, left, cp;
+        int ret, toread;
+        uint64_t left, cp;
 
         //ANALYSIS_BEGIN(0);
         
@@ -492,7 +502,7 @@ static int __corenet_tcp_recv(corenet_node_t *node, int *count)
         while (left) {
                 cp = _min(left, BUFFER_SEG_SIZE * CORE_IOV_MAX);
 
-                if (toread > BUFFER_SEG_SIZE * CORE_IOV_MAX) {
+                if ((uint64_t)toread > (BUFFER_SEG_SIZE * CORE_IOV_MAX)) {
                         DINFO("long msg, total %u, left %u, read %u\n", toread, left, cp);
                 }
 
@@ -584,7 +594,7 @@ static int __corenet_tcp_wrlock(corenet_node_t *node)
         int ret;
 
         YASSERT(schedule_running());
-        ret = sy_rwlock_wrlock(&node->rwlock);
+        ret = plock_wrlock(&node->rwlock);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -595,17 +605,17 @@ static int __corenet_tcp_wrlock(corenet_node_t *node)
         
         return 0;
 err_lock:
-        sy_rwlock_unlock(&node->rwlock);
+        plock_unlock(&node->rwlock);
 err_ret:
         return ret;
 }
 
-static int __corenet_tcp_rdlock(corenet_node_t *node)
+inline static int __corenet_tcp_rdlock(corenet_node_t *node)
 {
         int ret;
 
         YASSERT(schedule_running());
-        ret = sy_rwlock_rdlock(&node->rwlock);
+        ret = plock_rdlock(&node->rwlock);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -616,7 +626,7 @@ static int __corenet_tcp_rdlock(corenet_node_t *node)
         
         return 0;
 err_lock:
-        sy_rwlock_unlock(&node->rwlock);
+        plock_unlock(&node->rwlock);
 err_ret:
         return ret;
 }
@@ -625,7 +635,7 @@ static int __corenet_tcp_rwlock_init(corenet_node_t *node)
 {
         int ret;
 
-        ret = sy_rwlock_init(&node->rwlock, "corenet_tcp");
+        ret = plock_init(&node->rwlock, "corenet_tcp");
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -636,7 +646,7 @@ err_ret:
 
 static void __corenet_tcp_unlock(corenet_node_t *node)
 {
-        sy_rwlock_unlock(&node->rwlock);
+        plock_unlock(&node->rwlock);
 }
 
 static void __corenet_event_cleanup(corenet_node_t *node, int *_ev)
@@ -690,25 +700,19 @@ static void __corenet_event_set(corenet_node_t *node, int _ev)
 }
 
 
-static int __corenet_tcp_thread__(int fd, buffer_t *buf, int op, struct iovec *iov, int iov_count)
+static int __corenet_tcp_thread_send(int fd, buffer_t *buf, struct iovec *iov, int iov_count)
 {
         int ret;
         struct msghdr msg;
 
-        ret = mbuffer_trans(iov, &iov_count,  buf);
-        YASSERT(ret == (int)buf->len);
+        iov_count = CORE_IOV_MAX / 10;
+        ret = mbuffer_trans(iov, &iov_count, buf);
+        //YASSERT(ret == (int)newbuf.len);
         memset(&msg, 0x0, sizeof(msg));
         msg.msg_iov = iov;
         msg.msg_iovlen = iov_count;
 
-        if (op == __OP_SEND__) {
-                ret = _sendmsg(fd, &msg, MSG_DONTWAIT);
-        } else if (op == __OP_RECV__) {
-                ret = _recvmsg(fd, &msg, MSG_DONTWAIT);
-        } else {
-                YASSERT(0);
-        }
-
+        ret = _sendmsg(fd, &msg, MSG_DONTWAIT);
         if (ret < 0) {
                 ret = -ret;
                 DWARN("sd %u %u %s\n", fd, ret, strerror(ret));
@@ -719,6 +723,30 @@ static int __corenet_tcp_thread__(int fd, buffer_t *buf, int op, struct iovec *i
 err_ret:
         return -ret;
 }
+
+static int __corenet_tcp_thread_recv(int fd, buffer_t *buf, struct iovec *iov, int iov_count)
+{
+        int ret;
+        struct msghdr msg;
+
+        ret = mbuffer_trans(iov, &iov_count,  buf);
+        YASSERT(ret == (int)buf->len);
+        memset(&msg, 0x0, sizeof(msg));
+        msg.msg_iov = iov;
+        msg.msg_iovlen = iov_count;
+
+        ret = _recvmsg(fd, &msg, MSG_DONTWAIT);
+        if (ret < 0) {
+                ret = -ret;
+                DWARN("sd %u %u %s\n", fd, ret, strerror(ret));
+                GOTO(err_ret, ret);
+        }
+
+        return ret;
+err_ret:
+        return -ret;
+}
+
 
 static void *__corenet_tcp_thread(void *args)
 {
@@ -752,8 +780,13 @@ static void *__corenet_tcp_thread(void *args)
                 list_for_each_safe(pos, n, &list) {
                         list_del(pos);
                         ctx = (void *)pos;
-                        ctx->retval = __corenet_tcp_thread__(ctx->fd, ctx->buf,
-                                                             ctx->op, iov, iov_count);
+                        if (ctx->op == __OP_SEND__) {
+                                ctx->retval = __corenet_tcp_thread_send(ctx->fd, ctx->buf,
+                                                                        iov, iov_count);
+                        } else {
+                                ctx->retval = __corenet_tcp_thread_recv(ctx->fd, ctx->buf,
+                                                                        iov, iov_count);
+                        }
                         schedule_resume(&ctx->task, 0, NULL);
                 }
         }
@@ -1066,12 +1099,12 @@ err_ret:
 #endif
 #endif
 
-int corenet_tcp_poll(int tmo)
+int corenet_tcp_poll(void *ctx, int tmo)
 {
         int nfds, i;
         event_t events[512], *ev;
         corenet_node_t *node;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         DBUG("polling %d begin\n", tmo);
         YASSERT(tmo >= 0 && tmo < gloconf.rpc_timeout * 2);
@@ -1150,11 +1183,11 @@ static void __corenet_tcp_queue(corenet_tcp_t *__corenet__, const sockid_t *sock
         }
 }
 
-int corenet_tcp_send(const sockid_t *sockid, buffer_t *buf, int flag)
+int corenet_tcp_send(void *ctx, const sockid_t *sockid, buffer_t *buf, int flag)
 {
         int ret;
         corenet_node_t *node;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         YASSERT(sockid->type == SOCKID_CORENET);
         //YASSERT(sockid->addr);
@@ -1162,6 +1195,7 @@ int corenet_tcp_send(const sockid_t *sockid, buffer_t *buf, int flag)
         node = &__corenet__->array[sockid->sd];
         if (node->sockid.seq != sockid->seq || node->sockid.sd == -1) {
                 ret = ECONNRESET;
+                DWARN("seq %d %d, sd %d\n", node->sockid.seq, sockid->seq, node->sockid.sd);
                 GOTO(err_ret, ret);
         }
 
@@ -1220,14 +1254,12 @@ err_ret:
         return ret;
 }
 
-static void __corenet_tcp_commit_task(void *arg)
+static void __corenet_tcp_commit_task(void *ctx)
 {
         struct list_head *pos, *n;
         corenet_fwd_t *corenet_fwd;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
         struct list_head list;
-
-        (void) arg;
 
         INIT_LIST_HEAD(&list);
         list_splice_init(&__corenet__->corenet.forward_list, &list);
@@ -1245,20 +1277,20 @@ static void __corenet_tcp_commit_task(void *arg)
         }
 }
 
-void corenet_tcp_commit()
+void corenet_tcp_commit(void *ctx)
 {
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         if (list_empty(&__corenet__->corenet.forward_list))
                 return;
 
-        schedule_task_new("corenet_tcp_commit", __corenet_tcp_commit_task, NULL, -1);
-        schedule_run(NULL);
+        schedule_task_new("corenet_tcp_commit", __corenet_tcp_commit_task, ctx, -1);
+        schedule_run(variable_get_byctx(VARIABLE_SCHEDULE));
 }
 
 #else
 
-static void __corenet_tcp_exec_send_nowait(void *_node)
+inline static void __corenet_tcp_exec_send_nowait(void *_node)
 {
         int ret;
         corenet_node_t *node = _node;
@@ -1276,11 +1308,11 @@ static void __corenet_tcp_exec_send_nowait(void *_node)
         return;
 }
 
-static int __corenet_tcp_commit(const sockid_t *sockid, buffer_t *buf)
+static int __corenet_tcp_commit(void *ctx, const sockid_t *sockid, buffer_t *buf)
 {
         int ret;
         corenet_node_t *node;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         YASSERT(sockid->type == SOCKID_CORENET);
         //YASSERT(sockid->addr);
@@ -1296,7 +1328,7 @@ static int __corenet_tcp_commit(const sockid_t *sockid, buffer_t *buf)
 
 #if 1
         schedule_task_new("corenet_tcp_send", __corenet_tcp_exec_send_nowait, node, -1);
-        schedule_run(NULL);
+        //schedule_run(NULL);
 #else   
 #if 0
         ret =  __corenet_tcp_send(node);
@@ -1315,11 +1347,11 @@ err_ret:
         return ret;
 }
 
-void corenet_tcp_commit()
+void corenet_tcp_commit(void *ctx)
 {
         struct list_head *pos, *n;
         corenet_fwd_t *corenet_fwd;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         list_for_each_safe(pos, n, &__corenet__->corenet.forward_list) {
                 corenet_fwd = (void *)pos;
@@ -1328,7 +1360,7 @@ void corenet_tcp_commit()
                 DBUG("forward to %s @ %u\n",
                      _inet_ntoa(corenet_fwd->sockid.addr), corenet_fwd->sockid.sd);
 
-                __corenet_tcp_commit(&corenet_fwd->sockid, &corenet_fwd->buf);
+                __corenet_tcp_commit(ctx, &corenet_fwd->sockid, &corenet_fwd->buf);
 
                 mem_cache_free(MEM_CACHE_128, corenet_fwd);
         }
@@ -1409,7 +1441,6 @@ int corenet_tcp_init(int max, corenet_tcp_t **_corenet)
         if (_corenet)
                 *_corenet = corenet;
 
-        
 #if ENABLE_TCP_THREAD
         ret = __corenet_tcp_thread_init();
         if (unlikely(ret))
@@ -1423,4 +1454,35 @@ err_free:
         yfree((void **)&corenet);
 err_ret:
         return ret;
+}
+
+void corenet_tcp_destroy(corenet_tcp_t **_corenet)
+{
+        corenet_tcp_t *corenet = __corenet_get();
+
+        struct list_head *pos, *n;
+        corenet_fwd_t *corenet_fwd;
+        list_for_each_safe(pos, n, &corenet->corenet.forward_list) {
+                list_del(pos);
+                corenet_fwd = (void *)pos;
+                mbuffer_free(&corenet_fwd->buf);
+                mem_cache_free(MEM_CACHE_128, corenet_fwd);
+        }
+
+        corenet_node_t *node;
+        for (int i = 0; i < corenet->corenet.size; i++) {
+                node = &corenet->array[i];
+                
+                if (node->sockid.sd != -1) {
+                        __corenet_close__(&node->sockid);
+                }
+        }
+        
+        close(corenet->corenet.epoll_fd);
+        corenet->corenet.epoll_fd = -1;
+        
+        yfree((void **)&corenet);
+        *_corenet = NULL;
+
+        variable_unset(VARIABLE_CORENET_TCP);
 }

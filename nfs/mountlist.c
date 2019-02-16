@@ -17,7 +17,6 @@
 
 #include "ylib.h"
 #include "yfs_conf.h"
-#include "ynfs_conf.h"
 #include "net_proto.h"
 #include "attr.h"
 #include "error.h"

@@ -43,6 +43,11 @@ static  corenet_maping_t *__corenet_maping_get__()
         return variable_get(VARIABLE_MAPING);
 }
 
+static  corenet_maping_t *__corenet_maping_get_byctx(void *ctx)
+{
+        return variable_get_byctx(ctx, VARIABLE_MAPING);
+}
+
 static int __connected__(corenet_maping_t *entry, uint32_t addr)
 {
         sockid_t *sockid;
@@ -414,16 +419,13 @@ static void __corenet_maping_connect_task(void *arg)
         }
 }
 
-int corenet_maping(const nid_t *nid, sockid_t *sockid)
+int corenet_maping(void *ctx, const nid_t *nid, sockid_t *sockid)
 {
         int ret;
         corenet_maping_t *entry;
 
-        //ANALYSIS_BEGIN(0);
-        YASSERT(__corenet_maping_get__());
-
 retry:
-        entry = &__corenet_maping_get__()[nid->id];
+        entry = &__corenet_maping_get_byctx(ctx)[nid->id];
         YASSERT(entry);
 
         ret = __corenet_maping_get(nid, entry, sockid);
@@ -677,4 +679,11 @@ void corenet_maping_check(const ynet_net_info_t *info)
         if (ng.daemon) {
                 core_iterator(__corenet_maping_check, info);
         }
+}
+
+void corenet_maping_destroy(corenet_maping_t **maping)
+{
+        yfree((void **)maping);
+        variable_unset(VARIABLE_MAPING);
+        *maping = NULL;
 }

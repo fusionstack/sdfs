@@ -13,11 +13,11 @@
 #include "redis_util.h"
 #include "redis_conn.h"
 #include "schedule.h"
+#include "variable.h"
 #include "dbg.h"
 
 #define PIPELINE_PARALLEL 0
 
-#if ENABLE_REDIS_PIPELINE
 typedef struct {
         struct list_head hook;
         fileid_t fileid;
@@ -49,6 +49,7 @@ typedef struct {
 
 static pipeline_t *__pipeline_array__ = NULL;
 static int __count__ = 0;
+extern int __use_pipeline__;
 
 STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd);
 
@@ -108,6 +109,7 @@ int redis_pipeline_init()
         }
 
         __count__ = count;
+        __use_pipeline__ = 1;
         
         return 0;
 err_ret:
@@ -186,6 +188,8 @@ STATIC void *__redis_schedule(void *arg)
         }
         
         sem_post(&pipeline->sem);
+
+        void *ctx = variable_get_ctx();
         
         while (1) {
                 ret = eventfd_poll(interrupt_eventfd, 1, NULL);
@@ -206,7 +210,7 @@ STATIC void *__redis_schedule(void *arg)
                 schedule_run(pipeline->schedule);
 #endif
 
-                analysis_merge();
+                analysis_merge(ctx);
                 schedule_scan(pipeline->schedule);
         }
 
@@ -278,7 +282,7 @@ STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
         struct list_head *pos, *n;
         redis_pipline_ctx_t *ctx;
 
-        ret = sy_rwlock_wrlock(&conn->rwlock);
+        ret = pthread_rwlock_wrlock(&conn->rwlock);
         if ((unlikely(ret)))
                 GOTO(err_ret, ret);
 
@@ -286,19 +290,7 @@ STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
         
         list_for_each_safe(pos, n, list) {
                 ctx = (redis_pipline_ctx_t *)pos;
- 
-#if 0
-                const char *hash = va_arg(ctx->ap, const char *);
-                const char *key = va_arg(ctx->ap, const char *);
-                const void *value = va_arg(ctx->ap, const void *);
-                size_t size = va_arg(ctx->ap, size_t);
-                DWARN("fmt %s, hash %s, key %s, %u\n", ctx->format, hash, key, size);
-                YASSERT(ctx->format);
-                ret = redisAppendCommand(conn->ctx, ctx->format, hash, key, value, size);
-#else
                 ret = redisvAppendCommand(conn->ctx, ctx->format, ctx->ap);
-#endif
-                
                 if ((unlikely(ret)))
                         GOTO(err_lock, ret);
         }
@@ -314,11 +306,11 @@ STATIC int __redis_utils_pipeline(redis_conn_t *conn, struct list_head *list)
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 
         return 0;
 err_lock:
-        sy_rwlock_unlock(&conn->rwlock);
+        pthread_rwlock_unlock(&conn->rwlock);
 err_ret:
         return ret;
 }
@@ -342,12 +334,11 @@ STATIC int __redis_exec(va_list ap)
         fileid_t *fileid = &arg2->fileid;
 
         id2key(ftype(fileid), fileid, key);
-        volid_t volid = {fileid->volid, fileid->snapvers};
 
         DBUG(CHKID_FORMAT"\n", CHKID_ARG(fileid));
 
 retry:
-        ret = redis_conn_get(&volid, fileid->sharding, __redis_workerid__, &handler);
+        ret = redis_conn_get(&arg2->volid, fileid->sharding, __redis_workerid__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
         
@@ -849,5 +840,3 @@ int pipeline_kdel(const volid_t *volid, const fileid_t *fileid)
         
         return __pipeline_kdel(volid, fileid, key);
 }
-
-#endif

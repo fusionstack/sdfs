@@ -22,10 +22,13 @@ int redis_conn_get(const volid_t *volid, int sharding, int worker, redis_handler
 int redis_conn_new(const volid_t *volid, uint8_t *idx);
 int redis_conn_close(const redis_handler_t *handler);
 int redis_conn_vol(const volid_t *volid);
+void redis_conn_vol_close(void *vol);
 
-extern int redis_vol_get(const volid_t *volid, void **conn);
-extern int redis_vol_release(const volid_t *volid);
-extern int redis_vol_insert(const volid_t *volid, void *conn);
-extern int redis_vol_init();
+int redis_vol_get(const volid_t *volid, void **conn);
+int redis_vol_release(const volid_t *volid);
+int redis_vol_insert(const volid_t *volid, void *conn);
+int redis_vol_init();
+int redis_vol_private_init();
+void redis_vol_private_destroy(func_t func);
 
 #endif

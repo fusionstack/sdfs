@@ -17,9 +17,7 @@
 #define DBG_SUBSYS S_YNFS
 
 #include "yfs_conf.h"
-#include "ynfs_conf.h"
 #include "network.h"
-
 #include "attr.h"
 #include "error.h"
 #include "nfs_events.h"

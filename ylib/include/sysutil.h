@@ -164,8 +164,9 @@ int _get_long_rpc_timeout();
 
 time_t gettime();
 struct tm *localtime_safe(time_t *_time, struct tm *tm_time);
-void  gettime_refresh();
+void  gettime_refresh(void *ctx);
 int gettime_private_init();
+void gettime_private_destroy();
 
 extern void get_uuid(char *uuid);
 int is_zero_one_char(const char *_char);

@@ -100,7 +100,7 @@ void rpc_reply_prep(const msgid_t *msgid, buffer_t *buf, buffer_t *data, int fla
 
         rpc_reply_prep(msgid, &buf, _buf, 1);
 
-#if 1
+#if ENABLE_CORE_PIPELINE
         ret = core_pipeline_send(sockid, &buf, 0);
         if (unlikely(ret)) {
                 ret = _errno_net(ret);

@@ -10,6 +10,7 @@
 #include "adt.h"
 #include "net_global.h"
 #include "schedule.h"
+#include "variable.h"
 #include "cJSON.h"
 #include "sdfs_conf.h"
 #include "math.h"
@@ -20,11 +21,17 @@ typedef struct {
 } vol_tab_t;
 
 static vol_tab_t *__vol_tab__;
+static __thread vol_tab_t *__vol_tab_private__;
 
 typedef struct {
         volid_t volid;
         void *vol;
 } entry_t;
+
+static vol_tab_t *__redis_vol_self()
+{
+        return __vol_tab_private__;
+}
 
 #if 1
 static uint32_t __key (const void *_key)
@@ -50,7 +57,7 @@ static int __cmp(const void *_v1, const void *_v2)
 }
 #endif
 
-int redis_vol_init()
+int __redis_vol_init(vol_tab_t **_vol_tab)
 {
         int ret;
         vol_tab_t *vol_tab;
@@ -67,25 +74,84 @@ int redis_vol_init()
         if(ret)
                 GOTO(err_ret, ret);
 
-        __vol_tab__ = vol_tab;
+        *_vol_tab = vol_tab;
         
         return 0;
 err_ret:
         return ret;
 }
 
+int redis_vol_init()
+{
+        int ret;
+
+        ret = __redis_vol_init(&__vol_tab__);
+        if(ret)
+                GOTO(err_ret, ret);
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+int redis_vol_private_init()
+{
+        int ret;
+        vol_tab_t *vol_tab;
+
+        ret = __redis_vol_init(&vol_tab);
+        if(ret)
+                GOTO(err_ret, ret);
+
+        __vol_tab_private__ = vol_tab;
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+void __redis_vol_private_destroy(void *arg1, void *arg2)
+{
+        entry_t *ent = arg1;
+        func_t func = arg2;
+
+        func(ent->vol);
+        yfree((void **)&ent);
+}
+
+void redis_vol_private_destroy(func_t func)
+{
+        int ret;
+        vol_tab_t *vol_tab_private = __redis_vol_self();
+        vol_tab_t  *vol_tab = vol_tab_private;
+
+        ret = pthread_rwlock_wrlock(&vol_tab->lock);
+        if(ret)
+                UNIMPLEMENTED(__WARN__);
+
+        hash_destroy_table(vol_tab->tab, __redis_vol_private_destroy, func);
+
+        pthread_rwlock_unlock(&vol_tab->lock);
+
+        __vol_tab_private__ = NULL;
+}
+
 int redis_vol_get(const volid_t *volid, void **conn)
 {
         int ret;
         entry_t *ent;
+        vol_tab_t *vol_tab_private = __redis_vol_self();
+        vol_tab_t  *vol_tab = vol_tab_private ? vol_tab_private : __vol_tab__;
 
+        DBUG("private table %p\n", vol_tab_private);
+        
         YASSERT(!schedule_running());
         
-        ret = pthread_rwlock_rdlock(&__vol_tab__->lock);
+        ret = pthread_rwlock_rdlock(&vol_tab->lock);
         if(ret)
                 GOTO(err_ret, ret);
         
-        ent = hash_table_find(__vol_tab__->tab, (void *)volid);
+        ent = hash_table_find(vol_tab->tab, (void *)volid);
         if (ent == NULL) {
                 ret = ENOENT;
                 GOTO(err_lock, ret);
@@ -93,11 +159,11 @@ int redis_vol_get(const volid_t *volid, void **conn)
 
         *conn = ent->vol;
 
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        pthread_rwlock_unlock(&vol_tab->lock);
         
         return 0;
 err_lock:
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        pthread_rwlock_unlock(&vol_tab->lock);
 err_ret:
         return ret;
 }
@@ -112,8 +178,10 @@ int redis_vol_insert(const volid_t *volid, void *conn)
 {
         int ret;
         entry_t *ent;
+        vol_tab_t *vol_tab_private = __redis_vol_self();
+        vol_tab_t  *vol_tab = vol_tab_private ? vol_tab_private : __vol_tab__;
 
-        ret = pthread_rwlock_wrlock(&__vol_tab__->lock);
+        ret = pthread_rwlock_wrlock(&vol_tab->lock);
         if(ret)
                 GOTO(err_ret, ret);
 
@@ -124,18 +192,18 @@ int redis_vol_insert(const volid_t *volid, void *conn)
         ent->vol = conn;
         ent->volid = *volid;
         
-        ret = hash_table_insert(__vol_tab__->tab, ent, (void *)volid, 0);
+        ret = hash_table_insert(vol_tab->tab, ent, (void *)volid, 0);
         if (ret) {
                 GOTO(err_free, ret);
         }
 
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        pthread_rwlock_unlock(&vol_tab->lock);
         
         return 0;
 err_free:
         yfree((void **)&ent);
 err_lock:
-        pthread_rwlock_unlock(&__vol_tab__->lock);
+        pthread_rwlock_unlock(&vol_tab->lock);
 err_ret:
         return ret;
 }

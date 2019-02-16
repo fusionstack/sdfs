@@ -10,10 +10,12 @@
 #include "../sock/ynet_sock.h"
 #include "cache.h"
 #include "core.h"
+#include "plock.h"
 #include "ylock.h"
 #include "ynet_net.h"
 
 #define ENABLE_RDMA 0
+#define ENABLE_TCP_THREAD 0
 
 #if ENABLE_RDMA
 
@@ -87,7 +89,7 @@ typedef struct {
         int closed;
 
 #if ENABLE_TCP_THREAD
-        sy_rwlock_t rwlock;
+        plock_t rwlock;
 #endif
         
         char name[MAX_NAME_LEN / 2];
@@ -149,6 +151,7 @@ typedef struct {
 
 
 int corenet_tcp_init(int max, corenet_tcp_t **corenet);
+void corenet_tcp_destroy();
 
 int corenet_tcp_add(corenet_tcp_t *corenet, const sockid_t *sockid, void *ctx,
                     core_exec exec, func_t reset, func_t check, func_t recv, const char *name);
@@ -157,9 +160,9 @@ void corenet_tcp_close(const sockid_t *sockid);
 void corenet_tcp_check();
 int corenet_tcp_connected(const sockid_t *sockid);
 
-int corenet_tcp_poll(int tmo);
-int corenet_tcp_send(const sockid_t *sockid, buffer_t *buf, int flag);
-void corenet_tcp_commit();
+int corenet_tcp_poll(void *ctx, int tmo);
+int corenet_tcp_send(void *ctx, const sockid_t *sockid, buffer_t *buf, int flag);
+void corenet_tcp_commit(void *ctx);
 
 #if ENABLE_RDMA
 // below is RDMA transfer

@@ -53,12 +53,33 @@ static sy_spinlock_t __lock__;
 static int __thread_idx__;
 
 
-void * IO_FUNC variable_get(int type)
+void * IO_FUNC variable_get(variable_type_t type)
 {
-        if (__thread_id__ == -1)
+        int id = __thread_id__;
+        
+        if (id == -1)
                 return NULL;
         else
-                return __array__[__thread_id__].array[type];
+                return __array__[id].array[type];
+}
+
+void * IO_FUNC variable_get_byctx(void *ctx, int type)
+{
+        if (ctx) {
+                variable_t *variable = ctx;
+                return variable->array[type];
+        } else {
+                return variable_get(type);
+        }
+}
+
+void * IO_FUNC variable_get_ctx()
+{
+        if (__thread_id__ == -1) {
+                UNIMPLEMENTED(__DUMP__);
+                return NULL;
+        } else
+                return &__array__[__thread_id__];
 }
 
 int variable_thread()
@@ -67,18 +88,21 @@ int variable_thread()
         return __thread_id__;
 }
 
-void variable_set(int type, void *variable)
+void variable_set(variable_type_t type, void *variable)
 {
         YASSERT(__thread_id__ != -1);
         YASSERT(__thread_id__ < THREAD_MAX);
         YASSERT(variable);
+        int a = type, b = VARIABLE_MAX;
+        (void) a;
+        (void) b;
         YASSERT(type < VARIABLE_MAX);
 
         YASSERT(__array__[__thread_id__].array[type] == NULL);
         __array__[__thread_id__].array[type] = variable;
 }
 
-void variable_unset(int type)
+void variable_unset(variable_type_t type)
 {
         YASSERT(__thread_id__ != -1);
         YASSERT(__thread_id__ < THREAD_MAX);

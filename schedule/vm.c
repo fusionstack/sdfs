@@ -445,7 +445,7 @@ static void __vm_exit(vm_t *vm)
         vm->exiting = 1;
         __vm_forward();
 
-        schedule_destroy();
+        schedule_destroy(NULL);
 
         if (vm->exit) {
                 vm->exit();

@@ -30,6 +30,7 @@ typedef struct {
 extern rpc_table_t *__rpc_table__;
 
 int rpc_table_init(const char *name, rpc_table_t **rpc_table, int scan);
+void rpc_table_destroy(rpc_table_t **_rpc_table);
 
 void rpc_table_scan(rpc_table_t *rpc_table, int interval, int newtask);
 

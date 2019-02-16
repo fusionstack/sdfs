@@ -21,7 +21,6 @@
 #include "sunrpc_reply.h"
 #include "sunrpc_passive.h"
 #include "sunrpc_proto.h"
-#include "ynfs_conf.h"
 #include "nfs_conf.h"
 #include "ynet_rpc.h"
 #include "dbg.h"

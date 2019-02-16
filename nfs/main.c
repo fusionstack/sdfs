@@ -20,7 +20,6 @@
 #include "sdfs_lib.h"
 #include "xdr_nfs.h"
 #include "ynet_rpc.h"
-#include "ynfs_conf.h"
 #include "md_lib.h"
 #include "configure.h"
 #include "nfs_proc.h"

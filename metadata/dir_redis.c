@@ -199,7 +199,8 @@ static int __readdirplus_filter(const volid_t *volid, const fileid_t *fid, void 
         return __readdir(volid, fid, buf, buflen, offset, filter, 1);
 }
 
-static int __dir_list(const volid_t *volid, const dirid_t *dirid, uint32_t count, uint64_t offset, dirlist_t **dirlist)
+static int __dir_list(const volid_t *volid, const dirid_t *dirid,
+                      uint32_t count, uint64_t offset, dirlist_t **dirlist)
 {
         int ret, idx;
         redisReply *reply, *e0, *e1, *k1, *v1;
@@ -211,6 +212,7 @@ static int __dir_list(const volid_t *volid, const dirid_t *dirid, uint32_t count
         
 
         reply = hscan(volid, dirid, NULL, offset, count);
+        YASSERT(reply);
         if (reply->type != REDIS_REPLY_ARRAY) {
                 ret = ENOENT;
                 GOTO(err_ret, ret);
