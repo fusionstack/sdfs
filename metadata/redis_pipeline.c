@@ -610,6 +610,7 @@ STATIC int __pipeline_kset(const volid_t *volid, const fileid_t *fileid,
 
         if (flag & O_EXCL && reply->type == REDIS_REPLY_NIL) {
                 ret = EEXIST;
+                DBUG("exist\n");
                 GOTO(err_free, ret);
         }
 

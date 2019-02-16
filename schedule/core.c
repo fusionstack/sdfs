@@ -229,11 +229,11 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
                 corenet_tcp_commit();
         }
 
-        //schedule_run(NULL);
+        schedule_run(core->schedule);
 #endif
 
 #if ENABLE_COREAIO
-        if (likely(core->flag & CORE_FLAG_AIO)) {
+        if (core->flag & CORE_FLAG_AIO) {
                 aio_submit();
         }
 #endif
@@ -247,7 +247,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
         schedule_scan(core->schedule);
 
 #if ENABLE_CORENET
-        if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
+        if (!gloconf.rdma || sanconf.tcp_discovery) {
                 corenet_tcp_check();
         }
 #endif

@@ -1301,7 +1301,7 @@ static int __corenet_tcp_commit(const sockid_t *sockid, buffer_t *buf)
 
 #if 1
         schedule_task_new("corenet_tcp_send", __corenet_tcp_exec_send_nowait, node, -1);
-        schedule_run(NULL);
+        //schedule_run(NULL);
 #else   
 #if 0
         ret =  __corenet_tcp_send(node);

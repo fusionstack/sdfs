@@ -223,14 +223,13 @@ typedef struct {
 
 #define ENABLE_HEARTBEAT 1
 
-#define ENABLE_NEWMD 1
 #define ENABLE_CORENET 1
 #define ENABLE_CORERPC 1
 #define ENABLE_COREAIO 1
 
 #define ENABLE_QUOTA 0
-#define ENABLE_MD_POSIX 0
-#define ENABLE_KLOCK 0
+#define ENABLE_MD_POSIX 1
+#define ENABLE_KLOCK 1
 
 #define SDFS_SYSTEM_VOL "system"
 
