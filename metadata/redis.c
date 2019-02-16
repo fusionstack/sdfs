@@ -7,6 +7,7 @@
 #include "redis.h"
 #include "redis_conn.h"
 #include "redis_pipeline.h"
+#include "redis_co.h"
 #include "configure.h"
 #include "net_global.h"
 #include "dbg.h"
@@ -48,6 +49,7 @@ static int __worker_count__ = 0;
 int __redis_conn_pool__ = -1;
 __thread int __redis_conn_pool_private__ = -1;
 int __use_pipeline__ = 0;
+extern __thread int __use_co__;
 
 static int __redis_request(const int hash, const char *name, func_va_t exec, ...);
 
@@ -118,7 +120,9 @@ int hget(const volid_t *volid, const fileid_t *fileid, const char *name,
 
         ANALYSIS_BEGIN(0);
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                ret = co_hget(volid, fileid, name, value, size);
+        } else if (__use_pipeline__) {
                 ret = pipeline_hget(volid, fileid, name, value, size);
         } else  {
                 ret =  __redis_request(fileid_hash(fileid), "hget", __hget,
@@ -201,7 +205,9 @@ int hset(const volid_t *volid, const fileid_t *fileid, const char *name,
                 volid = &_volid;
         }
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                ret = co_hset(volid, fileid, name, value, size, flag);
+        } else if (__use_pipeline__) {
                 ret = pipeline_hset(volid, fileid, name, value, size, flag);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "hset", __hset,
@@ -267,7 +273,9 @@ int hlen(const volid_t *volid, const fileid_t *fileid, uint64_t *count)
                 volid = &_volid;
         }
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                ret = co_hlen(volid, fileid, count);
+        } else if (__use_pipeline__) {
                 ret = pipeline_hlen(volid, fileid, count);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "hlen", __hlen,
@@ -396,7 +404,9 @@ int hdel(const volid_t *volid, const fileid_t *fileid, const char *name)
                 volid = &_volid;
         }
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                return co_hdel(volid, fileid, name);
+        } else if (__use_pipeline__) {
                 return pipeline_hdel(volid, fileid, name);
         } else {
                 return __redis_request(fileid_hash(fileid), "hdel", __hdel,
@@ -458,7 +468,9 @@ int kget(const volid_t *volid, const fileid_t *fileid, void *value, size_t *size
                 volid = &_volid;
         }
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                ret = co_kget(volid, fileid, value, size);
+        } else if (__use_pipeline__) {
                 ret = pipeline_kget(volid, fileid, value, size);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "kget", __kget,
@@ -524,7 +536,9 @@ int kset(const volid_t *volid, const fileid_t *fileid, const void *value, size_t
                 volid = &_volid;
         }
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                ret = co_kset(volid, fileid, value, size, flag, -1);
+        } else if (__use_pipeline__) {
                 ret = pipeline_kset(volid, fileid, value, size, flag, -1);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "kset", __kset,
@@ -584,7 +598,9 @@ int kdel(const volid_t *volid, const fileid_t *fileid)
                 volid = &_volid;
         }
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                return co_kdel(volid, fileid);
+        } else if (__use_pipeline__) {
                 return pipeline_kdel(volid, fileid);
         } else {
                 return __redis_request(fileid_hash(fileid), "kdel", __kdel,
@@ -672,7 +688,9 @@ int klock(const volid_t *volid, const fileid_t *fileid, int ttl, int block)
         
         ANALYSIS_BEGIN(0);
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                ret = co_klock(volid, fileid, ttl, block);
+        } else if (__use_pipeline__) {
                 ret = pipeline_klock(volid, fileid, ttl, block);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "klock", __klock,
@@ -744,7 +762,9 @@ int kunlock(const volid_t *volid, const fileid_t *fileid)
 
         ANALYSIS_BEGIN(0);
 
-        if (__use_pipeline__) {
+        if (__use_co__) { 
+                ret = co_kunlock(volid, fileid);
+        } else if (__use_pipeline__) {
                 ret = pipeline_kunlock(volid, fileid);
         } else {
                 ret = __redis_request(fileid_hash(fileid), "kunlock", __kunlock,

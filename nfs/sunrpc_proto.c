@@ -284,7 +284,7 @@ int sunrpc_accept(int srv_sd)
 
         int flag = CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE;
 
-#if ENABLE_CO_REDIS
+#if ENABLE_REDIS_CO
         flag = flag | CORE_FLAG_REDIS;
 #endif
         ret = core_create(&core, 0, flag);

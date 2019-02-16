@@ -414,11 +414,13 @@ static int __core_worker_init(core_t *core)
         }
 #endif
 
+#if ENABLE_REDIS_CO
         if (core->flag & CORE_FLAG_REDIS) {
                 ret = redis_co_init();
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
+#endif
         
         variable_set(VARIABLE_CORE, core);
         //core_register_tls(VARIABLE_CORE, private_mem);

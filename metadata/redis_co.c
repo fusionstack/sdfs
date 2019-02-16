@@ -38,7 +38,8 @@ typedef struct {
         sy_spinlock_t lock;
         int eventfd;
         int running;
-        struct list_head list;
+        struct list_head queue1;
+        struct list_head queue2;
 } co_t;
 
 static __thread co_t *__co__ = NULL;
@@ -69,13 +70,17 @@ static void *__redis_co_worker(void *arg)
                         break;
                 }
 
+                if (list_empty(&co->queue2)) {
+                        continue;
+                }
+
                 INIT_LIST_HEAD(&list);
 
                 ret = sy_spin_lock(&co->lock);
                 if (ret)
                         UNIMPLEMENTED(__DUMP__);
                 
-                list_splice_init(&co->list, &list);
+                list_splice_init(&co->queue2, &list);
 
                 sy_spin_unlock(&co->lock);
         
@@ -101,7 +106,8 @@ int redis_co_init()
 
         memset(co, 0x0, sizeof(*co));
 
-        INIT_LIST_HEAD(&co->list);
+        INIT_LIST_HEAD(&co->queue2);
+        INIT_LIST_HEAD(&co->queue1);
         co->running = 1;
 
         ret = sy_spin_init(&co->lock);
@@ -173,13 +179,7 @@ int redis_co(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
         ctx.task = schedule_task_get();
         va_start(ctx.ap, format);
 
-        ret = sy_spin_lock(&co->lock);
-        if (ret)
-                UNIMPLEMENTED(__WARN__);
-
-        list_add_tail(&ctx.hook, &co->list);
-
-        sy_spin_unlock(&co->lock);
+        list_add_tail(&ctx.hook, &co->queue1);
 
         DBUG("%s\n", format);
 
@@ -347,8 +347,26 @@ int redis_co_run()
         int ret;
         uint64_t e;
         co_t *co = __co__;
+        struct list_head list;
 
-        if (co && !list_empty(&co->list)) {
+        if (co == NULL) {
+                return 0;
+        }
+
+        if (!list_empty(&co->queue1)) {
+                INIT_LIST_HEAD(&list);
+                list_splice_init(&co->queue1, &list);
+
+                ret = sy_spin_lock(&co->lock);
+                if ((unlikely(ret)))
+                        UNIMPLEMENTED(__DUMP__);
+                
+                list_splice_init(&list, &co->queue2);
+                
+                sy_spin_unlock(&co->lock);
+        }
+        
+        if (!list_empty(&co->queue2)) {
                 ret = write(co->eventfd, &e, sizeof(e));
                 if (ret < 0) {
                         ret = errno;
@@ -370,16 +388,14 @@ int redis_co_run()
         if (co == NULL) {
                 return 0;
         }
+
+        if (list_empty(&co->queue1)) {
+                return 0;
+        }
         
         INIT_LIST_HEAD(&list);
 
-        ret = sy_spin_lock(&co->lock);
-        if (ret)
-                UNIMPLEMENTED(__DUMP__);
-        
-        list_splice_init(&co->list, &list);
-
-        sy_spin_unlock(&co->lock);
+        list_splice_init(&co->queue1, &list);
         
         ret = __redis_co_run(&list);
         if (unlikely(ret))
