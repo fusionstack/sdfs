@@ -26,6 +26,8 @@
 #include "configure.h"
 #include "analysis.h"
 
+#define SCHEDULE_REPLY_NEW 1
+
 #define ENABLE_SCHEDULE_SELF_DEBUG 1
 #define ENABLE_SCHEDULE_STACK_ASSERT 1
 
@@ -51,6 +53,16 @@
 #define SCHEDULE_STATUS_NONE 0
 #define SCHEDULE_STATUS_IDLE 1
 #define SCHEDULE_STATUS_RUNNING 2
+
+#if SCHEDULE_REPLY_NEW
+typedef struct {
+        struct list_head hook;
+        buffer_t buf;
+        task_t task;
+        int retval;
+} reply_remote_t;
+
+#endif
 
 typedef enum {
         TASK_STAT_FREE = 10, //0
@@ -215,7 +227,13 @@ typedef struct schedule_t {
 
         // resume相关, local是本调度器上的任务，remote是跨core任务(需要MT同步）
         reply_queue_t reply_local;
+
+#if SCHEDULE_REPLY_NEW
+        sy_spinlock_t reply_remote_lock;
+        struct list_head reply_remote_list;
+#else
         reply_queue_t reply_remote;
+#endif
 
         // backtrace
         uint32_t sequence;

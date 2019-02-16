@@ -1209,10 +1209,19 @@ static int __schedule_create__(schedule_t **_schedule, const char *name, int idx
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        ret = sy_spin_init(&schedule->reply_remote.lock);
+#if SCHEDULE_REPLY_NEW
+        ret = sy_spin_init(&schedule->reply_remote_lock);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
+        INIT_LIST_HEAD(&schedule->reply_remote_list);
+#else
+
+        ret = sy_spin_init(&schedule->reply_remote.lock);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+#endif
+        
         schedule->running_task = -1;
         schedule->task_count = 0;
         schedule->id = idx;
@@ -1274,13 +1283,18 @@ err_ret:
 
 static void __schedule_destroy(schedule_t *schedule)
 {
-        reply_queue_t *reply_remote = &schedule->reply_remote;
         reply_queue_t *reply_local = &schedule->reply_local;
         request_queue_t *request_queue = &schedule->request_queue;
         taskctx_t *taskctx, *tasks = schedule->tasks;
 
+#if SCHEDULE_REPLY_NEW
+#else
+        reply_queue_t *reply_remote = &schedule->reply_remote;
+        
         if (reply_remote->replys)
                 yfree((void **)&reply_remote->replys);
+#endif
+
         if (reply_local->replys)
                 yfree((void **)&reply_local->replys);
         if (request_queue->requests)
@@ -1410,10 +1424,15 @@ static int __schedule_reply_remote_finished(schedule_t *_schedule)
 {
         const schedule_t *schedule = __schedule_self(_schedule);
 
+#if SCHEDULE_REPLY_NEW
+        return list_empty(&schedule->reply_remote_list);
+#else
         if (schedule->reply_remote.count == 0)
                 DBUG("retval finished %u\n", schedule->reply_remote.count);
 
+
         return !schedule->reply_remote.count;
+#endif
 }
 
 static int __schedule_reply_local_finished(schedule_t *_schedule)
@@ -1515,6 +1534,45 @@ static void __schedule_request_queue_run(schedule_t *_schedule)
         }
 }
 
+#if SCHEDULE_REPLY_NEW
+static int __schedule_reply_remote_run(schedule_t *_schedule)
+{
+        int ret;
+        schedule_t *schedule = __schedule_self(_schedule);
+        struct list_head list, *pos, *n;
+        reply_remote_t *reply;
+        
+        if (list_empty(&schedule->reply_remote_list)) {
+                return 0;
+        }
+        
+        // schedule_resume 是生产者，本函数是消费者，需要MT同步
+
+        INIT_LIST_HEAD(&list);
+        
+        ret = sy_spin_lock(&schedule->reply_remote_lock);
+        if (unlikely(ret))
+                UNIMPLEMENTED(__DUMP__);
+
+        list_splice_init(&schedule->reply_remote_list, &list);
+
+        sy_spin_unlock(&schedule->reply_remote_lock);
+
+        list_for_each_safe(pos, n, &list) {
+                list_del(pos);
+                reply = (void *)pos;
+        
+                ret = __schedule_exec(schedule, &reply->task, reply->retval, &reply->buf, 0);
+                if (unlikely(ret)) {
+                        YASSERT(ret == ESTALE);
+                }
+
+                mem_cache_free(MEM_CACHE_4K, reply);
+        }
+
+        return 1;
+}
+#else
 static int __schedule_reply_remote_run(schedule_t *_schedule)
 {
         int ret, count, i;
@@ -1563,6 +1621,7 @@ static int __schedule_reply_remote_run(schedule_t *_schedule)
 
         return 1;
 }
+#endif
 
 static int __schedule_reply_local_run(schedule_t *_schedule)
 {
@@ -1814,6 +1873,7 @@ err_ret:
         return;
 }
 
+#if 0
 /**
  * task_t里包含scheduleid，所以可以在外部线程里调用，也可定位到任务所在scheduler
  *
@@ -1867,18 +1927,63 @@ void schedule_resume1(const task_t *task, int retval, buffer_t *buf)
                 schedule_post(schedule);
         }
 }
+#endif
+
+#if SCHEDULE_REPLY_NEW
+static void __schedule_resume_remote(schedule_t *schedule,
+                              const task_t *task, int retval, buffer_t *buf)
+{
+        int ret;
+        reply_remote_t *reply = mem_cache_calloc(MEM_CACHE_4K, 1);
+
+        YASSERT(task->scheduleid >= 0 && task->scheduleid <= SCHEDULE_MAX);
+        YASSERT(task->taskid >= 0 && task->taskid < TASK_MAX);
+        YASSERT(task->fingerprint);
+
+        (void) schedule;
+#if 0
+        taskctx_t *taskctx;
+        taskctx = &schedule->tasks[task->taskid];
+#if 0
+        YASSERT(taskctx->state != RUNNING);
+        YASSERT(taskctx->state != FREE);
+        YASSERT(task->fingerprint == taskctx->fingerprint);
+#endif
+        DINFO("resume core[%u][%u] name %s\n", task->scheduleid, task->taskid, taskctx->name);
+#endif
+        reply->task = *task;
+        reply->retval = retval;
+        mbuffer_init(&reply->buf, 0);
+        if (buf && buf->len) {
+                mbuffer_merge(&reply->buf, buf);
+        }
+
+        ret = sy_spin_lock(&schedule->reply_remote_lock);
+        if (unlikely(ret))
+                UNIMPLEMENTED(__DUMP__);
+
+        list_add_tail(&reply->hook, &schedule->reply_remote_list);
+        
+        sy_spin_unlock(&schedule->reply_remote_lock);
+        
+        return;
+}
+#endif
 
 void schedule_resume(const task_t *task, int retval, buffer_t *buf)
 {
-        int ret;
         schedule_t *schedule = __schedule_array__[task->scheduleid];
-        reply_queue_t *reply_queue;
 
         if (schedule == schedule_self()) {
                 __schedule_resume(schedule, &schedule->reply_local, task, retval, buf);
 
                 schedule_post(schedule);
         } else {
+#if SCHEDULE_REPLY_NEW
+                __schedule_resume_remote(schedule, task, retval, buf);
+#else
+                int ret;
+                reply_queue_t *reply_queue;
                 // 由外部线程唤醒，需要MT同步机制
                 // 如AIO，异步sqlite等使用场景
                 reply_queue = &schedule->reply_remote;
@@ -1890,6 +1995,7 @@ void schedule_resume(const task_t *task, int retval, buffer_t *buf)
                 __schedule_resume(schedule, reply_queue, task, retval, buf);
 
                 sy_spin_unlock(&reply_queue->lock);
+#endif
 
                 schedule_post(schedule);
         }
@@ -2130,8 +2236,8 @@ void schedule_destroy(schedule_t *_schedule)
         while (1) {
                 DBUG("running\n");
                 if (retry > 100) {
-                        DINFO("schedule[%u] exist, retry %u reply queue %u %u\n",
-                              schedule->id, retry, schedule->reply_remote.count,
+                        DINFO("schedule[%u] exist, retry %u %u\n",
+                              schedule->id, retry,
                               schedule->reply_local.count);
                 }
 

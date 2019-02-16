@@ -1244,6 +1244,7 @@ void core_worker_exit(core_t *core)
         DINFO("core[%u] destroy begin\n", core->hash);
 
         corenet_tcp_destroy(&core->tcp_net);
+        gettime_private_destroy();
 
 #if ENABLE_COREAIO
         if (core->flag & CORE_FLAG_AIO) {

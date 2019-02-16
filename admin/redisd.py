@@ -271,6 +271,9 @@ class Redisd():
         return version + 1
         
     def redis_stop(self):
+        if (self.redis_pid == -1):
+            return
+        
         try:
             os.kill(self.redis_pid, SIGTERM)
         except:
