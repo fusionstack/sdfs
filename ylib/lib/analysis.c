@@ -396,7 +396,7 @@ int analysis_private_create(const char *_name)
         int ret;
         analysis_t *ana;
 
-#if 1
+#if 0
         DWARN("analysis private disabled\n");
         return 0;
 #endif
@@ -531,6 +531,23 @@ static void __analysis_destroy(analysis_t *ana)
         yfree((void **)&ana);
 }
 
+static int __analysis_deregister(analysis_t *ana)
+{
+        int ret;
+
+        ret = sy_spin_lock(&analysis_list.lock);
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        list_del(&ana->hook);
+
+        sy_spin_unlock(&analysis_list.lock);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
 void analysis_private_destroy()
 {
         if (__private_analysis__ == NULL) {
@@ -538,6 +555,7 @@ void analysis_private_destroy()
                 return;
         }
 
+        __analysis_deregister(__private_analysis__);
         __analysis_destroy(__private_analysis__);
         __private_analysis__ = NULL;
 }

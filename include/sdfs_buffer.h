@@ -47,7 +47,7 @@ typedef struct {
 #pragma pack()
 
 typedef struct {
-        uint32_t len;
+        uint64_t len;
         struct list_head list;
 } buffer_t;
 

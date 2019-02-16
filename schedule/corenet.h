@@ -10,10 +10,12 @@
 #include "../sock/ynet_sock.h"
 #include "cache.h"
 #include "core.h"
+#include "plock.h"
 #include "ylock.h"
 #include "ynet_net.h"
 
 #define ENABLE_RDMA 0
+#define ENABLE_TCP_THREAD 0
 
 #if ENABLE_RDMA
 
@@ -87,7 +89,7 @@ typedef struct {
         int closed;
 
 #if ENABLE_TCP_THREAD
-        sy_rwlock_t rwlock;
+        plock_t rwlock;
 #endif
         
         char name[MAX_NAME_LEN / 2];

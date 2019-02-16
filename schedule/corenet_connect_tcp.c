@@ -162,7 +162,6 @@ STATIC void *__corenet_accept__(void *arg)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        
         core = core_get(msg->hash);
 #if ENABLE_RDMA
         sockid->rdma_handler = 0;
