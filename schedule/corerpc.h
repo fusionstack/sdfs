@@ -48,8 +48,10 @@ int corerpc_postwait(const char *name, const nid_t *nid, const void *request,
                      int reqlen, const buffer_t *wbuf, buffer_t *rbuf, int msg_type, int msg_size, int timeout);
 
 // sockid-based
-int corerpc_send_and_wait(const char *name, const sockid_t *sockid, const nid_t *nid, const void *request,
-                          int reqlen, const buffer_t *wbuf, buffer_t *rbuf, int msg_type, int msg_size, int timeout);
+int corerpc_send_and_wait(void *ctx, const char *name, const sockid_t *sockid,
+                          const nid_t *nid, const void *request,
+                          int reqlen, const buffer_t *wbuf, buffer_t *rbuf,
+                          int msg_type, int msg_size, int timeout);
 
 void corerpc_reply(const sockid_t *sockid, const msgid_t *msgid, const void *_buf, int len);
 void corerpc_reply1(const sockid_t *sockid, const msgid_t *msgid, buffer_t *_buf);

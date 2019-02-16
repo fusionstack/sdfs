@@ -15,6 +15,7 @@
 #include "bh.h"
 #include "ylib.h"
 #include "ylock.h"
+#include "variable.h"
 #include "dbg.h"
 
 typedef struct {
@@ -32,7 +33,6 @@ struct {
 } analysis_list;
 
 analysis_t *default_analysis = NULL;
-static __thread analysis_t *__private_analysis__ = NULL;
 
 static int __analysis_count(analysis_t *ana, const char *name, uint64_t _time)
 {
@@ -401,13 +401,11 @@ int analysis_private_create(const char *_name)
         return 0;
 #endif
         
-        YASSERT(__private_analysis__ == NULL);
-        
         ret = analysis_create(&ana, _name, 1);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        __private_analysis__ = ana;
+        variable_set(VARIABLE_ANALYSIS, ana);
 
         return 0;
 err_ret:
@@ -416,7 +414,7 @@ err_ret:
 
 int analysis_private_queue(const char *_name, const char *type, uint64_t _time)
 {
-        analysis_t *ana = __private_analysis__;
+        analysis_t *ana = variable_get(VARIABLE_ANALYSIS);
 
         if (ana) {
                 return analysis_queue(ana, _name, type, _time);
@@ -515,10 +513,12 @@ err_ret:
         return ret;
 }
 
-void analysis_merge()
+void analysis_merge(void *ctx)
 {
-        if (likely(__private_analysis__)) {
-                __analysis__(__private_analysis__, NULL);
+        analysis_t *ana = variable_get_byctx(ctx, VARIABLE_ANALYSIS);
+
+        if (likely(ana)) {
+                __analysis__(ana, NULL);
         }
 }
 
@@ -550,12 +550,14 @@ err_ret:
 
 void analysis_private_destroy()
 {
-        if (__private_analysis__ == NULL) {
+        analysis_t *ana = variable_get(VARIABLE_ANALYSIS);
+        
+        if (ana == NULL) {
                 DWARN("analysis private disabled\n");
                 return;
         }
 
-        __analysis_deregister(__private_analysis__);
-        __analysis_destroy(__private_analysis__);
-        __private_analysis__ = NULL;
+        __analysis_deregister(ana);
+        __analysis_destroy(ana);
+        variable_unset(VARIABLE_ANALYSIS);
 }

@@ -33,6 +33,11 @@ rpc_table_t *corerpc_self()
         return variable_get(VARIABLE_CORERPC);
 }
 
+rpc_table_t *corerpc_self_byctx(void *ctx)
+{
+        return variable_get_byctx(ctx, VARIABLE_CORERPC);
+}
+
 static void __request_nosys(void *arg)
 {
         sockid_t sockid;
@@ -85,11 +90,11 @@ static void __corerpc_request_reset(const msgid_t *msgid)
         rpc_table_free(__rpc_table_private__, msgid);
 }
 
-STATIC int __corerpc_getsolt(msgid_t *msgid, rpc_ctx_t *ctx, const char *name,
+STATIC int __corerpc_getsolt(void *_ctx, msgid_t *msgid, rpc_ctx_t *ctx, const char *name,
                              const sockid_t *sockid, const nid_t *nid, int timeout)
 {
         int ret;
-        rpc_table_t *__rpc_table_private__ = corerpc_self();
+        rpc_table_t *__rpc_table_private__ = corerpc_self_byctx(_ctx);
 
         ret = rpc_table_getsolt(__rpc_table_private__, msgid, name);
         if (unlikely(ret))
@@ -176,8 +181,8 @@ static void __corerpc_msgid_prep(msgid_t *msgid, const buffer_t *wbuf, buffer_t 
 }
 #endif
 
-STATIC int __corerpc_send(msgid_t *msgid, const sockid_t *sockid, const void *request,
-                              int reqlen, const buffer_t *wbuf, buffer_t *rbuf, int msg_type, int msg_size)
+STATIC int __corerpc_send(void *ctx, msgid_t *msgid, const sockid_t *sockid, const void *request,
+                          int reqlen, const buffer_t *wbuf, buffer_t *rbuf, int msg_type, int msg_size)
 {
         int ret;
         buffer_t buf;
@@ -205,7 +210,7 @@ STATIC int __corerpc_send(msgid_t *msgid, const sockid_t *sockid, const void *re
                                 _inet_ntoa(sockid->addr), msgid->idx,
                                 msgid->figerprint, buf.len);
 
-                ret = corenet_tcp_send(sockid, &buf, 0);
+                ret = corenet_tcp_send(ctx, sockid, &buf, 0);
                 if (unlikely(ret)) {
                         GOTO(err_free, ret);
                 }
@@ -222,7 +227,7 @@ STATIC int __corerpc_send(msgid_t *msgid, const sockid_t *sockid, const void *re
              _inet_ntoa(sockid->addr), msgid->idx,
              msgid->figerprint, buf.len);
 
-        ret = corenet_tcp_send(sockid, &buf, 0);
+        ret = corenet_tcp_send(ctx, sockid, &buf, 0);
         if (unlikely(ret)) {
                 GOTO(err_free, ret);
         }
@@ -247,7 +252,7 @@ static inline int __get_buffer_seg_count(const buffer_t *buf)
         return count;
 }
 
-int corerpc_send_and_wait(const char *name, const sockid_t *sockid,
+int corerpc_send_and_wait(void *_ctx, const char *name, const sockid_t *sockid,
                           const nid_t *nid, const void *request,
                           int reqlen, const buffer_t *wbuf, buffer_t *rbuf,
                           int msg_type, int msg_size, int timeout)
@@ -259,7 +264,7 @@ int corerpc_send_and_wait(const char *name, const sockid_t *sockid,
         buffer_t cbuf;
         int wbuf_seg_count = 0;
 
-        ret = __corerpc_getsolt(&msgid, &ctx, name, sockid, nid, timeout);
+        ret = __corerpc_getsolt(_ctx, &msgid, &ctx, name, sockid, nid, timeout);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -272,7 +277,7 @@ int corerpc_send_and_wait(const char *name, const sockid_t *sockid,
 		}
 	}
 
-        ret = __corerpc_send(&msgid, sockid, request, reqlen, tmp, rbuf, msg_type, msg_size);
+        ret = __corerpc_send(_ctx, &msgid, sockid, request, reqlen, tmp, rbuf, msg_type, msg_size);
         if (unlikely(ret)) {
 		ret = _errno_net(ret);
 		YASSERT(ret == ENONET || ret == ESHUTDOWN);
@@ -322,13 +327,14 @@ int IO_FUNC corerpc_postwait(const char *name, const nid_t *nid, const void *req
 {
         int ret;
         sockid_t sockid;
+        void *ctx = variable_get_ctx();
         //rpc_table_t *__rpc_table_private__ = corerpc_self();
 
-        ret = corenet_maping(nid, &sockid);
+        ret = corenet_maping(ctx, nid, &sockid);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        ret = corerpc_send_and_wait(name, &sockid, nid, request, reqlen,
+        ret = corerpc_send_and_wait(ctx, name, &sockid, nid, request, reqlen,
                                     wbuf, rbuf, msg_type, msg_size, timeout);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
@@ -664,14 +670,14 @@ void IO_FUNC corerpc_reply1(const sockid_t *sockid, const msgid_t *msgid, buffer
         } else {
                 rpc_reply_prep(msgid, &reply_buf, _buf, 1);
 
-                ret = corenet_tcp_send(sockid, &reply_buf, 0);
+                ret = corenet_tcp_send(NULL, sockid, &reply_buf, 0);
                 if (unlikely(ret))
                         mbuffer_free(&reply_buf);
         }
 #else
         rpc_reply_prep(msgid, &reply_buf, _buf, 1);
 
-        ret = corenet_tcp_send(sockid, &reply_buf, 0);
+        ret = corenet_tcp_send(NULL, sockid, &reply_buf, 0);
         if (unlikely(ret))
                 mbuffer_free(&reply_buf);
 #endif
@@ -698,13 +704,13 @@ void corerpc_reply_error(const sockid_t *sockid, const msgid_t *msgid, int _erro
         if (sockid->rdma_handler > 0) {
                 ret = corenet_rdma_send(sockid, &buf, 0);
         } else {
-                ret = corenet_tcp_send(sockid, &buf, 0);
+                ret = corenet_tcp_send(NULL, sockid, &buf, 0);
         }
         if (unlikely(ret))
                 mbuffer_free(&buf);
 #else
         rpc_reply_error_prep(msgid, &buf, _error);
-        ret = corenet_tcp_send(sockid, &buf, 0);
+        ret = corenet_tcp_send(NULL, sockid, &buf, 0);
         if (unlikely(ret))
                 mbuffer_free(&buf);
         

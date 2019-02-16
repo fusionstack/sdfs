@@ -12,7 +12,7 @@ typedef int (*timer_exec_t)(void *);
 int timer_init(int private, int polling);
 void timer_destroy();
 int timer_insert(const char *name, void *ctx, func_t func, suseconds_t usec);
-void timer_expire();
+void timer_expire(void *ctx);
 
 int timer1_create(worker_handler_t *handler, const char *name, timer_exec_t exec, void *_ctx);
 

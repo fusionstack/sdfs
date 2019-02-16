@@ -160,9 +160,9 @@ void corenet_tcp_close(const sockid_t *sockid);
 void corenet_tcp_check();
 int corenet_tcp_connected(const sockid_t *sockid);
 
-int corenet_tcp_poll(int tmo);
-int corenet_tcp_send(const sockid_t *sockid, buffer_t *buf, int flag);
-void corenet_tcp_commit();
+int corenet_tcp_poll(void *ctx, int tmo);
+int corenet_tcp_send(void *ctx, const sockid_t *sockid, buffer_t *buf, int flag);
+void corenet_tcp_commit(void *ctx);
 
 #if ENABLE_RDMA
 // below is RDMA transfer

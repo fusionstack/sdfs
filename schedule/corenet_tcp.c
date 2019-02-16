@@ -53,6 +53,11 @@ static void *__corenet_get()
         return variable_get(VARIABLE_CORENET_TCP);
 }
 
+static void *__corenet_get_byctx(void *ctx)
+{
+        return variable_get_byctx(ctx, VARIABLE_CORENET_TCP);
+}
+
 static void __corenet_set_out(corenet_node_t *node)
 {
         int ret, event;
@@ -1094,12 +1099,12 @@ err_ret:
 #endif
 #endif
 
-int corenet_tcp_poll(int tmo)
+int corenet_tcp_poll(void *ctx, int tmo)
 {
         int nfds, i;
         event_t events[512], *ev;
         corenet_node_t *node;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         DBUG("polling %d begin\n", tmo);
         YASSERT(tmo >= 0 && tmo < gloconf.rpc_timeout * 2);
@@ -1178,11 +1183,11 @@ static void __corenet_tcp_queue(corenet_tcp_t *__corenet__, const sockid_t *sock
         }
 }
 
-int corenet_tcp_send(const sockid_t *sockid, buffer_t *buf, int flag)
+int corenet_tcp_send(void *ctx, const sockid_t *sockid, buffer_t *buf, int flag)
 {
         int ret;
         corenet_node_t *node;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         YASSERT(sockid->type == SOCKID_CORENET);
         //YASSERT(sockid->addr);
@@ -1249,14 +1254,12 @@ err_ret:
         return ret;
 }
 
-static void __corenet_tcp_commit_task(void *arg)
+static void __corenet_tcp_commit_task(void *ctx)
 {
         struct list_head *pos, *n;
         corenet_fwd_t *corenet_fwd;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
         struct list_head list;
-
-        (void) arg;
 
         INIT_LIST_HEAD(&list);
         list_splice_init(&__corenet__->corenet.forward_list, &list);
@@ -1274,15 +1277,15 @@ static void __corenet_tcp_commit_task(void *arg)
         }
 }
 
-void corenet_tcp_commit()
+void corenet_tcp_commit(void *ctx)
 {
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         if (list_empty(&__corenet__->corenet.forward_list))
                 return;
 
-        schedule_task_new("corenet_tcp_commit", __corenet_tcp_commit_task, NULL, -1);
-        schedule_run(NULL);
+        schedule_task_new("corenet_tcp_commit", __corenet_tcp_commit_task, ctx, -1);
+        schedule_run(variable_get_byctx(VARIABLE_SCHEDULE));
 }
 
 #else
@@ -1305,11 +1308,11 @@ inline static void __corenet_tcp_exec_send_nowait(void *_node)
         return;
 }
 
-static int __corenet_tcp_commit(const sockid_t *sockid, buffer_t *buf)
+static int __corenet_tcp_commit(void *ctx, const sockid_t *sockid, buffer_t *buf)
 {
         int ret;
         corenet_node_t *node;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         YASSERT(sockid->type == SOCKID_CORENET);
         //YASSERT(sockid->addr);
@@ -1344,11 +1347,11 @@ err_ret:
         return ret;
 }
 
-void corenet_tcp_commit()
+void corenet_tcp_commit(void *ctx)
 {
         struct list_head *pos, *n;
         corenet_fwd_t *corenet_fwd;
-        corenet_tcp_t *__corenet__ = __corenet_get();
+        corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
         list_for_each_safe(pos, n, &__corenet__->corenet.forward_list) {
                 corenet_fwd = (void *)pos;
@@ -1357,7 +1360,7 @@ void corenet_tcp_commit()
                 DBUG("forward to %s @ %u\n",
                      _inet_ntoa(corenet_fwd->sockid.addr), corenet_fwd->sockid.sd);
 
-                __corenet_tcp_commit(&corenet_fwd->sockid, &corenet_fwd->buf);
+                __corenet_tcp_commit(ctx, &corenet_fwd->sockid, &corenet_fwd->buf);
 
                 mem_cache_free(MEM_CACHE_128, corenet_fwd);
         }

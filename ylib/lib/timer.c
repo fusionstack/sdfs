@@ -350,10 +350,10 @@ err_ret:
         return ret;
 }
 
-void timer_expire()
+void timer_expire(void *ctx)
 {
         ytimer_t *timer;
-        timer = variable_get(VARIABLE_TIMER);
+        timer = variable_get_byctx(ctx, VARIABLE_TIMER);
         YASSERT(timer);
 
         if (unlikely(!timer->polling))

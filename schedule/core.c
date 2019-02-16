@@ -209,13 +209,11 @@ static void __core_check(core_t *core)
         __core_check_callback(core, now);
 }
 
-static inline void IO_FUNC __core_worker_run(core_t *core)
+static inline void IO_FUNC __core_worker_run(core_t *core, void *ctx)
 {
 #if ENABLE_CORENET
-        if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
-                int tmo = core->main_core ? 0 : 1;
-                corenet_tcp_poll(tmo);
-        }
+        int tmo = core->main_core ? 0 : 1;
+        corenet_tcp_poll(ctx, tmo);
 #endif
 
         schedule_run(core->schedule);
@@ -225,10 +223,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 #endif
         
 #if ENABLE_CORENET
-        if (unlikely(!gloconf.rdma || sanconf.tcp_discovery)) {
-                corenet_tcp_commit();
-        }
-
+        corenet_tcp_commit(ctx);
         schedule_run(core->schedule);
 #endif
 
@@ -242,7 +237,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
         corerpc_scan();
 #endif
 
-        redis_co_run();
+        redis_co_run(ctx);
         
         schedule_scan(core->schedule);
 
@@ -254,9 +249,9 @@ static inline void IO_FUNC __core_worker_run(core_t *core)
 
         __core_check(core);
 
-        gettime_refresh();
-        timer_expire();
-        analysis_merge();
+        gettime_refresh(ctx);
+        timer_expire(ctx);
+        analysis_merge(ctx);
 }
 
 static int __core_worker_init(core_t *core)
@@ -452,8 +447,11 @@ static void * IO_FUNC __core_worker(void *_args)
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
+        void *ctx = variable_get_ctx();
+        YASSERT(ctx);
+        
         while (1) {
-                __core_worker_run(core);
+                __core_worker_run(core, ctx);
         }
 
         DFATAL("name %s idx %d hash %d\n", core->name, core->idx, core->hash);

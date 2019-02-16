@@ -13,6 +13,7 @@
 #include "redis_util.h"
 #include "redis_conn.h"
 #include "schedule.h"
+#include "variable.h"
 #include "dbg.h"
 
 #define PIPELINE_PARALLEL 0
@@ -187,6 +188,8 @@ STATIC void *__redis_schedule(void *arg)
         }
         
         sem_post(&pipeline->sem);
+
+        void *ctx = variable_get_ctx();
         
         while (1) {
                 ret = eventfd_poll(interrupt_eventfd, 1, NULL);
@@ -207,7 +210,7 @@ STATIC void *__redis_schedule(void *arg)
                 schedule_run(pipeline->schedule);
 #endif
 
-                analysis_merge();
+                analysis_merge(ctx);
                 schedule_scan(pipeline->schedule);
         }
 

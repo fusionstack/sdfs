@@ -21,9 +21,9 @@
 #include "configure.h"
 #include "schedule.h"
 #include "adt.h"
-//#include "sdfs.h"
 #include "ylib.h"
 #include "analysis.h"
+#include "variable.h"
 #include "dbg.h"
 
 #define TIME_ZONE 8
@@ -34,19 +34,17 @@ typedef struct {
         uint32_t cycle;
 } gettime_t;
 
-static __thread gettime_t *__gettime__ = NULL;
-
 #define GETTIME_CYCLE 10
 #define GETTIME_CYCLE_PRINT 100000000
 
-void  gettime_refresh()
+void  gettime_refresh(void *ctx)
 {
-        gettime_t *gettime = __gettime__;
+        gettime_t *gettime = variable_get_byctx(ctx, VARIABLE_GETTIME);
 
         YASSERT(gettime);
         gettime->cycle++;
         if (unlikely((gettime->cycle % GETTIME_CYCLE == 0) || gloconf.performance_analysis))
-                gettimeofday(&__gettime__->tv, NULL);
+                gettimeofday(&gettime->tv, NULL);
 
         if (gettime->cycle % GETTIME_CYCLE_PRINT == 0) {
                 DINFO("gettime cycle\n");
@@ -55,7 +53,7 @@ void  gettime_refresh()
 
 time_t gettime()
 {
-        gettime_t *gettime = __gettime__;
+        gettime_t *gettime = variable_get(VARIABLE_GETTIME);
         
         if (likely(gettime && (gloconf.polling_timeout == 0 || gloconf.rdma))) {
                 return gettime->tv.tv_sec;
@@ -66,7 +64,7 @@ time_t gettime()
 
 int _gettimeofday(struct timeval *tv, struct timezone *tz)
 {
-        gettime_t *gettime = __gettime__;
+        gettime_t *gettime = variable_get(VARIABLE_GETTIME);
 
         (void) tz;
         
@@ -82,19 +80,29 @@ int _gettimeofday(struct timeval *tv, struct timezone *tz)
 int gettime_private_init()
 {
         int ret;
+        gettime_t *gettime;
         
-        YASSERT(__gettime__ == NULL);
-
-        ret = ymalloc((void **)&__gettime__, sizeof(*__gettime__));
+        ret = ymalloc((void **)&gettime, sizeof(*gettime));
         if (ret)
                 GOTO(err_ret, ret);
 
-        memset(__gettime__, 0x0, sizeof(*__gettime__));
-        gettimeofday(&__gettime__->tv, NULL);
+        memset(gettime, 0x0, sizeof(*gettime));
+        gettimeofday(&gettime->tv, NULL);
+
+        variable_set(VARIABLE_GETTIME, gettime);
         
         return 0;
 err_ret:
         return ret;
+}
+
+void gettime_private_destroy()
+{
+        gettime_t *gettime = variable_get(VARIABLE_GETTIME);
+
+        yfree((void **)&gettime);
+
+        variable_unset(VARIABLE_GETTIME);
 }
 
 struct tm *localtime_safe(time_t *_time, struct tm *tm_time)

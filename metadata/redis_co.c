@@ -14,6 +14,7 @@
 #include "redis_util.h"
 #include "redis_conn.h"
 #include "schedule.h"
+#include "variable.h"
 #include "dbg.h"
 
 typedef struct {
@@ -42,7 +43,7 @@ typedef struct {
         struct list_head queue2;
 } co_t;
 
-static __thread co_t *__co__ = NULL;
+//static __thread co_t *__co__ = NULL;
  __thread int __use_co__;
 
 #define REDIS_CO_THREAD 1
@@ -132,7 +133,7 @@ int redis_co_init()
         if (ret)
                 GOTO(err_ret, ret);
 
-        __co__ = co;
+        variable_set(VARIABLE_REDIS, co);
         __use_co__ = 1;
         
         return 0;
@@ -151,9 +152,11 @@ void redis_co_destroy()
         redis_vol_private_destroy(redis_conn_vol_close);
 #endif
         
-        co_t *co = __co__;
+        co_t *co = variable_get(VARIABLE_REDIS);
         co->running = 0;
 
+        variable_unset(VARIABLE_REDIS);
+        
         ret = write(co->eventfd, &e, sizeof(e));
         if (ret < 0) {
                 ret = errno;
@@ -166,7 +169,7 @@ int redis_co(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
 {
         int ret;
         redis_co_ctx_t ctx;
-        co_t *co = __co__;
+        co_t *co = variable_get(VARIABLE_REDIS);
 
         ANALYSIS_BEGIN(0);
         
@@ -342,11 +345,11 @@ err_ret:
 }
 
 #if REDIS_CO_THREAD
-int redis_co_run()
+int redis_co_run(void *ctx)
 {
         int ret;
         uint64_t e;
-        co_t *co = __co__;
+        co_t *co = variable_get_byctx(ctx, VARIABLE_REDIS);
         struct list_head list;
 
         if (co == NULL) {
@@ -379,11 +382,11 @@ int redis_co_run()
 
 #else
 
-int redis_co_run()
+int redis_co_run(void *ctx)
 {
         int ret;
         struct list_head list;
-        co_t *co = __co__;    
+        co_t *co = variable_get_byctx(ctx, VARIABLE_REDIS);
 
         if (co == NULL) {
                 return 0;

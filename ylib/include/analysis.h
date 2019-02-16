@@ -40,6 +40,6 @@ int analysis_init(void);
 int analysis_dump(const char *tab, const char *name,  char *buf);
 int analysis_private_queue(const char *_name, const char *type, uint64_t _time);
 void analysis_private_destroy();
-void analysis_merge();
+void analysis_merge(void *ctx);
 
 #endif

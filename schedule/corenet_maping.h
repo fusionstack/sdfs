@@ -16,7 +16,7 @@ typedef struct {
 } corenet_maping_t;
 
 int corenet_maping_init(corenet_maping_t **_maping);
-int corenet_maping(const nid_t *nid, sockid_t *sockid);
+int corenet_maping(void *ctx, const nid_t *nid, sockid_t *sockid);
 int corenet_maping_loading(const nid_t *nid);
 int corenet_maping_accept(core_t *core, const nid_t *nid, const sockid_t *sockid, int count);
 void corenet_maping_close(const nid_t *nid, const sockid_t *sockid);
