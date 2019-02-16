@@ -87,9 +87,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/array_table.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/buffer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ec_isa_l.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bitmap.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/cmp.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/atomic_id.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crc32.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crcrs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/daemon.c
@@ -107,7 +105,6 @@ add_library(sdfs SHARED
     #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls.c
     #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/nls/nls_cp936.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/path.c
-    #${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/pipe_pool.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/skiplist.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/stat.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/str.c
@@ -118,7 +115,6 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/tpool.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ytime.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/bmap.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/dynarray.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/privilege.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/md5.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/squeue.c

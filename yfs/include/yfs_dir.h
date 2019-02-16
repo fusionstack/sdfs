@@ -3,10 +3,5 @@
 
 #include "dir.h"
 
-typedef struct {
-        fileid_t dirid;
-        dirkey_t dir_cached; 
-        uint64_t idx_cached;
-} dir_t;
 
 #endif

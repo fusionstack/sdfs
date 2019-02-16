@@ -3,7 +3,6 @@
 
 #define DBG_SUBSYS S_YFSMDC
 
-#include "align.h"
 #include "net_global.h"
 #include "job_dock.h"
 #include "ynet_rpc.h"

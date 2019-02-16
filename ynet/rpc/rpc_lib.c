@@ -4,7 +4,6 @@
 
 #include "ynet_net.h"
 #include "configure.h"
-#include "shm.h"
 #include "net_global.h"
 #include "job_dock.h"
 #include "rpc_proto.h"

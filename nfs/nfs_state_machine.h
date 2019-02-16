@@ -895,11 +895,6 @@ enum {
         ACL_NULL = 0,
 };
 
-typedef struct {
-        uint32_t len;
-        char path[0];
-} dir_t;
-
 typedef char *dirpath;
 
 typedef char *name;
