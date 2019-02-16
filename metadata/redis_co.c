@@ -17,6 +17,8 @@
 #include "variable.h"
 #include "dbg.h"
 
+#define REDIS_CO_THREAD 0
+
 typedef struct {
         struct list_head hook;
         fileid_t fileid;
@@ -36,20 +38,20 @@ typedef struct {
 } arg2_t;
 
 typedef struct {
+#if REDIS_CO_THREAD
         sy_spinlock_t lock;
         int eventfd;
+        struct list_head queue2;
+#endif
         int running;
         struct list_head queue1;
-        struct list_head queue2;
 } co_t;
 
-//static __thread co_t *__co__ = NULL;
  __thread int __use_co__;
-
-#define REDIS_CO_THREAD 1
 
 static int __redis_co_run(struct list_head *list);
 
+#if REDIS_CO_THREAD
 static void *__redis_co_worker(void *arg)
 {
         int ret;
@@ -92,7 +94,7 @@ static void *__redis_co_worker(void *arg)
         
         pthread_exit(NULL);
 }
-        
+#endif        
 
 int redis_co_init()
 {
@@ -107,19 +109,15 @@ int redis_co_init()
 
         memset(co, 0x0, sizeof(*co));
 
-        INIT_LIST_HEAD(&co->queue2);
         INIT_LIST_HEAD(&co->queue1);
         co->running = 1;
+
+#if REDIS_CO_THREAD
+        INIT_LIST_HEAD(&co->queue2);
 
         ret = sy_spin_init(&co->lock);
         if (ret)
                 UNIMPLEMENTED(__WARN__);
-
-#if !REDIS_CO_THREAD
-        ret = redis_vol_private_init();
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
 
         int fd = eventfd(0, EFD_CLOEXEC);
         if (fd < 0) {
@@ -132,6 +130,11 @@ int redis_co_init()
         ret = sy_thread_create2(__redis_co_worker, co, "__core_worker");
         if (ret)
                 GOTO(err_ret, ret);
+#else
+        ret = redis_vol_private_init();
+        if (ret)
+                GOTO(err_ret, ret);
+#endif
 
         variable_set(VARIABLE_REDIS, co);
         __use_co__ = 1;
@@ -143,25 +146,25 @@ err_ret:
 
 void redis_co_destroy()
 {
+        UNIMPLEMENTED(__WARN__);
+
+        co_t *co = variable_get(VARIABLE_REDIS);
+        co->running = 0;
+        
+#if REDIS_CO_THREAD
         int ret;
         uint64_t e;
 
-        UNIMPLEMENTED(__WARN__);
-
-#if !REDIS_CO_THREAD
-        redis_vol_private_destroy(redis_conn_vol_close);
-#endif
-        
-        co_t *co = variable_get(VARIABLE_REDIS);
-        co->running = 0;
-
-        variable_unset(VARIABLE_REDIS);
-        
         ret = write(co->eventfd, &e, sizeof(e));
         if (ret < 0) {
                 ret = errno;
                 UNIMPLEMENTED(__WARN__);
         }
+#else
+        redis_vol_private_destroy(redis_conn_vol_close);
+#endif
+
+        variable_unset(VARIABLE_REDIS);
 }
 
 int redis_co(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
