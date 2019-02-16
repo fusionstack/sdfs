@@ -17,7 +17,6 @@
 
 #define PIPELINE_PARALLEL 0
 
-#if ENABLE_REDIS_PIPELINE
 typedef struct {
         struct list_head hook;
         fileid_t fileid;
@@ -49,6 +48,7 @@ typedef struct {
 
 static pipeline_t *__pipeline_array__ = NULL;
 static int __count__ = 0;
+extern int __use_pipeline__;
 
 STATIC int __redis_pipline_run(pipeline_t *pipeline, int interrupt_eventfd);
 
@@ -108,6 +108,7 @@ int redis_pipeline_init()
         }
 
         __count__ = count;
+        __use_pipeline__ = 1;
         
         return 0;
 err_ret:
@@ -836,5 +837,3 @@ int pipeline_kdel(const volid_t *volid, const fileid_t *fileid)
         
         return __pipeline_kdel(volid, fileid, key);
 }
-
-#endif

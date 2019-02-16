@@ -281,9 +281,13 @@ int sunrpc_accept(int srv_sd)
         ret = tcp_sock_tuning(sd, 1, YNET_RPC_NONBLOCK);
         if (ret)
                 GOTO(err_sd, ret);
-        
-        //ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_REDIS);
-        ret = core_create(&core, 0, CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE | CORE_FLAG_REDIS);
+
+        int flag = CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE;
+
+#if ENABLE_CO_REDIS
+        flag = flag | CORE_FLAG_REDIS;
+#endif
+        ret = core_create(&core, 0, flag);
         if (ret)
                 GOTO(err_sd, ret);
 

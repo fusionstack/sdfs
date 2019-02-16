@@ -325,7 +325,7 @@ static int __core_worker_init(core_t *core)
 
         DINFO("core[%u] timer inited\n", core->hash);
         
-#if 1
+#if ENABLE_CO_WORKER
         if (core->flag & CORE_FLAG_PRIVATE) {
                 ret = mem_cache_private_init();
                 if (unlikely(ret))
@@ -342,6 +342,22 @@ static int __core_worker_init(core_t *core)
                 if (unlikely(ret)) {
                         GOTO(err_ret, ret);
                 }
+        }
+#else
+        ret = mem_cache_private_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+
+        ret = mem_hugepage_private_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
+        
+        DINFO("core[%u] mem inited\n", core->hash);
+
+        snprintf(name, sizeof(name), "core[%u]", core->idx);
+        ret = analysis_private_create(name);
+        if (unlikely(ret)) {
+                GOTO(err_ret, ret);
         }
 
         DINFO("core[%u] analysis inited\n", core->hash);

@@ -237,8 +237,12 @@ typedef struct {
 
 #define ENABLE_CO_WORKER 0
 
-#if !ENABLE_CO_WORKER
+#if ENABLE_CO_WORKER
+#define ENABLE_REDIS_CO 0
+#else
 #define ENABLE_CORE_PIPELINE 1
 #endif
+
+#define ENABLE_REDIS_PIPELINE 0
 
 #endif

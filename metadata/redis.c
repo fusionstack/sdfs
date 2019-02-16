@@ -47,7 +47,7 @@ static redis_worker_t *__redis_worker__;
 static int __worker_count__ = 0;
 int __redis_conn_pool__ = -1;
 __thread int __redis_conn_pool_private__ = -1;
-__thread int __use_pipeline__ = 0;
+int __use_pipeline__ = 0;
 
 static int __redis_request(const int hash, const char *name, func_va_t exec, ...);
 
@@ -1169,6 +1169,12 @@ int redis_init(int _worker_count)
         ret = redis_conn_init();
         if(ret)
                 GOTO(err_ret, ret);
+        
+#if ENABLE_REDIS_PIPELINE
+        ret = redis_pipeline_init();
+        if(ret)
+                GOTO(err_ret, ret);
+#endif
 
         return 0;
 err_ret:
