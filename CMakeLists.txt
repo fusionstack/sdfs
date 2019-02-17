@@ -88,6 +88,7 @@ add_library(sdfs SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/buffer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ec_isa_l.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/cmp.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/ll.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crc32.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/crcrs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/daemon.c

@@ -17,9 +17,15 @@
 #include "variable.h"
 #include "dbg.h"
 
-#define REDIS_CO_THREAD 0
+#define REDIS_CO_THREAD 1
 
-typedef struct {
+#define ENABLE_LOCK_FREE_LIST 1
+
+#if ENABLE_LOCK_FREE_LIST
+#include <ll.h>
+#endif
+
+typedef struct redis_co_ctx {
         struct list_head hook;
         fileid_t fileid;
         volid_t volid;
@@ -28,7 +34,16 @@ typedef struct {
         redisReply *reply;
         task_t task;
         void *co;
+#if ENABLE_LOCK_FREE_LIST
+        uint32_t magic;
+        LL_ENTRY(redis_co_ctx)entry;
+#endif
 } redis_co_ctx_t;
+
+#if ENABLE_LOCK_FREE_LIST
+LL_HEAD(co_list, redis_co_ctx);
+LL_GENERATE(co_list, redis_co_ctx, entry);
+#endif
 
 typedef struct {
         struct list_head list;
@@ -39,9 +54,14 @@ typedef struct {
 
 typedef struct {
 #if REDIS_CO_THREAD
-        sy_spinlock_t lock;
         int eventfd;
+
+#if ENABLE_LOCK_FREE_LIST
+        struct co_list list;
+#else
+        sy_spinlock_t lock;
         struct list_head queue2;
+#endif
 #endif
         int running;
         struct list_head queue1;
@@ -73,6 +93,23 @@ static void *__redis_co_worker(void *arg)
                         break;
                 }
 
+#if ENABLE_LOCK_FREE_LIST
+                INIT_LIST_HEAD(&list);
+
+                redis_co_ctx_t *ctx = NULL;
+
+                while (1) {
+                        ctx = LL_FIRST(co_list, &co->list);
+                        if (ctx == NULL)
+                                break;
+                        
+                        //assert(o->satelite == i);
+                        LL_UNLINK(co_list, &co->list, ctx);
+                        DBUG("------------release 0x%o-------------\n", ctx->magic);
+                        list_add_tail(&ctx->hook, &list);
+                }
+
+#else
                 if (list_empty(&co->queue2)) {
                         continue;
                 }
@@ -86,6 +123,7 @@ static void *__redis_co_worker(void *arg)
                 list_splice_init(&co->queue2, &list);
 
                 sy_spin_unlock(&co->lock);
+#endif
         
                 __redis_co_run(&list);
         }
@@ -113,11 +151,15 @@ int redis_co_init()
         co->running = 1;
 
 #if REDIS_CO_THREAD
+#if ENABLE_LOCK_FREE_LIST
+        LL_INIT(&(co->list));//LL_HEAD_INITIALIZER(&co->list);
+#else
         INIT_LIST_HEAD(&co->queue2);
 
         ret = sy_spin_init(&co->lock);
         if (ret)
                 UNIMPLEMENTED(__WARN__);
+#endif
 
         int fd = eventfd(0, EFD_CLOEXEC);
         if (fd < 0) {
@@ -351,35 +393,48 @@ err_ret:
 int redis_co_run(void *ctx)
 {
         int ret;
-        uint64_t e;
         co_t *co = variable_get_byctx(ctx, VARIABLE_REDIS);
-        struct list_head list;
 
         if (co == NULL) {
                 return 0;
         }
 
-        if (!list_empty(&co->queue1)) {
-                INIT_LIST_HEAD(&list);
-                list_splice_init(&co->queue1, &list);
-
-                ret = sy_spin_lock(&co->lock);
-                if ((unlikely(ret)))
-                        UNIMPLEMENTED(__DUMP__);
-                
-                list_splice_init(&list, &co->queue2);
-                
-                sy_spin_unlock(&co->lock);
+        if (list_empty(&co->queue1)) {
+                return 0;
         }
         
-        if (!list_empty(&co->queue2)) {
-                ret = write(co->eventfd, &e, sizeof(e));
-                if (ret < 0) {
-                        ret = errno;
-                        UNIMPLEMENTED(__WARN__);
-                }
-        }
+#if ENABLE_LOCK_FREE_LIST
 
+        redis_co_ctx_t *co_ctx;
+        struct list_head *pos, *n;
+
+        list_for_each_safe(pos, n, &co->queue1) {
+                list_del(pos);
+                co_ctx = (redis_co_ctx_t *)pos;
+                LL_INIT_ENTRY(&co_ctx->entry);
+                co_ctx->magic = _random();
+                LL_PUSH_BACK(co_list, &co->list, co_ctx);
+                //LL_RELEASE(co_list, &co->list, co_ctx);
+                DBUG("------------push 0x%o-------------\n", co_ctx->magic);
+        }
+        
+#else
+        ret = sy_spin_lock(&co->lock);
+        if ((unlikely(ret)))
+                UNIMPLEMENTED(__DUMP__);
+                
+        list_splice_init(&co->queue1, &co->queue2);
+                
+        sy_spin_unlock(&co->lock);
+#endif
+
+        uint64_t e;
+        ret = write(co->eventfd, &e, sizeof(e));
+        if (ret < 0) {
+                ret = errno;
+                UNIMPLEMENTED(__WARN__);
+        }
+        
         return 0;
 }
 
