@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <pthread.h>
 
-#define ENABLE_SCHEDULE_LL 1
+#define ENABLE_SCHEDULE_LL 0
 
 #if ENABLE_SCHEDULE_LL
 #include <ll.h>
