@@ -17,9 +17,7 @@
 #include "variable.h"
 #include "dbg.h"
 
-#define REDIS_CO_THREAD 1
-
-#define ENABLE_LOCK_FREE_LIST 1
+#define REDIS_CO_THREAD 0
 
 #if ENABLE_LOCK_FREE_LIST
 #include <ll.h>
@@ -152,7 +150,7 @@ int redis_co_init()
 
 #if REDIS_CO_THREAD
 #if ENABLE_LOCK_FREE_LIST
-        LL_INIT(&(co->list));//LL_HEAD_INITIALIZER(&co->list);
+        LL_INIT(&(co->list));
 #else
         INIT_LIST_HEAD(&co->queue2);
 
@@ -880,5 +878,47 @@ int co_kdel(const volid_t *volid, const fileid_t *fileid)
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
+        return ret;
+}
+
+int co_newsharing(const volid_t *volid, uint8_t *idx)
+{
+        int ret, seq;
+        redis_vol_t *vol;
+
+        ANALYSIS_BEGIN(0);
+
+
+retry:
+        ret = redis_vol_get(volid, (void **)&vol);
+        if(ret) {
+                if (ret == ENOENT) {
+                        ret = redis_conn_vol(volid);
+                        if(ret)
+                                GOTO(err_ret, ret);
+
+                        goto retry;
+                } else
+                        GOTO(err_ret, ret);
+        }
+        
+        if (ng.daemon) {
+                seq = ++ vol->sequence;
+        } else {
+                seq = _random();
+        }
+
+        *idx = seq % vol->sharding;
+
+#if 0
+        DINFO("sharding %u %u %u\n", *idx, vol->sequence, vol->sharding);
+#endif
+        
+        redis_vol_release(volid);
+
+        ANALYSIS_END(0, IO_WARN, NULL);
+        
+        return 0;
+err_ret:
         return ret;
 }

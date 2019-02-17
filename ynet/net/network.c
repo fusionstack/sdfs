@@ -339,7 +339,7 @@ static int __network_connect_wait(const nid_t *nid, int timeout, int force)
                 GOTO(err_ret, ret);
         }
 
-        DBUG("try to connect %s \n", netable_rname_nid(nid));
+        DINFO("try to connect %s \n", netable_rname_nid(nid));
 
         netable_update_retry(nid);
 

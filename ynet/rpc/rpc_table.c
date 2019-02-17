@@ -57,28 +57,37 @@ static void __rpc_table_free(solt_t *solt)
         //__rpc_table()->cur = solt->msgid.idx;
 }
 
-static int __rpc_table_lock(solt_t *solt)
+static int __rpc_table_lock(rpc_table_t *rpc_table, solt_t *solt)
 {
-        return sy_spin_lock(&solt->lock);
+        if (likely(rpc_table->private))
+                return 0;
+        else
+                return sy_spin_lock(&solt->lock);
 }
 
-static int __rpc_table_trylock(solt_t *solt)
+static int __rpc_table_trylock(rpc_table_t *rpc_table, solt_t *solt)
 {
-        return sy_spin_trylock(&solt->lock);
+        if (likely(rpc_table->private))
+                return 0;
+        else
+                return sy_spin_trylock(&solt->lock);
 }
 
-static int __rpc_table_unlock(solt_t *solt)
+static int __rpc_table_unlock(rpc_table_t *rpc_table, solt_t *solt)
 {
-        return sy_spin_unlock(&solt->lock);
+        if (likely(rpc_table->private))
+                return 0;
+        else
+                return sy_spin_unlock(&solt->lock);
 }
 
-static int __rpc_table_check(solt_t *solt, uint32_t now)
+static int __rpc_table_check(rpc_table_t *rpc_table, solt_t *solt, uint32_t now)
 {
         int ret, retval = ETIMEDOUT;
         sockid_t *closed = NULL, sockid;
         const char *conn;
 
-        ret = __rpc_table_trylock(solt);
+        ret = __rpc_table_trylock(rpc_table, solt);
         if (unlikely(ret)) {
                 if (ret == EBUSY) {
                         DINFO("%s @ %s/%u check, id (%u, %x) busy\n", solt->name,
@@ -99,7 +108,8 @@ static int __rpc_table_check(solt_t *solt, uint32_t now)
                 conn = "unknow";
         }
 
-        if (solt->timeout && now > solt->timeout && (now - solt->timeout > (uint32_t)gloconf.rpc_timeout / 2)) {
+        if (solt->timeout && now > solt->timeout
+            && (now - solt->timeout > (uint32_t)gloconf.rpc_timeout / 2)) {
                 DINFO("%s @ %s/%u(%s) check, id (%u, %x), used %u timeout %d\n", solt->name,
                       _inet_ntoa(solt->sockid.addr), solt->sockid.sd, conn, solt->msgid.idx,
                       solt->msgid.figerprint, (int)(now - solt->begin), solt->timeout);
@@ -110,8 +120,10 @@ static int __rpc_table_check(solt_t *solt, uint32_t now)
         }
 
         if (solt->timeout && now > solt->timeout) {
-                DWARN("%s @ %s/%u(%s) timeout, id (%u, %x), rpc %u used %u timeout %d\n", solt->name,
-                      _inet_ntoa(solt->sockid.addr), solt->sockid.sd, conn, solt->msgid.idx,
+                DWARN("%s @ %s/%u(%s) timeout, id (%u, %x), rpc %u "
+                      "used %u timeout %d\n", solt->name,
+                      _inet_ntoa(solt->sockid.addr), solt->sockid.sd,
+                      conn, solt->msgid.idx,
                       solt->msgid.figerprint,
                       gloconf.rpc_timeout,
                       (int)(now - solt->begin), solt->timeout);
@@ -132,7 +144,7 @@ static int __rpc_table_check(solt_t *solt, uint32_t now)
                 __rpc_table_free(solt);
         }
 
-        __rpc_table_unlock(solt);
+        __rpc_table_unlock(rpc_table, solt);
 
         if (closed) {
                 if (closed->type == SOCKID_CORENET && closed->sd != -1) {
@@ -173,7 +185,7 @@ static void __rpc_table_scan(rpc_table_t *rpc_table)
 
                 used++;
 
-                __rpc_table_check(solt, now);
+                __rpc_table_check(rpc_table, solt, now);
 
                 checked++;
         }
@@ -325,7 +337,7 @@ static solt_t *__rpc_table_lock_solt(rpc_table_t *rpc_table, const msgid_t *msgi
                 return NULL;
         }
 
-        ret = __rpc_table_lock(solt);
+        ret = __rpc_table_lock(rpc_table, solt);
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
@@ -333,7 +345,7 @@ static solt_t *__rpc_table_lock_solt(rpc_table_t *rpc_table, const msgid_t *msgi
                 return solt;
         else {
                 DWARN("solt[%u] unused\n", msgid->idx);
-                __rpc_table_unlock(solt);
+                __rpc_table_unlock(rpc_table, solt);
                 return NULL;
         }
 
@@ -371,7 +383,7 @@ int rpc_table_setsolt(rpc_table_t *rpc_table, const msgid_t *msgid, func3_t func
                 memset(&solt->nid, 0x0, sizeof(*nid));
         }
         
-        __rpc_table_unlock(solt);
+        __rpc_table_unlock(rpc_table, solt);
 
         return 0;
 err_ret:
@@ -393,7 +405,7 @@ int rpc_table_post(rpc_table_t *rpc_table, const msgid_t *msgid, int retval, buf
 
         __rpc_table_free(solt);
 
-        __rpc_table_unlock(solt);
+        __rpc_table_unlock(rpc_table, solt);
 
         return 0;
 err_ret:
@@ -413,14 +425,16 @@ int rpc_table_free(rpc_table_t *rpc_table, const msgid_t *msgid)
 
         __rpc_table_free(solt);
 
-        __rpc_table_unlock(solt);
+        __rpc_table_unlock(rpc_table, solt);
 
         return 0;
 err_ret:
         return ret;
 }
 
-static int __rpc_table_reset(const char *name, solt_t *solt, const sockid_t *sockid, const nid_t *nid)
+static int __rpc_table_reset(rpc_table_t *rpc_table,
+                             solt_t *solt, const sockid_t *sockid,
+                             const nid_t *nid)
 {
         int ret, retval = ECONNRESET;
 
@@ -428,7 +442,7 @@ static int __rpc_table_reset(const char *name, solt_t *solt, const sockid_t *soc
                 return 0;
         }
 
-        ret = __rpc_table_trylock(solt);
+        ret = __rpc_table_trylock(rpc_table, solt);
         if (unlikely(ret)) {
                 if (ret == EBUSY) {
                         return 0;
@@ -442,8 +456,10 @@ static int __rpc_table_reset(const char *name, solt_t *solt, const sockid_t *soc
                 YASSERT(solt->func);
                 YASSERT(solt->arg);
 
-                DINFO("table %s %s @ %s(%s) reset, id (%u, %x), used %u\n", name, solt->name,
-                      _inet_ntoa(solt->sockid.addr), nid ? network_rname(nid) : "NULL", solt->msgid.idx,
+                DINFO("table %s %s @ %s(%s) reset, id (%u, %x), used %u\n",
+                      rpc_table->name, solt->name,
+                      _inet_ntoa(solt->sockid.addr),
+                      nid ? network_rname(nid) : "NULL", solt->msgid.idx,
                       solt->msgid.figerprint, (int)(gettime() - solt->begin));
                 uint64_t latency = -1;
                 solt->func(solt->arg, &retval, NULL, &latency);
@@ -451,7 +467,7 @@ static int __rpc_table_reset(const char *name, solt_t *solt, const sockid_t *soc
                 __rpc_table_free(solt);
         }
 
-        __rpc_table_unlock(solt);
+        __rpc_table_unlock(rpc_table, solt);
 
         return 0;
 err_ret:
@@ -478,7 +494,7 @@ void  rpc_table_reset(rpc_table_t *rpc_table, const sockid_t *sockid, const nid_
         
         for (i = 0; i < rpc_table->count; i++) {
                 solt = &rpc_table->solt[i];
-                __rpc_table_reset(rpc_table->name, solt, sockid, nid);
+                __rpc_table_reset(rpc_table, solt, sockid, nid);
         }
 }
 
@@ -524,7 +540,7 @@ err_ret:
         return ret;
 }
 
-int rpc_table_init(const char *name, rpc_table_t **rpc_table, int scan)
+int rpc_table_init(const char *name, rpc_table_t **rpc_table, int private)
 {
         int ret, count;
         rpc_table_t *tmp;
@@ -534,7 +550,7 @@ int rpc_table_init(const char *name, rpc_table_t **rpc_table, int scan)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        if (scan) {
+        if (!private) {
                 pthread_t th;
                 pthread_attr_t ta;
 

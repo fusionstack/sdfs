@@ -9,6 +9,8 @@
 
 #define MAX_LOCK_NAME 128
 
+extern int __sy_spin_lock(pthread_spinlock_t *lock, const char *name);
+
 #if 1
 
 #define sy_spinlock_t pthread_spinlock_t
@@ -17,11 +19,17 @@
         pthread_spin_init(__spin__, PTHREAD_PROCESS_PRIVATE)
 
 #define sy_spin_destroy pthread_spin_destroy
+#if 0
+#define sy_spin_lock(lock) __sy_spin_lock(lock, __FUNCTION__)
+#else
 #define sy_spin_lock pthread_spin_lock
+#endif
 #define sy_spin_trylock pthread_spin_trylock
 #define sy_spin_unlock pthread_spin_unlock
 
 #endif
+
+
 
 #define SCHEDULE
 

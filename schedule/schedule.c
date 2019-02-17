@@ -1210,11 +1210,15 @@ static int __schedule_create__(schedule_t **_schedule, const char *name, int idx
                 GOTO(err_ret, ret);
 
 #if SCHEDULE_REPLY_NEW
+#if ENABLE_SCHEDULE_LL
+        LL_INIT(&schedule->reply_remote_lfl);
+#else        
         ret = sy_spin_init(&schedule->reply_remote_lock);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
         INIT_LIST_HEAD(&schedule->reply_remote_list);
+#endif
 #else
 
         ret = sy_spin_init(&schedule->reply_remote.lock);
@@ -1422,10 +1426,14 @@ static int __schedule_task_finished(schedule_t *_schedule)
 
 static int __schedule_reply_remote_finished(schedule_t *_schedule)
 {
-        const schedule_t *schedule = __schedule_self(_schedule);
+        schedule_t *schedule = __schedule_self(_schedule);
 
 #if SCHEDULE_REPLY_NEW
+#if ENABLE_SCHEDULE_LL
+        return LL_EMPTY(reply_remote_list, &schedule->reply_remote_lfl);
+#else
         return list_empty(&schedule->reply_remote_list);
+#endif
 #else
         if (schedule->reply_remote.count == 0)
                 DBUG("retval finished %u\n", schedule->reply_remote.count);
@@ -1542,13 +1550,32 @@ static int __schedule_reply_remote_run(schedule_t *_schedule)
         struct list_head list, *pos, *n;
         reply_remote_t *reply;
         
+#if ENABLE_SCHEDULE_LL
+        if (LL_EMPTY(reply_remote_list, &schedule->reply_remote_lfl)) {
+                return 0;
+        }
+#else
         if (list_empty(&schedule->reply_remote_list)) {
                 return 0;
         }
+#endif
         
         // schedule_resume 是生产者，本函数是消费者，需要MT同步
 
         INIT_LIST_HEAD(&list);
+
+#if ENABLE_SCHEDULE_LL
+        while (1) {
+                reply = LL_FIRST(reply_remote_list, &schedule->reply_remote_lfl);
+                if (reply == NULL)
+                        break;
+                
+                        //assert(o->satelite == i);
+                LL_UNLINK(reply_remote_list, &schedule->reply_remote_lfl, reply);
+                DBUG("------------release 0x%p-------------\n", reply);
+                list_add_tail(&reply->hook, &list);
+        }
+#else
         
         ret = sy_spin_lock(&schedule->reply_remote_lock);
         if (unlikely(ret))
@@ -1557,6 +1584,7 @@ static int __schedule_reply_remote_run(schedule_t *_schedule)
         list_splice_init(&schedule->reply_remote_list, &list);
 
         sy_spin_unlock(&schedule->reply_remote_lock);
+#endif
 
         list_for_each_safe(pos, n, &list) {
                 list_del(pos);
@@ -1930,10 +1958,10 @@ void schedule_resume1(const task_t *task, int retval, buffer_t *buf)
 #endif
 
 #if SCHEDULE_REPLY_NEW
+
 static void __schedule_resume_remote(schedule_t *schedule,
                               const task_t *task, int retval, buffer_t *buf)
 {
-        int ret;
         reply_remote_t *reply = mem_cache_calloc(MEM_CACHE_4K, 1);
 
         YASSERT(task->scheduleid >= 0 && task->scheduleid <= SCHEDULE_MAX);
@@ -1958,6 +1986,12 @@ static void __schedule_resume_remote(schedule_t *schedule,
                 mbuffer_merge(&reply->buf, buf);
         }
 
+#if ENABLE_SCHEDULE_LL
+        LL_INIT_ENTRY(&reply->entry);
+        LL_PUSH_BACK(reply_remote_list, &schedule->reply_remote_lfl, reply);
+        DBUG("----------------push 0x%p------------------", reply);
+#else
+        int ret;
         ret = sy_spin_lock(&schedule->reply_remote_lock);
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
@@ -1965,6 +1999,7 @@ static void __schedule_resume_remote(schedule_t *schedule,
         list_add_tail(&reply->hook, &schedule->reply_remote_list);
         
         sy_spin_unlock(&schedule->reply_remote_lock);
+#endif
         
         return;
 }

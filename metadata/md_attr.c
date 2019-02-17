@@ -8,7 +8,7 @@
 #include "job_dock.h"
 #include "net_global.h"
 #include "ylib.h"
-#include "redis_conn.h"
+#include "redis.h"
 #include "md_proto.h"
 #include "md_lib.h"
 #include "md_db.h"
@@ -330,7 +330,7 @@ int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const 
                 fileid->idx = 0;
                 fileid->id = id;
 
-                ret = redis_conn_new(volid, &fileid->sharding);
+                ret = redis_new_sharding(volid, &fileid->sharding);
                 if (ret)
                         GOTO(err_ret, ret);
         } else {
@@ -341,7 +341,7 @@ int md_attr_getid(fileid_t *fileid, const fileid_t *parent, ftype_t type, const 
                 fileid->idx = 0;
                 fileid->id = id;
                 volid_t _volid = {systemvol, 0};
-                ret = redis_conn_new(&_volid, &fileid->sharding);
+                ret = redis_new_sharding(&_volid, &fileid->sharding);
                 if (ret)
                         GOTO(err_ret, ret);
         }

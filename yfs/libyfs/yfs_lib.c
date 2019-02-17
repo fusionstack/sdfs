@@ -967,7 +967,7 @@ int sdfs_init_verbose(const char *name, int polling_core)
                 GOTO(err_ret, ret);
 
         ret = core_init(polling_core, gloconf.polling_timeout,
-                        CORE_FLAG_ACTIVE);
+                        CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE);
         if (ret)
                 GOTO(err_ret, ret);
 

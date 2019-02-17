@@ -42,6 +42,7 @@ extern int rm_push(const nid_t *nid, int _hash, const chkid_t *chkid);
 extern int rm_pop(const nid_t *nid, int _hash, chkid_t *array, int *count);
 extern int redis_exec(const fileid_t *fileid, func_va_t exec, void *arg);
 extern int redis_init(int worker);
+extern int redis_new_sharding(const volid_t *volid, uint8_t *idx);
 
 extern int hset(const volid_t *volid, const fileid_t *fid, const char *name, const void *buf, uint32_t size, int flag);
 extern int hget(const volid_t *volid, const fileid_t *fid, const char *name, char *buf, size_t *len);

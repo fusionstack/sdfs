@@ -8,6 +8,29 @@
 #include "cJSON.h"
 #include "zlib.h"
 
+typedef struct{
+        int magic;
+        int erased;
+        int used;
+        redis_conn_t *conn;
+} __conn_t;
+
+typedef struct{
+        pthread_rwlock_t lock;
+        int sequence;
+        int count;
+        __conn_t *conn;
+} __conn_sharding_t;
+
+typedef struct {
+        pthread_rwlock_t lock;
+        int sequence;
+        int sharding;
+        __conn_sharding_t *shardings;
+        volid_t volid;
+        char volume[MAX_NAME_LEN];
+} redis_vol_t;
+
 typedef struct {
         int magic;
         int sharding;

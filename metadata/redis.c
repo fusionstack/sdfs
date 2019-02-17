@@ -826,7 +826,8 @@ static int __hiter(va_list ap)
 }
 
 
-int hiter(const volid_t *volid, const fileid_t *fileid, const char *match, func2_t func, void *ctx)
+int hiter(const volid_t *volid, const fileid_t *fileid, const char *match,
+          func2_t func, void *ctx)
 {
         if (unlikely(volid == NULL)) {
                 volid_t _volid = {fileid->volid, 0};
@@ -1204,4 +1205,13 @@ err_ret:
 int redis_exec(const fileid_t *fileid, func_va_t exec, void *arg)
 {
         return __redis_request(fileid_hash(fileid), "exec", exec, arg);
+}
+
+int redis_new_sharding(const volid_t *volid, uint8_t *idx)
+{
+        if (__use_co__) {
+                return co_newsharing(volid, idx);
+        } else {
+                return redis_conn_new(volid, idx);
+        }
 }

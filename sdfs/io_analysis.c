@@ -277,6 +277,11 @@ int io_analysis_init(const char *name, int seq)
 {
         int ret;
 
+#if 0
+        DINFO("io analysis disabled\n");
+        return 0;
+#endif
+        
         ret = ymalloc((void **)&__io_analysis__, sizeof(*__io_analysis__));
         if (ret)
                 GOTO(err_ret, ret);
