@@ -183,7 +183,7 @@ static int __mount_mnt_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         snprintf(dpath, MAX_PATH_LEN, "%s", *args);
         snprintf(remoteip, MAX_NAME_LEN, "%s", inet_ntoa(__get_remote(sockid)));
 
-        DINFO("mount dir (%s) from %s, socket %d\n\n", dpath, remoteip, sockid->sd);
+        DINFO("mount dir (%s) from %s, socket %d\n", dpath, remoteip, sockid->sd);
 
         if (strcmp(dpath, "/") == 0) {
                 ret = EPERM;

@@ -204,14 +204,7 @@ void redis_co_destroy()
         co->running = 0;
         
 #if REDIS_CO_THREAD
-        int ret;
-        uint64_t e = 1;
-
-        ret = write(co->eventfd, &e, sizeof(e));
-        if (ret < 0) {
-                ret = errno;
-                UNIMPLEMENTED(__DUMP__);
-        }
+        close(co->eventfd);
 #endif
         redis_vol_private_destroy(redis_conn_vol_close);
         variable_unset(VARIABLE_REDIS);
