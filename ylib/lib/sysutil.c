@@ -2537,7 +2537,7 @@ int eventfd_poll(int fd, int tmo, uint64_t *_event)
         uint64_t e;
 
         pfd.fd = fd;
-        pfd.events = POLLIN;
+        pfd.events = POLLIN | POLLRDHUP | POLLERR | POLLHUP;
         
         while (1) { 
                 event = poll(&pfd, 1, tmo * 1000 * 1000);
