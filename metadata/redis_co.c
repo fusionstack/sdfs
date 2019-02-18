@@ -18,7 +18,7 @@
 #include "variable.h"
 #include "dbg.h"
 
-#define REDIS_CO_THREAD 1
+#define REDIS_CO_THREAD 0
 
 #if ENABLE_LOCK_FREE_LIST
 #include <ll.h>
