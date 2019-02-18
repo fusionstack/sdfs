@@ -245,6 +245,6 @@ typedef struct {
 
 #define ENABLE_REDIS_PIPELINE 0
 
-#define ENABLE_LOCK_FREE_LIST 1
+#define ENABLE_LOCK_FREE_LIST 0
 
 #endif

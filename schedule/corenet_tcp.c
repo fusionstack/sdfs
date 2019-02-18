@@ -1285,7 +1285,7 @@ void corenet_tcp_commit(void *ctx)
                 return;
 
         schedule_task_new("corenet_tcp_commit", __corenet_tcp_commit_task, ctx, -1);
-        schedule_run(variable_get_byctx(VARIABLE_SCHEDULE));
+        schedule_run(variable_get_byctx(ctx, VARIABLE_SCHEDULE));
 }
 
 #else

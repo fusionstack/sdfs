@@ -9,6 +9,7 @@
 #define DBG_SUBSYS S_LIBYLIB
 
 #include "ylib.h"
+#include "plock.h"
 #include "net_global.h"
 #include "redis.h"
 #include "redis_util.h"
@@ -17,7 +18,7 @@
 #include "variable.h"
 #include "dbg.h"
 
-#define REDIS_CO_THREAD 0
+#define REDIS_CO_THREAD 1
 
 #if ENABLE_LOCK_FREE_LIST
 #include <ll.h>
@@ -51,9 +52,17 @@ typedef struct {
 } arg2_t;
 
 typedef struct {
-#if REDIS_CO_THREAD
-        int eventfd;
+        struct list_head hook;
+        redis_handler_t *handler_array;
+        arg2_t *array;
+        int count;
+        task_t task;
+} arg1_t;
 
+typedef struct {
+#if REDIS_CO_THREAD
+        plock_t plock;
+        int eventfd;
 #if ENABLE_LOCK_FREE_LIST
         struct co_list list;
 #else
@@ -65,20 +74,17 @@ typedef struct {
         struct list_head queue1;
 } co_t;
 
- __thread int __use_co__;
+__thread int __use_co__ = 0;
 
-static int __redis_co_run(struct list_head *list);
+static int __redis_co_run(void *ctx, struct list_head *list);
+static void __redis_co_recv(arg2_t *array, redis_handler_t *handler_array, int count);
 
 #if REDIS_CO_THREAD
 static void *__redis_co_worker(void *arg)
 {
-        int ret;
         co_t *co = arg;
-        struct list_head list;
-
-        ret = redis_vol_private_init();
-        if (ret)
-                UNIMPLEMENTED(__DUMP__);
+        struct list_head list, *pos, *n;
+        arg1_t *arg1;
 
         DINFO("co worker start %u\n", co->running);
 
@@ -108,6 +114,7 @@ static void *__redis_co_worker(void *arg)
                 }
 
 #else
+                int ret;
                 if (list_empty(&co->queue2)) {
                         continue;
                 }
@@ -117,17 +124,20 @@ static void *__redis_co_worker(void *arg)
                 ret = sy_spin_lock(&co->lock);
                 if (ret)
                         UNIMPLEMENTED(__DUMP__);
-                
+
                 list_splice_init(&co->queue2, &list);
 
                 sy_spin_unlock(&co->lock);
 #endif
-        
-                __redis_co_run(&list);
+
+                list_for_each_safe(pos, n, &list) {
+                        arg1 = (void *)pos;
+                        __redis_co_recv(arg1->array, arg1->handler_array, arg1->count);
+                }
+
+                schedule_resume(&arg1->task, 0, NULL);
         }
 
-        redis_vol_private_destroy(redis_conn_vol_close);
-        
         pthread_exit(NULL);
 }
 #endif        
@@ -158,7 +168,10 @@ int redis_co_init()
         if (ret)
                 UNIMPLEMENTED(__WARN__);
 #endif
-
+        ret = plock_init(&co->plock, "redis_co");
+        if (ret)
+                GOTO(err_ret, ret);
+        
         int fd = eventfd(0, EFD_CLOEXEC);
         if (fd < 0) {
                 ret = errno;
@@ -170,11 +183,10 @@ int redis_co_init()
         ret = sy_thread_create2(__redis_co_worker, co, "__core_worker");
         if (ret)
                 GOTO(err_ret, ret);
-#else
+#endif
         ret = redis_vol_private_init();
         if (ret)
                 GOTO(err_ret, ret);
-#endif
 
         variable_set(VARIABLE_REDIS, co);
         __use_co__ = 1;
@@ -193,17 +205,15 @@ void redis_co_destroy()
         
 #if REDIS_CO_THREAD
         int ret;
-        uint64_t e;
+        uint64_t e = 1;
 
         ret = write(co->eventfd, &e, sizeof(e));
         if (ret < 0) {
                 ret = errno;
-                UNIMPLEMENTED(__WARN__);
+                UNIMPLEMENTED(__DUMP__);
         }
-#else
-        redis_vol_private_destroy(redis_conn_vol_close);
 #endif
-
+        redis_vol_private_destroy(redis_conn_vol_close);
         variable_unset(VARIABLE_REDIS);
 }
 
@@ -279,6 +289,81 @@ STATIC int __redis_utils_co1(const arg2_t *arg2, redis_handler_t *handler,
         return 0;
 }
 
+#if 1
+STATIC int __redis_utils_co2(redis_handler_t *handler, struct list_head *list, int retry)
+{
+        int ret;
+        struct list_head *pos, *n;
+        redis_co_ctx_t *ctx;
+        redis_conn_t *conn;
+
+        ANALYSIS_BEGIN(0);
+
+        if (list_empty(list)) {
+                return 0;
+        }
+        
+        conn = handler->conn;
+
+        ret = redisBufferRead(conn->ctx);
+        if (ret) {
+                DBUG("-----ret %u--\n", ret, retry);
+                return 1;
+        }
+        
+        list_for_each_safe(pos, n, list) {
+                ctx = (redis_co_ctx_t *)pos;
+
+                ret = redisGetReply(conn->ctx, (void **)&ctx->reply);
+                if (ret || ctx->reply == NULL) {
+                        DBUG("-----ret %u reply %p, retry %u--\n", ret, ctx->reply, retry);
+
+                        return 1;
+                } else {
+                        DBUG("-----ret %u reply %p, retry %u--\n", ret, ctx->reply, retry);
+                }
+
+                list_del(pos);
+                schedule_resume(&ctx->task, ret, NULL);
+        }
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
+        DBUG("----get reply success, retry %u----\n", retry);
+        
+        return 0;
+}
+
+static void __redis_co_recv(arg2_t *array, redis_handler_t *handler_array, int count)
+{
+        arg2_t *arg2;
+        redis_handler_t *handler;
+
+        int retry = 0;
+
+        ANALYSIS_BEGIN(0);
+
+        while (1) {
+                int fail = 0;
+                for (int i = 0; i < count; i++) {
+                        handler = &handler_array[i];
+                        arg2 = &array[i];
+
+                        fail += __redis_utils_co2(handler, &arg2->list, retry);
+                }
+
+                DBUG("------------fail %u------------\n", fail);
+                
+                if (fail == 0) {
+                        break;
+                } else {
+                        retry++;
+                }
+        }
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+}
+#else
 STATIC void __redis_utils_co2(redis_handler_t *handler, struct list_head *list)
 {
         int ret;
@@ -300,11 +385,36 @@ STATIC void __redis_utils_co2(redis_handler_t *handler, struct list_head *list)
         }
 
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
-        pthread_rwlock_unlock(&conn->rwlock);
-        redis_conn_release(handler);
 }
 
-STATIC int __redis_co_exec(arg2_t *array, int count)
+static void __redis_co_recv(arg2_t *array, redis_handler_t *handler_array, int count)
+{
+        arg2_t *arg2;
+        redis_handler_t *handler;
+
+        for (int i = 0; i < count; i++) {
+                handler = &handler_array[i];
+                arg2 = &array[i];
+
+                __redis_utils_co2(handler, &arg2->list);
+        }
+}
+#endif
+
+static void __redis_co_release(redis_handler_t *handler_array, int count)
+{
+        redis_handler_t *handler;
+        redis_conn_t *conn;
+
+        for (int i = 0; i < count; i++) {
+                handler = &handler_array[i];
+                conn = handler->conn;
+                pthread_rwlock_unlock(&conn->rwlock);
+                redis_conn_release(handler);
+        }
+}
+
+STATIC int __redis_co_exec(void *core_ctx, arg2_t *array, int count)
 {
         int ret, i;
         redis_handler_t handler_array[512], *handler;
@@ -319,22 +429,46 @@ STATIC int __redis_co_exec(arg2_t *array, int count)
                 ret = __redis_utils_co1(arg2, handler, &arg2->list);
                 if ((unlikely(ret)))
                         UNIMPLEMENTED(__DUMP__);
-       }
+        }
 
+#if REDIS_CO_THREAD
+        arg1_t arg1;
+        arg1.array = array;
+        arg1.handler_array = handler_array;
+        arg1.count = count;
+        arg1.task = schedule_task_get();
+        co_t *co = variable_get_byctx(core_ctx, VARIABLE_REDIS);
         
-        for (i = 0; i < count; i++) {
-                handler = &handler_array[i];
-                arg2 = &array[i];
+        ret = sy_spin_lock(&co->lock);
+        if(ret)
+                UNIMPLEMENTED(__DUMP__);
 
-                __redis_utils_co2(handler, &arg2->list);
-        }        
+        list_add_tail(&arg1.hook, &co->queue2);
+        
+        sy_spin_unlock(&co->lock);
 
+        uint64_t e = 1;
+        ret = write(co->eventfd, &e, sizeof(e));
+        if (ret < 0) {
+                ret = errno;
+                UNIMPLEMENTED(__DUMP__);
+        }
+
+        ret = schedule_yield1("redis_co", NULL, NULL, NULL, -1);
+        if(ret)
+                UNIMPLEMENTED(__DUMP__);
+#else
+        (void) core_ctx;
+        __redis_co_recv(array, handler_array, count);
+#endif
+        
+        __redis_co_release(handler_array, count);
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 }
 
-static int __redis_co_run(struct list_head *list)
+static int __redis_co_run(void *core_ctx, struct list_head *list)
 {
         int ret, count = 0;
         struct list_head *pos, *n;
@@ -376,7 +510,7 @@ static int __redis_co_run(struct list_head *list)
                 DBUG("submit %u\n", submit);
         }
 
-        ret = __redis_co_exec(array, count);
+        ret = __redis_co_exec(core_ctx, array, count);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
@@ -388,9 +522,31 @@ err_ret:
 }
 
 #if REDIS_CO_THREAD
-int redis_co_run(void *ctx)
+static void __redis_co_run_task(void *ctx)
 {
         int ret;
+        struct list_head list;
+        co_t *co = variable_get_byctx(ctx, VARIABLE_REDIS);
+
+        if (list_empty(&co->queue1)) {
+                return;
+        }
+
+        INIT_LIST_HEAD(&list);
+
+        list_splice_init(&co->queue1, &list);
+        
+        ret = plock_wrlock(&co->plock);
+        if (unlikely(ret))
+                UNIMPLEMENTED(__DUMP__);
+
+        __redis_co_run(ctx, &list);
+
+        plock_unlock(&co->plock);
+}
+
+int redis_co_run(void *ctx)
+{
         co_t *co = variable_get_byctx(ctx, VARIABLE_REDIS);
 
         if (co == NULL) {
@@ -400,6 +556,11 @@ int redis_co_run(void *ctx)
         if (list_empty(&co->queue1)) {
                 return 0;
         }
+
+        schedule_task_new("redis_co_run", __redis_co_run_task, ctx, -1);
+        schedule_run(variable_get_byctx(ctx, VARIABLE_SCHEDULE));
+        
+#if 0        
         
 #if ENABLE_LOCK_FREE_LIST
 
@@ -426,12 +587,14 @@ int redis_co_run(void *ctx)
         sy_spin_unlock(&co->lock);
 #endif
 
-        uint64_t e;
+        uint64_t e = 1;
         ret = write(co->eventfd, &e, sizeof(e));
         if (ret < 0) {
                 ret = errno;
-                UNIMPLEMENTED(__WARN__);
+                UNIMPLEMENTED(__DUMP__);
         }
+
+#endif
         
         return 0;
 }
@@ -456,7 +619,7 @@ int redis_co_run(void *ctx)
 
         list_splice_init(&co->queue1, &list);
         
-        ret = __redis_co_run(&list);
+        ret = __redis_co_run(ctx, &list);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
@@ -888,7 +1051,6 @@ int co_newsharing(const volid_t *volid, uint8_t *idx)
 
         ANALYSIS_BEGIN(0);
 
-
 retry:
         ret = redis_vol_get(volid, (void **)&vol);
         if(ret) {
@@ -913,7 +1075,7 @@ retry:
 #if 0
         DINFO("sharding %u %u %u\n", *idx, vol->sequence, vol->sharding);
 #endif
-        
+
         redis_vol_release(volid);
 
         ANALYSIS_END(0, IO_WARN, NULL);

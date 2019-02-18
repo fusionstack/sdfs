@@ -282,7 +282,8 @@ int sunrpc_accept(int srv_sd)
         if (ret)
                 GOTO(err_sd, ret);
 
-        int flag = CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE;
+        //int flag = CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE;
+        int flag = CORE_FLAG_ACTIVE;
 
 #if ENABLE_REDIS_CO
         flag = flag | CORE_FLAG_REDIS;

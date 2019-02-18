@@ -251,7 +251,7 @@ int redis_conn_get(const volid_t *volid, int sharding, int worker, redis_handler
         int ret, idx;
         redis_vol_t *vol;
 
-        YASSERT(!schedule_running());
+        //YASSERT(!schedule_running());
         
         ret = __redis_vol_get(volid, &vol, O_CREAT);
         if(ret)
