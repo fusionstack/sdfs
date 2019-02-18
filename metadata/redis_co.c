@@ -60,8 +60,8 @@ typedef struct {
 } arg1_t;
 
 typedef struct {
-#if REDIS_CO_THREAD
         plock_t plock;
+#if REDIS_CO_THREAD
         int eventfd;
 #if ENABLE_LOCK_FREE_LIST
         struct co_list list;
@@ -158,6 +158,10 @@ int redis_co_init()
         INIT_LIST_HEAD(&co->queue1);
         co->running = 1;
 
+        ret = plock_init(&co->plock, "redis_co");
+        if (ret)
+                GOTO(err_ret, ret);
+        
 #if REDIS_CO_THREAD
 #if ENABLE_LOCK_FREE_LIST
         LL_INIT(&(co->list));
@@ -168,10 +172,6 @@ int redis_co_init()
         if (ret)
                 UNIMPLEMENTED(__WARN__);
 #endif
-        ret = plock_init(&co->plock, "redis_co");
-        if (ret)
-                GOTO(err_ret, ret);
-        
         int fd = eventfd(0, EFD_CLOEXEC);
         if (fd < 0) {
                 ret = errno;
@@ -521,7 +521,6 @@ err_ret:
         return ret;
 }
 
-#if REDIS_CO_THREAD
 static void __redis_co_run_task(void *ctx)
 {
         int ret;
@@ -599,35 +598,6 @@ int redis_co_run(void *ctx)
         return 0;
 }
 
-#else
-
-int redis_co_run(void *ctx)
-{
-        int ret;
-        struct list_head list;
-        co_t *co = variable_get_byctx(ctx, VARIABLE_REDIS);
-
-        if (co == NULL) {
-                return 0;
-        }
-
-        if (list_empty(&co->queue1)) {
-                return 0;
-        }
-        
-        INIT_LIST_HEAD(&list);
-
-        list_splice_init(&co->queue1, &list);
-        
-        ret = __redis_co_run(ctx, &list);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-        
-        return 0;
-err_ret:
-        return ret;
-}
-#endif
 
 int co_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
                   void *buf, size_t *len)
