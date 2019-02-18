@@ -2239,15 +2239,23 @@ static int __schedule_task_cleanup()
 {
         int i, waiting = 0;
         const schedule_t *schedule = schedule_self();
-        taskctx_t *taskctx, *tasks = schedule->tasks;
 
 #if SCHEDULE_RUNNING_TASK_LIST
-        list_for_each_entry_safe(taskctx, tasks, &schedule->running_task_list, running_hook) {
+        taskctx_t *taskctx, *tmp;
+        list_for_each_entry_safe(taskctx, tmp, &schedule->running_task_list, running_hook) {
                 i = taskctx->id;
+                if (taskctx->state != TASK_STAT_FREE) {
+                        DINFO("task[%u] name %s wait %s state %u\n",
+                              i, taskctx->name, taskctx->wait_name, taskctx->state);
+                        __schedule_backtrace_set(taskctx);
+                        waiting++;
+                }
+        }
 #else
+        taskctx_t *taskctx, *tasks = schedule->tasks;
+
         for (i = 0; i < schedule->size; ++i) {
                 taskctx = &tasks[i];
-#endif
                 if (taskctx->state != TASK_STAT_FREE) {
                         DINFO("task[%u] name %s wait %s state %u\n",
                               i, tasks[i].name, tasks[i].wait_name, tasks[i].state);
@@ -2255,7 +2263,8 @@ static int __schedule_task_cleanup()
                         waiting++;
                 }
         }
-
+#endif
+        
         DBUG("task finished\n");
 
         return !waiting;
