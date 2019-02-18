@@ -27,12 +27,7 @@
 #include "nodeid.h"
 #include "network.h"
 #include "dbg.h"
-#include "atomic_id.h"
 #include "yatomic.h"
-#ifndef __CYGWIN__
-//#include "leveldb_util.h"
-//#include "leveldb_queue.h"
-#endif
 
 #define POLL_TMO 2
 

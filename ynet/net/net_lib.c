@@ -13,7 +13,6 @@
 #include "../rpc/rpc_proto.h"
 #include "sdevent.h"
 #include "configure.h"
-#include "shm.h"
 #include "dbg.h"
 
 net_global_t ng;

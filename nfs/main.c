@@ -22,7 +22,6 @@
 #include "ynet_rpc.h"
 #include "md_lib.h"
 #include "configure.h"
-#include "nfs_proc.h"
 #include "net_table.h"
 #include "network.h"
 #include "proc.h"

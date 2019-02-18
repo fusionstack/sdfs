@@ -209,10 +209,6 @@ extern void sy_msleep(uint32_t milisec);
 extern int sy_isidle();
 extern int sy_is_mountpoint(const char *path, long f_type);
 
-/* var.c */
-/* args ends with -1 */
-extern int varsum(int first, ...);
-
 /* configure.c */
 extern int conf_init(const char *conf_path);
 extern int nfs_config_init(const char *conf_path);
@@ -226,12 +222,6 @@ int heap_insert(struct heap_t *heap, void *data);
 int heap_pop(struct heap_t *heap, void **data);
 void heap_print(struct heap_t *heap);
 uint32_t heap_len(struct heap_t *heap);
-
-/* async.c */
-
-int async_init();
-int async_push(void *addr, uint32_t len);
-void async_print();
 
 int config_import(addr_t *addr, int *_count, const char *pattern);
 

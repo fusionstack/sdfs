@@ -38,7 +38,6 @@
 #include "sdfs_lib.h"
 #include "md_lib.h"
 #include "yfs_limit.h"
-#include "nfs_proc.h"
 #include "dbg.h"
 
 #define xdr_mountargs xdr_dirpath

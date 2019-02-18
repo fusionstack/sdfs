@@ -6,7 +6,6 @@
 
 #define DBG_SUBSYS S_LIBYNET
 
-#include "align.h"
 #include "sysutil.h"
 #include "configure.h"
 #include "sock_buffer.h"

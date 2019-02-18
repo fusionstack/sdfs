@@ -16,6 +16,8 @@
 #include "redis_util.h"
 #include "schedule.h"
 
+extern __thread int __use_co__;
+
 static int __redis_error(redis_conn_t *conn, const char *func, redisReply *reply)
 {
         int ret;
@@ -59,15 +61,29 @@ int connect_redis(const char *ip, short port, redis_ctx_t **ctx)
         redisContext *c = NULL;
         struct timeval timeout = {1, 500000}; // 1.5s
 
-        c = redisConnectWithTimeout(ip, port, timeout);
-        if (!c || c->err) {
-                if (c) {
-                        DINFO("Connection error: %s, addr %s:%d\n", c->errstr, ip, port);
-                } else {
-                        DINFO("Connection error: can't allocate redis context\n");
+        if (__use_co__) {
+                c = redisConnectNonBlock(ip, port);
+                if (!c || c->err) {
+                        if (c) {
+                                DINFO("Connection error: %s, addr %s:%d\n", c->errstr, ip, port);
+                        } else {
+                                DINFO("Connection error: can't allocate redis context\n");
+                        }
+                        ret = ENONET;
+                        GOTO(err_ret, ret);
                 }
-                ret = ENONET;
-                GOTO(err_ret, ret);
+                
+        } else {
+                c = redisConnectWithTimeout(ip, port, timeout);
+                if (!c || c->err) {
+                        if (c) {
+                                DINFO("Connection error: %s, addr %s:%d\n", c->errstr, ip, port);
+                        } else {
+                                DINFO("Connection error: can't allocate redis context\n");
+                        }
+                        ret = ENONET;
+                        GOTO(err_ret, ret);
+                }
         }
 
         *ctx = c;

@@ -18,8 +18,6 @@
 #include "option.h"
 #include "sdfs_lib.h"
 #include "md_lib.h"
-//#include "leveldb_util.h"
-#include "atomic_id.h"
 
 #define MAX_SUBCMD_DEPTH 8
 #define CMD_NEED_NULL (1 << 0)

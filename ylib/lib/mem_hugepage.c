@@ -25,6 +25,7 @@ typedef struct {
 
 typedef struct {
         int cur;
+        int private;
         sy_spinlock_t lock;
         entry_t array[0];
 } mem_hugepage_t;
@@ -38,7 +39,7 @@ mem_hugepage_t *mem_self()
         return variable_get(VARIABLE_HUGEPAGE);
 }
 
-static int __mem_hugepage_init(mem_hugepage_t **_mem)
+static int __mem_hugepage_init(mem_hugepage_t **_mem, int private)
 {
         int ret, i;
         entry_t *ent;
@@ -75,11 +76,15 @@ static int __mem_hugepage_init(mem_hugepage_t **_mem)
                 //YASSERT((uint64_t)ptr > 1000);
         }
 
-        ret = sy_spin_init(&mem->lock);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
         mem->cur = 0;
+        mem->private = private;
+        
+        if (unlikely(!mem->private)) {
+                ret = sy_spin_init(&mem->lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
+
         *_mem = mem;
 
         static int __enter__ = 0;
@@ -96,16 +101,20 @@ static int __mem_hugepage_ref(mem_hugepage_t *mem, int idx)
         int ret;
         entry_t *ent;
 
-        ret = sy_spin_lock(&mem->lock);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (unlikely(!mem->private)) {
+                ret = sy_spin_lock(&mem->lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
 
         ent = &mem->array[idx];
         YASSERT(ent->ref > 0);
 
         ent->ref++;
 
-        sy_spin_unlock(&mem->lock);
+        if (unlikely(!mem->private)) {
+                sy_spin_unlock(&mem->lock);
+        }
 
         return 0;
 err_ret:
@@ -117,9 +126,11 @@ static int __mem_hugepage_deref(mem_hugepage_t *mem, int idx)
         int ret;
         entry_t *ent;
 
-        ret = sy_spin_lock(&mem->lock);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (unlikely(!mem->private)) {
+                ret = sy_spin_lock(&mem->lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
 
         ent = &mem->array[idx];
 
@@ -132,7 +143,9 @@ static int __mem_hugepage_deref(mem_hugepage_t *mem, int idx)
 
         YASSERT(ent->ref >= 0);
 
-        sy_spin_unlock(&mem->lock);
+        if (unlikely(!mem->private)) {
+                sy_spin_unlock(&mem->lock);
+        }
 
         return 0;
 err_ret:
@@ -155,7 +168,8 @@ static int __mem_hugepage_new__(int32_t *idx, void **ptr, uint32_t _size, entry_
         }
 
         if (ent->offset + size > ent->size) {
-                DBUG("fd %d size %d offset %d size %u\n", ent->idx, ent->size, ent->offset, size);
+                DBUG("fd %d size %d offset %d size %u\n", ent->idx, ent->size,
+                     ent->offset, size);
                 ent->offset = ent->size;
                 ret = ENOMEM;
                 goto err_ret;
@@ -208,9 +222,11 @@ static int __mem_hugepage_new(mem_hugepage_t *mem, uint32_t size, mem_handler_t 
 
         DBUG("new %u\n", size);
 
-        ret = sy_spin_lock(&mem->lock);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (unlikely(!mem->private)) {
+                ret = sy_spin_lock(&mem->lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
 
         while (1) {
                 ent = &mem->array[mem->cur];
@@ -231,7 +247,9 @@ static int __mem_hugepage_new(mem_hugepage_t *mem, uint32_t size, mem_handler_t 
                 break;
         }
 
-        sy_spin_unlock(&mem->lock);
+        if (unlikely(!mem->private)) {
+                sy_spin_unlock(&mem->lock);
+        }
 
         mem_handler->idx = idx;
         mem_handler->pool = mem;
@@ -239,7 +257,9 @@ static int __mem_hugepage_new(mem_hugepage_t *mem, uint32_t size, mem_handler_t 
 
         return 0;
 err_lock:
-        sy_spin_unlock(&mem->lock);
+        if (unlikely(!mem->private)) {
+                sy_spin_unlock(&mem->lock);
+        }
         DWARN("no memory, count %u, size %u\n", gloconf.memcache_count, gloconf.memcache_seg);
         //UNIMPLEMENTED(__DUMP__);
         EXIT(EAGAIN);
@@ -278,7 +298,7 @@ int mem_hugepage_init()
         }
         
         YASSERT(__mem_hugepage__ == NULL);
-        return __mem_hugepage_init(&__mem_hugepage__);
+        return __mem_hugepage_init(&__mem_hugepage__, 0);
 }
 
 int mem_hugepage_private_init()
@@ -290,9 +310,11 @@ int mem_hugepage_private_init()
                 DINFO("disable memcache\n");
                 return 0;
         }
+
+        DWARN("private nolock disabled\n");
         
         YASSERT(__mem_hugepage_private__ == NULL);
-        ret = __mem_hugepage_init(&__mem_hugepage_private__);
+        ret = __mem_hugepage_init(&__mem_hugepage_private__, 0);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }

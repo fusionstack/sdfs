@@ -29,6 +29,14 @@ typedef enum {
 
 #define RET_MAGIC 0x866aa9f0
 
+int __sy_spin_lock(pthread_spinlock_t *lock, const char *name)
+{
+        if (schedule_running()) {
+                DINFO("lock %s\n", name);
+        }
+        return pthread_spin_lock(lock);
+}
+
 typedef struct {
         struct list_head hook;
         char lock_type;

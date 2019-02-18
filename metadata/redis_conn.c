@@ -15,29 +15,6 @@
 #include "maping.h"
 #include "dbg.h"
 
-typedef struct{
-        int magic;
-        int erased;
-        int used;
-        redis_conn_t *conn;
-} __conn_t;
-
-typedef struct{
-        pthread_rwlock_t lock;
-        int sequence;
-        int count;
-        __conn_t *conn;
-} __conn_sharding_t;
-
-typedef struct {
-        pthread_rwlock_t lock;
-        int sequence;
-        int sharding;
-        __conn_sharding_t *shardings;
-        volid_t volid;
-        char volume[MAX_NAME_LEN];
-} redis_vol_t;
-
 //static redis_vol_t *__conn__;
 static int __conn_magic__ = 0;
 extern int __redis_conn_pool__;
@@ -274,7 +251,7 @@ int redis_conn_get(const volid_t *volid, int sharding, int worker, redis_handler
         int ret, idx;
         redis_vol_t *vol;
 
-        YASSERT(!schedule_running());
+        //YASSERT(!schedule_running());
         
         ret = __redis_vol_get(volid, &vol, O_CREAT);
         if(ret)

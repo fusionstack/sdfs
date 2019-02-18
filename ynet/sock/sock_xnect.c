@@ -10,7 +10,6 @@
 
 #define DBG_SUBSYS S_LIBYNET
 
-#include "align.h"
 #include "net_global.h"
 #include "ylib.h"
 #include "sock_tcp.h"

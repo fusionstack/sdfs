@@ -237,7 +237,7 @@ void __sunrpc_check__(void *arg1, void *arg2)
         
         (void) arg2;
 
-        DINFO("sunrpc check, host %s, running %d, socked %d\n",
+        DINFO("sunrpc client %s, running %d, socked %d\n",
               ctx->host, ctx->running, ctx->sockid.sd);
 
         if (ctx->running)
@@ -283,6 +283,7 @@ int sunrpc_accept(int srv_sd)
                 GOTO(err_sd, ret);
 
         int flag = CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE;
+        //int flag = CORE_FLAG_ACTIVE;
 
 #if ENABLE_REDIS_CO
         flag = flag | CORE_FLAG_REDIS;

@@ -722,7 +722,7 @@ int corerpc_init(const char *name, core_t *core)
         int ret;
         rpc_table_t *__rpc_table_private__;
 
-        ret = rpc_table_init(name, &__rpc_table_private__, 0);
+        ret = rpc_table_init(name, &__rpc_table_private__, 1);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 

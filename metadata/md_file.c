@@ -3,7 +3,6 @@
 
 #define DBG_SUBSYS S_YFSMDC
 
-#include "array.h"
 #include "sdfs_buffer.h"
 #include "file_proto.h"
 #include "job_dock.h"

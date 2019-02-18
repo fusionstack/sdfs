@@ -19,6 +19,12 @@
 #include <errno.h>
 #include <pthread.h>
 
+#define ENABLE_SCHEDULE_LL 0
+
+#if ENABLE_SCHEDULE_LL
+#include <ll.h>
+#endif
+
 #include "ylib.h"
 #include "dbg.h"
 #include "sdfs_list.h"
@@ -55,12 +61,21 @@
 #define SCHEDULE_STATUS_RUNNING 2
 
 #if SCHEDULE_REPLY_NEW
-typedef struct {
+
+typedef struct reply_remote {
         struct list_head hook;
         buffer_t buf;
         task_t task;
         int retval;
+#if ENABLE_SCHEDULE_LL
+        LL_ENTRY(reply_remote)entry;
+#endif
 } reply_remote_t;
+
+#if ENABLE_SCHEDULE_LL
+LL_HEAD(reply_remote_list, reply_remote);
+LL_GENERATE(reply_remote_list, reply_remote, entry);
+#endif
 
 #endif
 
@@ -229,8 +244,13 @@ typedef struct schedule_t {
         reply_queue_t reply_local;
 
 #if SCHEDULE_REPLY_NEW
+#if ENABLE_SCHEDULE_LL
+        struct reply_remote_list reply_remote_lfl;
+#else
         sy_spinlock_t reply_remote_lock;
         struct list_head reply_remote_list;
+#endif
+
 #else
         reply_queue_t reply_remote;
 #endif

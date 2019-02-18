@@ -4,7 +4,6 @@
 
 #include "ynet_net.h"
 #include "configure.h"
-#include "shm.h"
 #include "net_global.h"
 #include "job_dock.h"
 #include "rpc_proto.h"
@@ -76,7 +75,7 @@ int rpc_init(net_proto_t *op, const char *name, int seq, const char *path)
         if (ret)
                 GOTO(err_ret, ret);
         
-        ret = rpc_table_init("default", &__rpc_table__, 1);
+        ret = rpc_table_init("default", &__rpc_table__, 0);
         if (ret)
                 GOTO(err_ret, ret);
 

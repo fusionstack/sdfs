@@ -15,7 +15,6 @@
 
 #define DBG_SUBSYS S_YFSLIB
 
-#include "shm.h"
 #include "yfs_conf.h"
 #include "etcd.h"
 #include "network.h"

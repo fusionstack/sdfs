@@ -235,7 +235,7 @@ typedef struct {
 
 #define REDIS_CONN_POOL 64
 
-#define ENABLE_CO_WORKER 0
+#define ENABLE_CO_WORKER 1
 
 #if ENABLE_CO_WORKER
 #define ENABLE_REDIS_CO 1
@@ -244,5 +244,7 @@ typedef struct {
 #endif
 
 #define ENABLE_REDIS_PIPELINE 0
+
+#define ENABLE_LOCK_FREE_LIST 0
 
 #endif

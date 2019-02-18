@@ -16,5 +16,6 @@ int co_kset(const volid_t *volid, const fileid_t *fileid, const void *value,
 int co_kdel(const volid_t *volid, const fileid_t *fileid);
 int co_klock(const volid_t *volid, const fileid_t *fileid, int ttl, int block);
 int co_kunlock(const volid_t *volid, const fileid_t *fileid);
+int co_newsharing(const volid_t *volid, uint8_t *idx);
 
 #endif

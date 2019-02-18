@@ -36,7 +36,6 @@
 #include "sdfs_lib.h"
 #include "core.h"
 #include "yfs_limit.h"
-#include "nfs_proc.h"
 #include "dbg.h"
 
 #define __FREE_ARGS(__func__, __request__)              \

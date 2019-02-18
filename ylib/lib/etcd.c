@@ -167,7 +167,7 @@ static int __etcd_set(const char *key, const char *value,
                 }
         } else {
                 if (unlikely(schedule_self()))
-                        DERROR("etcd request in core but no task!!!");
+                        DERROR("etcd request in core but no task!!!\n");
 
                 ret = __etcd_set__(key, value, precond, flag, ttl);
                 if (ret) {
@@ -229,7 +229,7 @@ static int __etcd_get(const char *key, etcd_node_t **result, int consistent)
                 }
         } else {
                 if (unlikely(schedule_self()))
-                        DERROR("etcd request in core but no task!!!");
+                        DERROR("etcd request in core but no task!!!\n");
 
                 ret = __etcd_get__(__ETCD_SRV__, key, &node, consistent);
                 if (ret) {
@@ -304,7 +304,7 @@ static int __etcd_del(etcd_session sess, char *key)
                 }
         } else {
                 if (unlikely(schedule_self()))
-                        DERROR("etcd request in core but no task!!!");
+                        DERROR("etcd request in core but no task!!!\n");
 
                 ret = __etcd_delete__(sess, key);
                 if (unlikely(ret)) {
@@ -370,14 +370,15 @@ static int __etcd_del_dir(etcd_session sess, char *key, int recursive)
 
         YASSERT(sess);
         if (likely(schedule_running())) {
-                ret = schedule_newthread(SCHE_THREAD_ETCD, _random(), FALSE, "etcd_del", -1, __etcd_del_dir_request,
-                                sess, key, recursive);
+                ret = schedule_newthread(SCHE_THREAD_ETCD, _random(), FALSE, "etcd_del",
+                                         -1, __etcd_del_dir_request,
+                                         sess, key, recursive);
                 if (unlikely(ret)) {
                         GOTO(err_ret, ret);
                 }
         } else {
                 if (unlikely(schedule_self()))
-                        DERROR("etcd request in core but no task!!!");
+                        DERROR("etcd request in core but no task!!!\n");
 
                 ret = __etcd_deletedir__(sess, key, recursive);
                 if (unlikely(ret)) {

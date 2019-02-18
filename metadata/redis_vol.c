@@ -145,7 +145,7 @@ int redis_vol_get(const volid_t *volid, void **conn)
 
         DBUG("private table %p\n", vol_tab_private);
         
-        YASSERT(!schedule_running());
+        //YASSERT(!schedule_running());
         
         ret = pthread_rwlock_rdlock(&vol_tab->lock);
         if(ret)

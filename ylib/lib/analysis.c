@@ -27,6 +27,7 @@ typedef struct {
 
 struct {
         struct list_head list;
+        int private;
         sy_spinlock_t lock;
         sem_t sem;
         int inited;
@@ -41,9 +42,11 @@ static int __analysis_count(analysis_t *ana, const char *name, uint64_t _time)
 
         DBUG("count %s time %llu\n", name, (LLU)_time);
 
-        ret = sy_spin_lock(&ana->tab_lock);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (unlikely(!ana->private)) {
+                ret = sy_spin_lock(&ana->tab_lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
 
         ent = hash_table_find(ana->tab, (void *)name);
         if (ent == NULL) {
@@ -67,11 +70,15 @@ static int __analysis_count(analysis_t *ana, const char *name, uint64_t _time)
 
         DBUG("%s: (%s, count)\n", ana->name, ent->name, ent->count);
         
-        sy_spin_unlock(&ana->tab_lock);
+        if (unlikely(!ana->private)) {
+                sy_spin_unlock(&ana->tab_lock);
+        }
 
         return 0;
 err_lock:
-        sy_spin_unlock(&ana->tab_lock);
+        if (unlikely(!ana->private)) {
+                sy_spin_unlock(&ana->tab_lock);
+        }
 err_ret:
         return ret;
 }

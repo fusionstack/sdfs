@@ -6,7 +6,7 @@
 #include "ylib.h"
 #include "dbg.h"
 
-#define ENABLE_ALLOCATE_BALANCE 0
+#define ENABLE_ALLOCATE_BALANCE 1
 
 int allocator_init();
 int allocator_new(int repnum, int hardend, int tier, nid_t *disks);

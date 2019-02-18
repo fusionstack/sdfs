@@ -34,7 +34,6 @@
 #include "configure.h"
 #include "sdfs_lib.h"
 #include "yfs_limit.h"
-#include "nfs_proc.h"
 #include "dbg.h"
 
 static int __sdfs_dir_itor1(const dirid_t *dirid, func1_t func, void *ctx)

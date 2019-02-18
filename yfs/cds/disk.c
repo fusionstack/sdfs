@@ -15,7 +15,6 @@
 
 #define DBG_SUBSYS S_YFSCDS
 
-#include "shm.h"
 #include "yfs_conf.h"
 #include "yfscds_conf.h"
 #include "chk_meta.h"
