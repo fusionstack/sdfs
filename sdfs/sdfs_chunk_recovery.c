@@ -503,7 +503,7 @@ int sdfs_chunk_recovery(const chkid_t *chkid)
 
         repmin = (md.plugin != PLUGIN_NULL) ? md.k : 1;
 
-        begin = time(NULL);
+        begin = gettime();
         ret = klock(NULL, chkid, 20, 0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -531,7 +531,7 @@ int sdfs_chunk_recovery(const chkid_t *chkid)
                 DBUG("status %u\n", nid->status);
         }
 
-        now = time(NULL);
+        now = gettime();
         if (now - begin > 10) {
                 ret = ETIMEDOUT;
                 GOTO(err_lock, ret);

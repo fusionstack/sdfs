@@ -780,7 +780,7 @@ static int __nfs3_create_svc(const sockid_t *sockid, const sunrpc_request_t *req
 #endif
 
                 YASSERT(attr->size.set_it != TRUE);
-                atime = time(NULL);
+                atime = gettime();
                 mtime = atime;
         }
 

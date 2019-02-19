@@ -25,6 +25,7 @@
 #include "configure.h"
 #include "core.h"
 #include "redis_co.h"
+#include "attr_queue.h"
 #if ENABLE_CORENET
 #include "corenet_maping.h"
 #include "corenet_connect.h"
@@ -216,6 +217,10 @@ static inline void IO_FUNC __core_worker_run(core_t *core, void *ctx)
 
         schedule_run(core->schedule);
 
+#if ENABLE_ATTR_QUEUE
+        attr_queue_run(ctx);
+#endif
+        
 #if ENABLE_CORE_PIPELINE
         __core_pipeline_forward();
 #endif
@@ -415,6 +420,12 @@ static int __core_worker_init(core_t *core)
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
+#endif
+
+#if ENABLE_ATTR_QUEUE
+        ret = attr_queue_init();
+        if (unlikely(ret))
+                GOTO(err_ret, ret);
 #endif
         
         variable_set(VARIABLE_CORE, core);
@@ -1237,10 +1248,16 @@ err_ret:
 }
 
 #if 1
-void core_worker_exit(core_t *core)
+int core_worker_exit(core_t *core)
 {
+        int ret;
+        
         DINFO("core[%u] destroy begin\n", core->hash);
 
+        ret = attr_queue_destroy();
+        if (ret)
+                GOTO(err_ret, ret);
+        
         corenet_tcp_destroy(&core->tcp_net);
         gettime_private_destroy();
 
@@ -1284,5 +1301,9 @@ void core_worker_exit(core_t *core)
         }
 
         schedule_destroy(core->schedule);
+
+        return 0;
+err_ret:
+        return ret;
 }
 #endif

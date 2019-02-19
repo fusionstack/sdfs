@@ -199,7 +199,13 @@ void md_attr_update(md_proto_t *md, const setattr_t *setattr)
         }
 
         if (setattr->size.set_it) {
-                md->at_size = setattr->size.size;
+                if (setattr->size.set_it == __SET_TRUNCATE) {
+                        md->at_size = setattr->size.size;
+                } else if (setattr->size.set_it == __SET_EXTERN) {
+                        md->at_size = setattr->size.size > md->at_size
+                                ? setattr->size.size : md->at_size;
+                }
+
                 md->chknum = _get_chknum(md->at_size, md->split);
                 changed = 1;
         }

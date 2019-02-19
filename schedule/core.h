@@ -110,7 +110,7 @@ int core_attach(int hash, const sockid_t *sockid, const char *name, void *ctx,
 core_t *core_get(int hash);
 core_t *core_self();
 
-void core_worker_exit(core_t *core);
+int core_worker_exit(core_t *core);
 int core_request_async(int hash, int priority, const char *name, func_t exec, void *arg);
 int core_request(int hash, int priority, const char *name, func_va_t exec, ...);
 int core_request_new(core_t *core, int priority, const char *name, func_va_t exec, ...);

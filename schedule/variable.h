@@ -16,6 +16,7 @@ typedef enum {
         VARIABLE_GETTIME,
         VARIABLE_REDIS,
         VARIABLE_ANALYSIS,
+        VARIABLE_ATTR_QUEUE,
         VARIABLE_MAX,
 } variable_type_t;
 

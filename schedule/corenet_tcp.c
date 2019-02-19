@@ -328,7 +328,8 @@ static void __corenet_close__(const sockid_t *sockid)
         //DBUG("close %d\n", sd);
 
         sd = node->sockid.sd;
-        DINFO("corenet_tcp close %s[%u] %s sd %d, ev %x\n", schedule->name, schedule->id, node->name, sd, node->ev);
+        DINFO("corenet_tcp close %s[%u] %s sd %d, ev %x\n", schedule->name,
+              schedule->id, node->name, sd, node->ev);
         YASSERT(node->ev);
         
         if (node->ev) {

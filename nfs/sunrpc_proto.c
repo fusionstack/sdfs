@@ -232,6 +232,7 @@ static int __sunrpc_recv(void *_ctx, void *buf, int *_count)
 
 void __sunrpc_check__(void *arg1, void *arg2)
 {
+        int ret;
         sunrpc_ctx_t *ctx = arg1;
         core_t *core = core_self();
         
@@ -243,7 +244,13 @@ void __sunrpc_check__(void *arg1, void *arg2)
         if (ctx->running)
                 return;
 
-        core_worker_exit(core);
+        ret = core_worker_exit(core);
+        if (ret) {
+                DWARN("sunrpc client %s, exit fail, wait next\n",
+                      ctx->host);
+                return;
+        }
+        
         DINFO("sunrpc host %s, exit\n", ctx->host);
         yfree((void**)&ctx);
         pthread_exit(NULL);

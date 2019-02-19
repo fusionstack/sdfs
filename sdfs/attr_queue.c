@@ -10,6 +10,7 @@
 #include "net_global.h"
 #include "network.h"
 #include "core.h"
+#include "plock.h"
 #include "main_loop.h"
 #include "schedule.h"
 #include "md_lib.h"
@@ -22,32 +23,27 @@
 #define ATTR_OP_SETTIME   0x00002
 #define ATTR_OP_TRUNCATE  0x00004
 
-#define ATTR_OP_MAX 512
+#define ATTR_QUEUE_TMO 1
 
 typedef struct {
-        sy_spinlock_t lock;
-        sem_t sem;
-        volid_t volid;
+        struct list_head hook;
         fileid_t fileid;
-        int op;
-        size_t size;
+        volid_t volid;
+        int running;
+        __set_size size;
         __set_time atime;
         __set_time btime;
         __set_time ctime;
         __set_time mtime;
-} attr_op_t;
+        struct list_head wait_list;
+} entry_t;
 
 typedef struct {
-        sy_spinlock_t lock;
-        struct list_head wait_list;
-        int eventfd;
-        int begin;
-        int len;
-        attr_op_t *queue;
+        plock_t plock;
+        time_t update;
+        hashtable_t tab;
+        struct list_head list;
 } attr_queue_t;
-
-static int __count__ = 0;
-static attr_queue_t *__attr_queue__ = NULL;
 
 typedef struct {
         struct list_head hook;
@@ -55,55 +51,129 @@ typedef struct {
 } wait_t;
         
 
-static void __attr_queue_set(attr_op_t *attr_op, const volid_t *volid, const fileid_t *fileid, int op, const void *arg)
+static int __attr_queue_update(entry_t *ent, int op, const void *arg)
 {
         int ret;
 
-        ret = sy_spin_lock(&attr_op->lock);
-        YASSERT(ret == 0);
-
-        attr_op->fileid = *fileid;
-        attr_op->volid = *volid;
         if (op == ATTR_OP_EXTERN) {
                 const uint64_t *size = arg;
-                attr_op->size = *size;
-        } else if (op == ATTR_OP_SETTIME) {
-                const setattr_t *setattr = arg;
-                attr_op->atime = setattr->atime;
-                attr_op->btime = setattr->btime;
-                attr_op->ctime = setattr->ctime;
-                attr_op->mtime = setattr->mtime;
+                if (ent->size.set_it == __SET_EXTERN) {
+                        ent->size.size = ent->size.size > *size
+                                ? ent->size.size : *size;
+                } else if (ent->size.set_it == __NOT_SET_SIZE) {
+                        ent->size.size = *size;
+                } else {
+                        DWARN("set "CHKID_FORMAT" busy\n", CHKID_ARG(&ent->fileid));
+                        ret = EBUSY;
+                        GOTO(err_ret, ret);
+                }
+
+                ent->size.set_it = ATTR_OP_EXTERN;
+                ent->size.size = __SET_EXTERN;
         } else if (op == ATTR_OP_TRUNCATE) {
                 const uint64_t *size = arg;
-                attr_op->size = *size;
+                ent->size.size = *size;
+                ent->size.size = __SET_TRUNCATE;
+        } else if (op == ATTR_OP_SETTIME) {
+                const setattr_t *setattr = arg;
+                ent->atime = setattr->atime;
+                ent->btime = setattr->btime;
+                ent->ctime = setattr->ctime;
+                ent->mtime = setattr->mtime;
         } else {
                 UNIMPLEMENTED(__DUMP__);
         }
 
-        attr_op->op = op;
-        
-        sy_spin_unlock(&attr_op->lock);
+        return 0;
+err_ret:
+        return ret;
 }
 
-static void __attr_queue_unset(attr_op_t *attr_op)
+static int __attr_queue_create(attr_queue_t *attr_queue, const volid_t *volid,
+                               const fileid_t *fileid, int op, const void *arg)
 {
         int ret;
+        entry_t *ent;
 
-        ret = sy_spin_lock(&attr_op->lock);
+        ret = ymalloc((void **)&ent, sizeof(*ent));
+        if (ret)
+                GOTO(err_ret, ret);
+
+        memset(ent, 0x0, sizeof(*ent));
+        INIT_LIST_HEAD(&ent->wait_list);
+
+        ret = __attr_queue_update(ent, op, arg);
         YASSERT(ret == 0);
 
-        memset(&attr_op->fileid, 0x0, sizeof(attr_op->fileid));
-        attr_op->op = 0;
+        ent->volid = *volid;
+        YASSERT(volid->snapvers == 0);
+        ent->fileid = *fileid;
+        YASSERT(fileid->type);
 
-        sy_spin_unlock(&attr_op->lock);
+        DBUG("add "CHKID_FORMAT"\n", CHKID_ARG(&ent->fileid));
+
+        ret = hash_table_insert(attr_queue->tab, (void *)ent, (void *)&ent->fileid, 0);
+        if (ret)
+                UNIMPLEMENTED(__DUMP__);
+        
+        list_add_tail(&ent->hook, &attr_queue->list);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+static void __attr_queue_remove(attr_queue_t *attr_queue, entry_t *ent)
+{
+        int ret;
+        struct list_head *pos, *n;
+        wait_t *wait;
+        entry_t *tmp;
+
+        DBUG("remove "CHKID_FORMAT" %p\n", CHKID_ARG(&ent->fileid), ent);
+        
+        ret = hash_table_remove(attr_queue->tab, (void *)&ent->fileid, (void **)&tmp);
+        YASSERT(ret == 0);
+
+        list_del(&ent->hook);
+
+        list_for_each_safe(pos, n, &ent->wait_list) {
+                list_del(pos);
+                wait = (void *)pos;
+                schedule_resume(&wait->task, 0, NULL);
+        }
+
+        yfree((void **)&ent);
+}
+
+static int __attr_wait(entry_t *ent)
+{
+        int ret;
+        wait_t wait;
+        
+        wait.task = schedule_task_get();
+        list_add_tail(&wait.hook, &ent->wait_list);
+
+        ret = schedule_yield1("attr_queue_wait", NULL, NULL, NULL, -1);
+        if (ret) {
+                GOTO(err_ret, ret);
+        }
+
+        return 0;
+err_ret:
+        return ret;
 }
 
 static int __attr_queue(const volid_t *volid, const fileid_t *fileid, int op, const void *arg)
 {
         int ret, retry = 0;
-        attr_queue_t *attr_queue = &__attr_queue__[fileid_hash(fileid) % __count__];
-        wait_t wait;
+        attr_queue_t *attr_queue = variable_get(VARIABLE_ATTR_QUEUE);
+        entry_t *ent;
 
+        if (attr_queue == NULL) {
+                return 0;
+        }
+        
         DBUG("queue "CHKID_FORMAT"\n", CHKID_ARG(fileid));
 
         if (unlikely(volid == NULL)) {
@@ -111,152 +181,114 @@ static int __attr_queue(const volid_t *volid, const fileid_t *fileid, int op, co
                 volid_t _volid = {fileid->volid, 0};
                 volid = &_volid;
         }
-        
+
 retry:
-        ret = sy_spin_lock(&attr_queue->lock);
-        if (ret)
-                GOTO(err_ret, ret);
+        ent = hash_table_find(attr_queue->tab, (void *)fileid);
+        if (ent) {
+                if (ent->running) {
+                        ret = __attr_wait(ent);
+                        if (ret)
+                                GOTO(err_ret, ret);
 
-        if (attr_queue->len + 1 > ATTR_OP_MAX) {
-                wait.task = schedule_task_get();
-                list_add_tail(&wait.hook, &attr_queue->wait_list);
-                sy_spin_unlock(&attr_queue->lock);
+                        DWARN("queue "CHKID_FORMAT", retrt %u\n", CHKID_ARG(fileid), retry);
+                        retry++;
 
-                DBUG("attr queue wait\n");
-                ret = schedule_yield1("attr_queue_wait", NULL, NULL, NULL, -1);
-                if (ret) {
+                        goto retry;
+                } else {
+                        __attr_queue_update(ent, op, arg);
+                }
+        } else {
+                ret = __attr_queue_create(attr_queue, volid, fileid, op, arg);
+                if (ret)
                         GOTO(err_ret, ret);
-                }
-
-                DBUG("attr queue wait return\n");
-                
-                if (retry > 10) {
-                        DWARN("retry %u\n", retry);
-                }
-
-                retry++;
-                goto retry;
         }
-
-        if (retry > 5) {
-                DINFO("retry %u success\n", retry);
-        }
-
-        DBUG("attr queue len %u\n", attr_queue->len);
-        attr_op_t *attr_op = &attr_queue->queue[(attr_queue->begin + attr_queue->len)
-                                                % ATTR_OP_MAX];
-        __attr_queue_set(attr_op, volid, fileid, op, arg);
-        attr_queue->len++;
-        
-        sy_spin_unlock(&attr_queue->lock);
-
-        uint64_t e = 1;
-        ret = write(attr_queue->eventfd, &e, sizeof(e));
-        if (ret < 0) {
-                ret = errno;
-                GOTO(err_ret, ret);
-        }
-                
         
         return 0;
 err_ret:
         return ret;
 }
 
-int attr_queue_settime(const volid_t *volid, const fileid_t *fileid, const setattr_t *setattr)
+int attr_queue_settime(const volid_t *volid, const fileid_t *fileid, const void *setattr)
 {
+        DBUG("set "CHKID_FORMAT"\n", CHKID_ARG(fileid));
         return __attr_queue(volid, fileid, ATTR_OP_SETTIME, setattr);
 }
 
 int attr_queue_extern(const volid_t *volid, const fileid_t *fileid, uint64_t size)
 {
+        DBUG("set "CHKID_FORMAT"\n", CHKID_ARG(fileid));
         return __attr_queue(volid, fileid, ATTR_OP_EXTERN, &size);
 }
 
 int attr_queue_truncate(const volid_t *volid, const fileid_t *fileid, uint64_t size)
 {
+        DBUG("set "CHKID_FORMAT"\n", CHKID_ARG(fileid));
         return __attr_queue(volid, fileid, ATTR_OP_TRUNCATE, &size);
 }
 
-int attr_queue_update(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
+int attr_queue_update(const volid_t *volid, const fileid_t *fileid, void *_md)
 {
-        int ret, begin, count;
-        attr_queue_t *attr_queue = &__attr_queue__[fileid_hash(fileid) % __count__];
-        attr_op_t *attr_op;
+        attr_queue_t *attr_queue = variable_get(VARIABLE_ATTR_QUEUE);
+        entry_t *ent;
+        md_proto_t *md = _md;
+
+        if (attr_queue == NULL) {
+                return 0;
+        }
+        
+        (void) volid;
+        
+        ent = hash_table_find(attr_queue->tab, (void *)fileid);
+        if (ent == NULL) {
+                return 0;
+        }
 
         DBUG("update "CHKID_FORMAT"\n", CHKID_ARG(fileid));
-        
-        begin = attr_queue->begin;
-        count = attr_queue->len;
 
-        for (int i = 0; i < count; i++) {
-                attr_op = &attr_queue->queue[(i + begin) % ATTR_OP_MAX];
-
-                if (fileid_cmp(fileid, &attr_op->fileid) != 0
-                    || volid->snapvers != attr_op->volid.snapvers) {
-                        continue;
-                }
-
-                ret = sy_spin_lock(&attr_op->lock);
-                if (ret)
-                        GOTO(err_ret, ret);
-
-                if (fileid_cmp(fileid, &attr_op->fileid) != 0) {
-                        DBUG("update "CHKID_FORMAT" skiped\n", CHKID_ARG(&attr_op->fileid));
-                        sy_spin_unlock(&attr_op->lock);
-                        continue;
-                }
-                
-                if (attr_op->op == ATTR_OP_EXTERN) {
-                        md->at_size = (md->at_size > attr_op->size)
-                                ? md->at_size : attr_op->size;
-                        DBUG("update "CHKID_FORMAT" size\n", CHKID_ARG(&attr_op->fileid));
-                } else if (attr_op->op == ATTR_OP_SETTIME) {
-                        setattr_t setattr;
-                        setattr_init(&setattr, -1, -1, NULL, -1, -1, -1);
-                        setattr.atime = attr_op->atime;
-                        setattr.btime = attr_op->btime;
-                        setattr.ctime = attr_op->ctime;
-                        setattr.mtime = attr_op->mtime;
-                        md_attr_update(md, &setattr);
-                        DBUG("update "CHKID_FORMAT" time\n", CHKID_ARG(&attr_op->fileid));
-                } else if (attr_op->op == ATTR_OP_TRUNCATE) {
-                        md->at_size = attr_op->size;
-                } else {
-                        UNIMPLEMENTED(__DUMP__);
-                }
-                
-                sy_spin_unlock(&attr_op->lock);
+        if (ent->size.set_it == __SET_EXTERN) {
+                md->at_size = (md->at_size > ent->size.size)
+                        ? md->at_size : ent->size.size;
+                DBUG("update "CHKID_FORMAT" size\n", CHKID_ARG(&ent->fileid));
+        } else if (ent->size.set_it == __SET_TRUNCATE) {
+                md->at_size = ent->size.size;
         }
-        
+
+        setattr_t setattr;
+        setattr_init(&setattr, -1, -1, NULL, -1, -1, -1);
+        setattr.atime = ent->atime;
+        setattr.btime = ent->btime;
+        setattr.ctime = ent->ctime;
+        setattr.mtime = ent->mtime;
+        md_attr_update(md, &setattr);
+
         return 0;
-err_ret:
-        return ret;
 }
 
-static void __attr_queue_run__(void *arg)
+static void __attr_queue_run__(entry_t *ent)
 {
         int ret, retry = 0;
-        attr_op_t *attr_op = arg;
         setattr_t setattr;
 
-retry:
-        if (attr_op->op == ATTR_OP_EXTERN) {
-                ret = md_extend(&attr_op->volid, &attr_op->fileid, attr_op->size);
-        } else if (attr_op->op == ATTR_OP_SETTIME) {
-                setattr_init(&setattr, -1, -1, NULL, -1, -1, -1);
-                setattr.atime = attr_op->atime;
-                setattr.btime = attr_op->btime;
-                setattr.ctime = attr_op->ctime;
-                setattr.mtime = attr_op->mtime;
-                
-                ret = md_setattr(&attr_op->volid, &attr_op->fileid, &setattr, 1);
-        } else if (attr_op->op == ATTR_OP_TRUNCATE) {
-                ret = md_truncate(&attr_op->volid, &attr_op->fileid, attr_op->size);
-        } else {
-                UNIMPLEMENTED(__DUMP__);
+        setattr_init(&setattr, -1, -1, NULL, -1, -1, -1);
+        
+        if (ent->size.set_it) {
+                setattr.size = ent->size;
         }
 
+        if (ent->atime.set_it != __DONT_CHANGE
+            || ent->btime.set_it != __DONT_CHANGE
+            || ent->ctime.set_it != __DONT_CHANGE
+            || ent->mtime.set_it != __DONT_CHANGE) {
+                setattr.atime = ent->atime;
+                setattr.btime = ent->btime;
+                setattr.ctime = ent->ctime;
+                setattr.mtime = ent->mtime;
+        }
+
+        YASSERT(ent->volid.snapvers == 0);
+retry:
+        ret = md_setattr(&ent->volid, &ent->fileid, &setattr, 1);
+        
         if (ret) {
                 ret = _errno(ret);
                 if (ret == EAGAIN) {
@@ -264,131 +296,98 @@ retry:
                 } else
                         GOTO(err_ret, ret);
         }
-
-        sem_post(&attr_op->sem);
         
         return;
 err_ret:
-        DWARN("set "CHKID_FORMAT" fail\n", CHKID_ARG(&attr_op->fileid));
-        sem_post(&attr_op->sem);
+        DWARN("set "CHKID_FORMAT" fail\n", CHKID_ARG(&ent->fileid));
         return;
 }
 
-static int __attr_queue_run(attr_queue_t *attr_queue)
+static void __attr_queue_run_task(void *var)
 {
-        int ret, begin, count;
-        attr_op_t *attr_op;
-        wait_t *wait;
+        int ret;
+        entry_t *ent;
+        attr_queue_t *attr_queue = variable_get_byctx(var, VARIABLE_ATTR_QUEUE);
 
-        begin = attr_queue->begin;
-        count = attr_queue->len;
-
-        DBUG("run[%d, %d]\n", begin, begin + count);
-        
-        for (int i = 0; i < count; i++) {
-                attr_op = &attr_queue->queue[(i + begin) % ATTR_OP_MAX];
-
-                ret = core_request_async(fileid_hash(&attr_op->fileid), -1,
-                                         "attr_queue_run", __attr_queue_run__,
-                                         attr_op);
-                if (ret)
-                        UNIMPLEMENTED(__DUMP__);
-        }
-
-        for (int i = 0; i < count; i++) {
-                attr_op = &attr_queue->queue[(i + begin) % ATTR_OP_MAX];
-
-                ret = sem_wait(&attr_op->sem);
-                if (ret)
-                        GOTO(err_ret, ret);
-
-                DBUG("set "CHKID_FORMAT" success\n", CHKID_ARG(&attr_op->fileid));
-                
-                __attr_queue_unset(attr_op);
-
-                ret = sy_spin_lock(&attr_queue->lock);
-                if (ret)
-                        GOTO(err_ret, ret);
-
-                attr_queue->begin = (attr_queue->begin + 1) % ATTR_OP_MAX;
-                attr_queue->len--;
-
-                if (!list_empty(&attr_queue->wait_list)) {
-                        wait = (void *)attr_queue->wait_list.next;
-                        list_del(&wait->hook);
+        ret = plock_trywrlock(&attr_queue->plock);
+        if (ret) {
+                if (ret == EBUSY) {
+                        return;
                 } else {
-                        wait = NULL;
-                }
-                
-                sy_spin_unlock(&attr_queue->lock);
-
-                if (wait) {
-                        schedule_resume(&wait->task, 0, NULL);
+                        UNIMPLEMENTED(__DUMP__);
                 }
         }
         
-        return 0;
-err_ret:
-        return ret;
-}
-
-
-static void *__attr_queue_worker(void *arg)
-{
-        attr_queue_t *attr_queue = arg;
-
-        while (1) {
-                eventfd_poll(attr_queue->eventfd, 1, NULL);
-
-                while (attr_queue->len) {
-                        __attr_queue_run(attr_queue);
-                }
+        while (!list_empty(&attr_queue->list)) {
+                ent = (void *)attr_queue->list.next;
+                YASSERT(ent->running == 0);
+                ent->running = 1;
+                __attr_queue_run__(ent);
+                
+                __attr_queue_remove(attr_queue, ent);
         }
 
-        pthread_exit(NULL);
+        plock_unlock(&attr_queue->plock);
+
 }
 
+void attr_queue_run(void *var)
+{
+        attr_queue_t *attr_queue = variable_get_byctx(var, VARIABLE_ATTR_QUEUE);
+        time_t time = gettime();
+
+        if (attr_queue == NULL) {
+                return;
+        }
+        
+        if (time - attr_queue->update < ATTR_QUEUE_TMO) {
+                return;
+        }
+        
+        if (list_empty(&attr_queue->list)) {
+                return;
+        }
+
+        attr_queue->update = time;
+        schedule_task_new("attr_queue_run", __attr_queue_run_task, var, -1);
+        schedule_run(variable_get_byctx(var, VARIABLE_SCHEDULE));
+        
+        return;
+}
+
+static uint32_t __key(const void *args)
+{
+        return ((fileid_t *)args)->id;
+}
+
+static int __cmp(const void *v1, const void *v2)
+{
+        const entry_t *ent = (entry_t *)v1;
+        const fileid_t *fileid = v2;
+
+        DBUG("cmp "CHKID_FORMAT" "CHKID_FORMAT"\n",
+              CHKID_ARG(&ent->fileid), CHKID_ARG(fileid));
+        
+        return chkid_cmp(&ent->fileid, fileid);
+}
 
 static int __attr_queue_init(attr_queue_t *attr_queue)
 {
         int ret;
 
-        INIT_LIST_HEAD(&attr_queue->wait_list);
+        attr_queue->tab = hash_create_table(__cmp, __key, "cds vol");
+        if (attr_queue->tab == NULL) {
+                ret = ENOMEM;
+                GOTO(err_ret, ret);
+        }
 
-        ret = sy_spin_init(&attr_queue->lock);
+        ret = plock_init(&attr_queue->plock, "attr queue");
         if (ret)
                 GOTO(err_ret, ret);
         
-        ret = ymalloc((void **)&attr_queue->queue, sizeof(attr_op_t) * ATTR_OP_MAX);
-        if (ret)
-                GOTO(err_ret, ret);
-
-        memset(attr_queue->queue, 0x0, sizeof(attr_op_t) * ATTR_OP_MAX);
-        attr_queue->begin = 0;
-        attr_queue->len = 0;
-
-        for (int i = 0; i < ATTR_OP_MAX; i++) {
-                ret = sy_spin_init(&attr_queue->queue[i].lock);
-                if (ret)
-                        UNIMPLEMENTED(__DUMP__);
-
-                ret = sem_init(&attr_queue->queue[i].sem, 0, 0);
-                if (ret)
-                        UNIMPLEMENTED(__DUMP__);
-        }
-
-        int fd = eventfd(0, EFD_CLOEXEC);
-        if (fd < 0) {
-                ret = errno;
-                GOTO(err_ret, ret);
-        }
-
-        attr_queue->eventfd = fd;
-
-        ret = sy_thread_create2(__attr_queue_worker, attr_queue, "attr_queue");
-        if (ret)
-                GOTO(err_ret, ret);
-
+        INIT_LIST_HEAD(&attr_queue->list);
+        attr_queue->update = 0;
+        
         return 0;
 err_ret:
         return ret;
@@ -396,22 +395,42 @@ err_ret:
 
 int attr_queue_init()
 {
-        int ret, count = gloconf.polling_core * 4;
+        int ret;
         attr_queue_t *attr_queue;
 
-        ret = ymalloc((void **)&__attr_queue__, sizeof(*__attr_queue__) * count);
+        ret = ymalloc((void **)&attr_queue, sizeof(*attr_queue));
         if (ret)
                 GOTO(err_ret, ret);
         
-        for (int i = 0; i < count; i++) {
-                attr_queue = &__attr_queue__[i];
+        ret = __attr_queue_init(attr_queue);
+        if (ret)
+                GOTO(err_ret, ret);
 
-                ret = __attr_queue_init(attr_queue);
-                if (ret)
-                        GOTO(err_ret, ret);
+        variable_set(VARIABLE_ATTR_QUEUE, attr_queue);
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+int attr_queue_destroy()
+{
+        int ret;
+        attr_queue_t *attr_queue = variable_get_byctx(NULL, VARIABLE_ATTR_QUEUE);
+
+        schedule_task_new("attr_queue_run", __attr_queue_run_task, NULL, -1);
+        schedule_run(NULL);
+
+        if (!list_empty(&attr_queue->list)) {
+                ret = EBUSY;
+                GOTO(err_ret, ret);
         }
 
-        __count__ = count;
+        hash_destroy_table(attr_queue->tab, NULL, NULL);
+        attr_queue->tab = NULL;
+        yfree((void **)&attr_queue);
+        
+        variable_unset(VARIABLE_ATTR_QUEUE);
         
         return 0;
 err_ret:

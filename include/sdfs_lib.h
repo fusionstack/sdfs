@@ -42,8 +42,8 @@ typedef struct {
 
 typedef enum {
         __NOT_SET_SIZE = 0,
-        __SET_PHYSICAL_SIZE,
-        __SET_LOGICAL_SIZE,
+        __SET_TRUNCATE,
+        __SET_EXTERN,
 } __size_how;
 
 typedef struct {

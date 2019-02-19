@@ -971,12 +971,6 @@ int sdfs_init_verbose(const char *name, int polling_core)
         if (ret)
                 GOTO(err_ret, ret);
 
-#if ENABLE_ATTR_QUEUE
-        ret = attr_queue_init();
-        if (ret)
-                GOTO(err_ret, ret);
-#endif
-        
 retry:
         ret = network_connect_mond(0);
         if (ret) {

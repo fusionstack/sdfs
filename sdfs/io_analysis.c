@@ -59,7 +59,7 @@ static int __io_analysis_dump()
         uint32_t readps, writeps, readbwps, writebwps;
         static time_t last_log = 0;
 
-        now = time(NULL);
+        now = gettime();
         memset(buf, 0x0, sizeof(buf));
 
         __io_analysis_get(&readps, &writeps, &readbwps, &writebwps);
@@ -86,7 +86,7 @@ static int __io_analysis_dump()
                          core_latency_get());
                 __io_analysis__->last_output = now;
 
-                time_t now = time(NULL);
+                time_t now = gettime();
                 if (now - last_log > 10) {
                         last_log = now;
                         DINFO("READ BWPS %u WRITE BWPS %u READ OPS %u WRITE OPS %u LATENCY %f\n",
@@ -120,7 +120,7 @@ int io_analysis(analysis_op_t op, int count)
                 goto out;
         }
         
-        now = time(NULL);
+        now = gettime();
 
         ret = sy_spin_lock(&__io_analysis__->lock);
         if (ret)

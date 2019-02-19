@@ -97,7 +97,7 @@ static void __nfs_remove_bytime(void *_de, void *_arg)
         const dirid_t *parent = _arg;
         dirid_t dirid;
 
-        now = time(NULL);
+        now = gettime();
         t = atoi(de->d_name);
         if (now - t < 3600) {
                 DINFO("name %s diff %u, skip it\n", de->d_name, now - t);
@@ -245,7 +245,7 @@ retry:
                         GOTO(err_ret, ret);
         }
 
-        now = time(NULL);
+        now = gettime();
         snprintf(tname, MAX_NAME_LEN, "%d", ((int)now / 3600) * 3600);
 
         ret = sdfs_lookup(NULL, &removed, tname, &workdir);
