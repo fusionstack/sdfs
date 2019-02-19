@@ -45,12 +45,18 @@ Installation
 
 Configuration
 ===========================================================
-    1.prepare disk, from 0 to num_of_your_disks for each node
+    1./*prepare disk, from 0 to num_of_your_disks for each node*/
     mkdir -p /opt/sdfs/data/cds/0
     mkfs.ext4 /dev/sdx
     blkid /dev/sdx
     echo 'UUID="you-disk-uuid" /opt/sdfs/data/cds/0 ext4 user_xattr,noatime,defaults 0 0' >> /etc/fstab
     mount /dev/sdx /opt/sdfs/data/cds/0
+    /*prepare a ssd or nvme for redis mount*/
+    mkdir -p /opt/sdfs/data/redis/0
+    mkfs.ext4 /dev/sdy
+    blkid /dev/sdy
+    echo 'UUID="you-disk-uuid" /opt/sdfs/data/redis/0 ext4 user_xattr,noatime,defaults 0 0' >> /etc/fstab
+    mount /dev/sdy /opt/sdfs/data/redis/0
 
     2.modify config, only modify one of your nodes:
     vim /opt/sdfs/etc/cluster.conf
