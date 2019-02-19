@@ -6,8 +6,6 @@
 #include "ylib.h"
 #include "dbg.h"
 
-#define ENABLE_ATTR_QUEUE 1
-
 int attr_queue_init();
 int attr_queue_destroy();
 void attr_queue_run(void *var);

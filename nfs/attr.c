@@ -46,8 +46,8 @@ err_ret:
 
 int sattr_set(const fileid_t *fileid, const sattr *attr, const nfs3_time *ctime)
 {
-        int ret, update = 0;
-        setattr_t setattr;
+        int ret, update = 0, settime;
+        setattr_t setattr, time;
         struct timespec t;
 
         DBUG("attr set %u %u %u %u %u %u %u %p\n",
@@ -60,6 +60,7 @@ int sattr_set(const fileid_t *fileid, const sattr *attr, const nfs3_time *ctime)
               ctime);
 
         setattr_init(&setattr, -1, -1, NULL, -1, -1, -1);
+        setattr_init(&time, -1, -1, NULL, -1, -1, -1);
 
         if (attr->uid.set_it == TRUE) {
                 setattr.uid.set_it = 1;
@@ -82,41 +83,44 @@ int sattr_set(const fileid_t *fileid, const sattr *attr, const nfs3_time *ctime)
         if (attr->size.set_it == TRUE) {
                 setattr.size.set_it = 1;
                 setattr.size.size = attr->size.size;
-                update = 1;
+
+                ret = sdfs_truncate(NULL, fileid, setattr.size.size);
+                if (ret)
+                        GOTO(err_ret, ret);
         }
 
         if (attr->atime.set_it == SET_TO_SERVER_TIME) {
-                setattr_update_time(&setattr,
+                setattr_update_time(&time,
                                     __SET_TO_SERVER_TIME, NULL,
                                     __DONT_CHANGE, NULL,
                                     __DONT_CHANGE, NULL);
-                update = 1;
+                settime = 1;
         } else if (attr->atime.set_it == SET_TO_CLIENT_TIME) {
                 t.tv_sec = attr->atime.time.seconds;
                 t.tv_nsec = attr->atime.time.nseconds;
                 
-                setattr_update_time(&setattr,
+                setattr_update_time(&time,
                                     __SET_TO_CLIENT_TIME, &t,
                                     __DONT_CHANGE, NULL,
                                     __DONT_CHANGE, NULL);
-                update = 1;
+                settime = 1;
         }
 
         if (attr->mtime.set_it == SET_TO_SERVER_TIME) {
-                setattr_update_time(&setattr,
+                setattr_update_time(&time,
                                     __DONT_CHANGE, NULL,
                                     __SET_TO_SERVER_TIME, NULL,
                                     __DONT_CHANGE, NULL);
-                update = 1;
+                settime = 1;
         } else if (attr->mtime.set_it == SET_TO_CLIENT_TIME) {
                 t.tv_sec = attr->mtime.time.seconds;
                 t.tv_nsec = attr->mtime.time.nseconds;
 
-                setattr_update_time(&setattr,
+                setattr_update_time(&time,
                                     __DONT_CHANGE, NULL,
                                     __SET_TO_CLIENT_TIME, &t,
                                     __DONT_CHANGE, NULL);
-                update = 1;
+                settime = 1;
         }
 
         if (ctime) {
@@ -130,11 +134,11 @@ int sattr_set(const fileid_t *fileid, const sattr *attr, const nfs3_time *ctime)
                 DINFO("time %s\n", _time);
 #endif
                 
-                setattr_update_time(&setattr,
+                setattr_update_time(&time,
                                     __DONT_CHANGE, NULL,
                                     __DONT_CHANGE, NULL,
                                     __SET_TO_CLIENT_TIME, &t);
-                update = 1;
+                settime = 1;
         }
 
         if (update) {
@@ -143,6 +147,13 @@ int sattr_set(const fileid_t *fileid, const sattr *attr, const nfs3_time *ctime)
                         GOTO(err_ret, ret);
         }
 
+        if (settime) {
+                ret = sdfs_setattr(NULL, fileid, &time, 1);
+                if (ret)
+                        GOTO(err_ret, ret);
+                        
+        }
+        
         return 0;
 err_ret:
         return ret;

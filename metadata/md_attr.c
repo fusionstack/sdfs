@@ -201,6 +201,8 @@ void md_attr_update(md_proto_t *md, const setattr_t *setattr)
         if (setattr->size.set_it) {
                 if (setattr->size.set_it == __SET_TRUNCATE) {
                         md->at_size = setattr->size.size;
+                        DBUG("truncate "CHKID_FORMAT" %u\n",
+                              CHKID_ARG(&md->fileid), md->at_size);
                 } else if (setattr->size.set_it == __SET_EXTERN) {
                         md->at_size = setattr->size.size > md->at_size
                                 ? setattr->size.size : md->at_size;

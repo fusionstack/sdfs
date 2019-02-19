@@ -43,7 +43,6 @@ int acl_null_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         (void) gid;
         (void) arg;
         (void) buf;
-
         
         ret = sunrpc_reply(sockid, req, ACCEPT_STATE_ERROR, NULL, NULL);
         if (ret)

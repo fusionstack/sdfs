@@ -23,7 +23,7 @@
 #define ATTR_OP_SETTIME   0x00002
 #define ATTR_OP_TRUNCATE  0x00004
 
-#define ATTR_QUEUE_TMO 1
+#define ATTR_QUEUE_TMO 5
 
 typedef struct {
         struct list_head hook;
@@ -43,6 +43,7 @@ typedef struct {
         time_t update;
         hashtable_t tab;
         struct list_head list;
+        int count;
 } attr_queue_t;
 
 typedef struct {
@@ -68,12 +69,13 @@ static int __attr_queue_update(entry_t *ent, int op, const void *arg)
                         GOTO(err_ret, ret);
                 }
 
-                ent->size.set_it = ATTR_OP_EXTERN;
-                ent->size.size = __SET_EXTERN;
+                ent->size.set_it = __SET_EXTERN;
         } else if (op == ATTR_OP_TRUNCATE) {
                 const uint64_t *size = arg;
                 ent->size.size = *size;
-                ent->size.size = __SET_TRUNCATE;
+                ent->size.set_it = __SET_TRUNCATE;
+                DBUG("----truncate "CHKID_FORMAT" %u--\n",
+                      CHKID_ARG(&ent->fileid), ent->size.size);
         } else if (op == ATTR_OP_SETTIME) {
                 const setattr_t *setattr = arg;
                 ent->atime = setattr->atime;
@@ -102,13 +104,12 @@ static int __attr_queue_create(attr_queue_t *attr_queue, const volid_t *volid,
         memset(ent, 0x0, sizeof(*ent));
         INIT_LIST_HEAD(&ent->wait_list);
 
-        ret = __attr_queue_update(ent, op, arg);
-        YASSERT(ret == 0);
-
         ent->volid = *volid;
-        YASSERT(volid->snapvers == 0);
         ent->fileid = *fileid;
         YASSERT(fileid->type);
+        
+        ret = __attr_queue_update(ent, op, arg);
+        YASSERT(ret == 0);
 
         DBUG("add "CHKID_FORMAT"\n", CHKID_ARG(&ent->fileid));
 
@@ -117,6 +118,7 @@ static int __attr_queue_create(attr_queue_t *attr_queue, const volid_t *volid,
                 UNIMPLEMENTED(__DUMP__);
         
         list_add_tail(&ent->hook, &attr_queue->list);
+        attr_queue->count++;
 
         return 0;
 err_ret:
@@ -136,6 +138,7 @@ static void __attr_queue_remove(attr_queue_t *attr_queue, entry_t *ent)
         YASSERT(ret == 0);
 
         list_del(&ent->hook);
+        attr_queue->count--;
 
         list_for_each_safe(pos, n, &ent->wait_list) {
                 list_del(pos);
@@ -285,7 +288,6 @@ static void __attr_queue_run__(entry_t *ent)
                 setattr.mtime = ent->mtime;
         }
 
-        YASSERT(ent->volid.snapvers == 0);
 retry:
         ret = md_setattr(&ent->volid, &ent->fileid, &setattr, 1);
         
@@ -348,6 +350,7 @@ void attr_queue_run(void *var)
                 return;
         }
 
+        DINFO("attr queue count %u\n", attr_queue->count);
         attr_queue->update = time;
         schedule_task_new("attr_queue_run", __attr_queue_run_task, var, -1);
         schedule_run(variable_get_byctx(var, VARIABLE_SCHEDULE));
@@ -387,6 +390,7 @@ static int __attr_queue_init(attr_queue_t *attr_queue)
         
         INIT_LIST_HEAD(&attr_queue->list);
         attr_queue->update = 0;
+        attr_queue->count = 0;
         
         return 0;
 err_ret:

@@ -1254,9 +1254,11 @@ int core_worker_exit(core_t *core)
         
         DINFO("core[%u] destroy begin\n", core->hash);
 
+#if ENABLE_ATTR_QUEUE
         ret = attr_queue_destroy();
         if (ret)
                 GOTO(err_ret, ret);
+#endif
         
         corenet_tcp_destroy(&core->tcp_net);
         gettime_private_destroy();
@@ -1268,7 +1270,9 @@ int core_worker_exit(core_t *core)
 #endif
 
         if (core->flag & CORE_FLAG_REDIS) {
-                redis_co_destroy();
+                ret = redis_co_destroy();
+                if (ret)
+                        GOTO(err_ret, ret);
         }
         
         if (core->main_core) {

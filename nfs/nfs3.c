@@ -1935,8 +1935,16 @@ int nfs_ver3(const sockid_t *sockid, const sunrpc_request_t *req,
         
 #if ENABLE_CO_WORKER
         ret = handler(sockid, req, uid, gid, &nfsarg, buf);
-        if (ret)
+        if (ret) {
+                if (req->procedure == NFS3_LOOKUP) {
+                        if (ret != ENOENT) {
+                                DERROR("%s (%d) %s\n", name, ret, strerror(ret));
+                        }
+                } else {
+                        DERROR("%s (%d) %s\n", name, ret, strerror(ret));
+                }
                 GOTO(err_ret, ret);
+        }
 #else
         if (hash_args) {
                 int hash = hash_args(&nfsarg);

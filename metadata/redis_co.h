@@ -2,7 +2,7 @@
 #define __REDIS_CO__
 
 int redis_co_init();
-void redis_co_destroy();
+int redis_co_destroy();
 int redis_co_run(void *ctx);
 int co_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
                   void *buf, size_t *len);

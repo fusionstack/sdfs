@@ -196,7 +196,7 @@ err_ret:
         return ret;
 }
 
-void redis_co_destroy()
+int redis_co_destroy()
 {
         UNIMPLEMENTED(__WARN__);
 
@@ -219,6 +219,8 @@ void redis_co_destroy()
 #endif
         redis_vol_private_destroy(redis_conn_vol_close);
         variable_unset(VARIABLE_REDIS);
+
+        return 0;
 }
 
 int redis_co(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
