@@ -79,6 +79,10 @@ class Cluster(object):
             try:
                 dmsg('backup %s to %s' % (dist, backup))
                 exec_remote(k, cmd_backup)
+            except Exp, e:
+                derror("%s : %s" % (k, e))
+
+            try:
                 dmsg('update %s to %s' % (src, k))
                 put_remote(k, src_tar, tmp_update)
                 exec_remote(k, cmd_update)
