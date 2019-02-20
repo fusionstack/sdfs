@@ -436,12 +436,24 @@ retry:
                 mbuffer_free(&seg->buf);
         }
 
+        if (offset + size > md->at_size) {
 #if ENABLE_ATTR_QUEUE
-        if (ng.daemon) {
-                ret = attr_queue_extern(&volid, fileid, size + offset);
-                if (ret)
-                        GOTO(err_ret, ret);
-        } else {
+                if (ng.daemon) {
+                        ret = attr_queue_extern(&volid, fileid, size + offset);
+                        if (ret)
+                                GOTO(err_ret, ret);
+                } else {
+                retry1:
+                        ret = md_extend(&volid, fileid, size + offset);
+                        if (ret) {
+                                ret = _errno(ret);
+                                if (ret == EAGAIN) {
+                                        USLEEP_RETRY(err_ret, ret, retry1, retry, 100, (1000 * 1000));
+                                } else
+                                        GOTO(err_ret, ret);
+                        }
+                }
+#else
         retry1:
                 ret = md_extend(&volid, fileid, size + offset);
                 if (ret) {
@@ -451,18 +463,8 @@ retry:
                         } else
                                 GOTO(err_ret, ret);
                 }
-        }
-#else
-retry1:
-        ret = md_extend(&volid, fileid, size + offset);
-        if (ret) {
-                ret = _errno(ret);
-                if (ret == EAGAIN) {
-                        USLEEP_RETRY(err_ret, ret, retry1, retry, 100, (1000 * 1000));
-                } else
-                        GOTO(err_ret, ret);
-        }
 #endif
+        }
 
         mbuffer_free(&newbuf);
 
