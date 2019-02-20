@@ -99,3 +99,7 @@ Auto Testing
 ===========================================================
     cd test
     test.py
+
+FAQ
+===========================================================
+   1.Drectories can only be mounted by nfs or cifs after the share has been created
