@@ -52,24 +52,22 @@ typedef struct {
 } wait_t;
         
 
-static int __attr_queue_update(entry_t *ent, int op, const void *arg)
+static void __attr_queue_update(entry_t *ent, int op, const void *arg)
 {
-        int ret;
-
         if (op == ATTR_OP_EXTERN) {
                 const uint64_t *size = arg;
                 if (ent->size.set_it == __SET_EXTERN) {
                         ent->size.size = ent->size.size > *size
                                 ? ent->size.size : *size;
+                        ent->size.set_it = __SET_EXTERN;
                 } else if (ent->size.set_it == __NOT_SET_SIZE) {
                         ent->size.size = *size;
+                        ent->size.set_it = __SET_EXTERN;
                 } else {
-                        DWARN("set "CHKID_FORMAT" busy\n", CHKID_ARG(&ent->fileid));
-                        ret = EBUSY;
-                        GOTO(err_ret, ret);
+                        YASSERT(ent->size.set_it = __SET_TRUNCATE);
+                        ent->size.size = ent->size.size > *size ? ent->size.size : *size;
                 }
 
-                ent->size.set_it = __SET_EXTERN;
         } else if (op == ATTR_OP_TRUNCATE) {
                 const uint64_t *size = arg;
                 ent->size.size = *size;
@@ -86,9 +84,7 @@ static int __attr_queue_update(entry_t *ent, int op, const void *arg)
                 UNIMPLEMENTED(__DUMP__);
         }
 
-        return 0;
-err_ret:
-        return ret;
+        return;
 }
 
 static int __attr_queue_create(attr_queue_t *attr_queue, const volid_t *volid,
@@ -108,8 +104,7 @@ static int __attr_queue_create(attr_queue_t *attr_queue, const volid_t *volid,
         ent->fileid = *fileid;
         YASSERT(fileid->type);
         
-        ret = __attr_queue_update(ent, op, arg);
-        YASSERT(ret == 0);
+        __attr_queue_update(ent, op, arg);
 
         DBUG("add "CHKID_FORMAT"\n", CHKID_ARG(&ent->fileid));
 
