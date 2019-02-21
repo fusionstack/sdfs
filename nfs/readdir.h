@@ -5,6 +5,7 @@
 
 #include "attr.h"
 #include "sdfs_lib.h"
+#include "nfs_args.h"
 #include "nfs3.h"
 
 #define MAX_ENTRIES MAX_READDIR_ENTRIES
@@ -16,6 +17,6 @@ int read_dir(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t offset, char *ver
 
 int readdirplus(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t offset, char *verf,
                 uint32_t count, readdirplus_ret *res, entryplus *_entryplus,
-                char *obj, fileid_t *fharray);
+                char *obj, nfh_t *fharray);
 
 #endif

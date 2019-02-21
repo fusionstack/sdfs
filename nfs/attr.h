@@ -9,10 +9,6 @@
 #include "nfs3.h"
 #include "file_proto.h"
 
-extern int get_postopattr(uint32_t dev, uint64_t ino, const char *path,
-                          post_op_attr *attr);
-extern int get_preopattr(uint32_t dev, uint64_t ino, mode_t mode,
-                         preop_attr *attr);
 extern int sattr_tomode(mode_t *, sattr *);
 extern int get_postopattr_stat(post_op_attr *, struct stat *);
 

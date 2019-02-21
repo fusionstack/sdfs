@@ -391,8 +391,9 @@ static int __nfs3_lookup_svc(const sockid_t *sockid, const sunrpc_request_t *req
                 res.status = NFS3_OK;
         }
 
-        res.u.ok.obj.len = sizeof(fileid_t);
-        res.u.ok.obj.val = (char *)&fileid;
+        nfh_t nfh = {fileid, 0};
+        res.u.ok.obj.len = sizeof(nfh_t);
+        res.u.ok.obj.val = (char *)&nfh;
         get_postopattr1(&fileid, &res.u.ok.obj_attr);
         get_postopattr1(parent, &res.u.ok.dir_attr);
 
@@ -797,9 +798,10 @@ static int __nfs3_create_svc(const sockid_t *sockid, const sunrpc_request_t *req
 
         res.status = NFS3_OK;
 
+        nfh_t nfh = {fileid, 0};
         pfh = &res.u.ok.obj;
-        pfh->handle.val = (void *)&fileid;
-        pfh->handle.len = sizeof(fileid);
+        pfh->handle.val = (void *)&nfh;
+        pfh->handle.len = sizeof(nfh_t);
         pfh->handle_follows = TRUE;
 
         get_postopattr1(&fileid, &res.u.ok.obj_attr);
@@ -932,9 +934,10 @@ static int __nfs3_mkdir_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         if (ret)
                 GOTO(err_rep, ret);
 
+        nfh_t nfh = {fileid, 0};
         pfh = &res.u.ok.obj;
-        pfh->handle.val = (void *)&fileid;
-        pfh->handle.len = sizeof(fileid_t);
+        pfh->handle.val = (void *)&nfh;
+        pfh->handle.len = sizeof(nfh_t);
         pfh->handle_follows = TRUE;
 
         res.status = NFS3_OK;
@@ -1036,7 +1039,7 @@ static int __nfs3_readdirplus_svc(const sockid_t *sockid, const sunrpc_request_t
         fileid_t *fileid = (fileid_t *)args->dir.val;
         entryplus *entrys;
         char *patharray;
-        fileid_t *fharray;
+        nfh_t *fharray;
         void *ptr;
 
         (void) req;
@@ -1046,7 +1049,7 @@ static int __nfs3_readdirplus_svc(const sockid_t *sockid, const sunrpc_request_t
 
         DBUG("----NFS3---- "FID_FORMAT"\n", FID_ARG(fileid));
 
-        ret = ymalloc(&ptr, (sizeof(entryplus) + sizeof(fileid_t) + MAX_NAME_LEN )
+        ret = ymalloc(&ptr, (sizeof(entryplus) + sizeof(nfh_t) + MAX_NAME_LEN )
                         * MAX_DIRPLUS_ENTRIES);
         if (ret)
                 UNIMPLEMENTED(__DUMP__);
@@ -1054,7 +1057,7 @@ static int __nfs3_readdirplus_svc(const sockid_t *sockid, const sunrpc_request_t
         entrys = ptr;
         ptr += sizeof(entryplus) * MAX_DIRPLUS_ENTRIES;
         fharray = ptr;
-        ptr += sizeof(fileid_t) * MAX_DIRPLUS_ENTRIES;
+        ptr += sizeof(nfh_t) * MAX_DIRPLUS_ENTRIES;
         patharray = ptr;
 
         DBUG("max %ju\n", args->maxcount);
@@ -1257,9 +1260,10 @@ static int __nfs3_symlink_svc(const sockid_t *sockid, const sunrpc_request_t *re
 
         res.status = NFS3_OK;
 
+        nfh_t nfh = {fileid, 0};
         pfh = &res.u.ok.obj;
-        pfh->handle.val = (void *)&fileid;
-        pfh->handle.len = sizeof(fileid_t);
+        pfh->handle.val = (void *)&nfh;
+        pfh->handle.len = sizeof(nfh_t);
         pfh->handle_follows = TRUE;
 
         res.u.ok.dir_wcc.before.attr_follow = FALSE;

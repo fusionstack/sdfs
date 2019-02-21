@@ -5,6 +5,7 @@
 #define DBG_SUBSYS S_YNFS
 
 #include "xdr_nfs.h"
+#include "nfs_args.h"
 #include "file_proto.h"
 #include "dbg.h"
 
@@ -68,15 +69,17 @@ int xdr_nfs_fh3(xdr_t *xdrs, nfs_fh3 *fh)
 {
         int ret;
         fileid_t *fileid;
+        nfh_t *nfh;
 
         ret = __xdr_bytes(xdrs, (char **)&fh->val, (u_int *)&fh->len, NFS3_FHSIZE);
         if (ret)
                 GOTO(err_ret, ret);
 
         if (xdrs->op != __XDR_FREE) {
-                fileid = (void *)fh->val;
+                nfh = (void *)fh->val;
+                fileid = &nfh->fileid;
                 YASSERT(fileid->idx == 0);
-                if (fileid->id == 0 || fileid->volid == 0 || fh->len != sizeof(fileid_t)) {
+                if (fileid->id == 0 || fileid->volid == 0 || fh->len != sizeof(nfh_t)) {
                         ret = EINVAL;
                         GOTO(err_ret, ret);
                 }

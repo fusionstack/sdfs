@@ -219,9 +219,10 @@ static int __mount_mnt_svc(const sockid_t *sockid, const sunrpc_request_t *req,
 
         DBUG("mount ok, res %p\n", &res);
 
+        nfh_t nfh = {fileid, 0};
         res.fhs_status = MNT_OK;
-        res.u.mountinfo.fhandle.len = sizeof(fileid_t);
-        res.u.mountinfo.fhandle.val = (char *)&fileid;
+        res.u.mountinfo.fhandle.len = sizeof(nfh_t);
+        res.u.mountinfo.fhandle.val = (char *)&nfh;
         //res.u.mountinfo.handle_follows = TRUE;
         res.u.mountinfo.auth_flavors.len = 0;
         res.u.mountinfo.auth_flavors.val = &auth;

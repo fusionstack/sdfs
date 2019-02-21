@@ -8,7 +8,7 @@
 typedef struct {
         fileid_t fileid;
         uint32_t sessid;
-} nfs_handler_t;
+} nfh_t;
 
 typedef union {
         setattr3_args setattr3_arg;

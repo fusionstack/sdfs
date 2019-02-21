@@ -230,11 +230,14 @@ err_ret:
         return ret;
 }
 
-static int __readirplus_entry(entryplus *entryplus, char *name, fileid_t *fileid,
+static int __readirplus_entry(entryplus *entryplus, char *name, nfh_t *nfh,
                               const __dirlist_t *node, const cookie_t *cookie)
 {
         int ret;
         struct stat stbuf;
+        fileid_t *fileid = &nfh->fileid;
+
+        nfh->sessid = 0;
 
         ret = sdfs_getattr(NULL, &node->fileid, &stbuf);
         if (ret) {
@@ -257,13 +260,13 @@ static int __readirplus_entry(entryplus *entryplus, char *name, fileid_t *fileid
         entryplus->name = name;
         memcpy(&entryplus->cookie, cookie, sizeof(entryplus->cookie));
         entryplus->fh.handle_follows = 1;
-        entryplus->fh.handle.val = (void *)fileid;
-        entryplus->fh.handle.len = sizeof(fileid_t);
+        entryplus->fh.handle.val = (void *)nfh;
+        entryplus->fh.handle.len = sizeof(nfh_t);
         get_postopattr_stat(&entryplus->attr, &stbuf);
         entryplus->next = NULL;
  
         DBUG("fileid "CHKID_FORMAT" name %s mode %o cookie %u,%u\n", CHKID_ARG(&node->fileid),
-              node->name, stbuf.st_mode, cookie->id, cookie->cur);
+             node->name, stbuf.st_mode, cookie->id, cookie->cur);
 
         return 0;
 err_ret:
@@ -272,7 +275,7 @@ err_ret:
 
 int readdirplus(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t _cookie, char *verf,
                 uint32_t count, readdirplus_ret *res, entryplus *_entryplus,
-                char *obj, fileid_t *fharray)
+                char *obj, nfh_t *fharray)
 {
         int ret;
         uint32_t i, real_count;
@@ -307,7 +310,7 @@ int readdirplus(sdfs_ctx_t *ctx, const fileid_t *fileid, uint64_t _cookie, char 
         _memset(verf, 0x0, NFS3_COOKIEVERFSIZE);
 
         DBUG("readdir "CHKID_FORMAT" count %u, cookie %u,%u\n",
-              CHKID_ARG(fileid), count, cookie.id, cookie.cur);
+             CHKID_ARG(fileid), count, cookie.id, cookie.cur);
 
         ret = __readdir_getlist(ctx, fileid, &cookie, &dirlist);
         if (ret) {
@@ -409,9 +412,10 @@ static int __readir_entry(entry *entry, char *name,
         memcpy(&entry->cookie, cookie, sizeof(entry->cookie));
 
 #if 0
+        nfh_t nfh = {fileid, 0};
         entry->fh.handle_follows = 1;
-        entry->fh.handle.val = (void *)fileid;
-        entry->fh.handle.len = sizeof(fileid_t);
+        entry->fh.handle.val = (void *)&nfh;
+        entry->fh.handle.len = sizeof(nfh_t);
         get_postopattr_stat(&entry->attr, &stbuf);
 #endif
         

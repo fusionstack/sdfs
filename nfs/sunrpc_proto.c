@@ -65,6 +65,14 @@ int sunrpc_pack_len(void *buf, uint32_t len, int *msg_len, int *io_len)
                 return 0;
         }
 
+        (void) msg;
+        (void) veri;
+        (void) cred;
+        (void) headlen;
+        (void) verilen;
+        (void) credlen;
+        (void) req;
+        
         length = buf;
 
         DBUG("sunrpc request len %u, is last %u\n", ntohl(*length) ^ (1 << 31),
@@ -79,41 +87,8 @@ int sunrpc_pack_len(void *buf, uint32_t len, int *msg_len, int *io_len)
         }
 
         req = buf;
-
-	//if (ntohl(req->procedure) == NFS3_WRITE) {
-	if (0) {
-#if 0
-		(void) msg;
-		(void) veri;
-                (void) cred;
-                (void) headlen;
-                (void) verilen;
-                (void) credlen;
-
-                *io_len = (_len / 1024) * 1024;
-                *msg_len = _len - *io_len;
-#else
-                cred = buf + sizeof(*req);
-                credlen = ntohl(cred->length);
-
-                veri = (void *)cred + credlen + sizeof(*cred);
-                verilen = ntohl(veri->length);
-
-                msg = (void *)veri + verilen + sizeof(*veri);
-
-                headlen =  msg - buf + sizeof(fileid_t) + sizeof(uint64_t)
-                        + sizeof(uint32_t)  * 4;
-
-                *msg_len = headlen;
-                *io_len = _len - headlen;
-
-                YASSERT(_len > headlen);
-                DBUG("nfs write msg %u io %u\n", *msg_len, *io_len);
-#endif
-        } else {
-                *msg_len =  _len;
-                *io_len = 0;
-        }
+        *msg_len =  _len;
+        *io_len = 0;
 
         DBUG("msg_len: %u, io_len: %u\n", *msg_len, *io_len);
 
