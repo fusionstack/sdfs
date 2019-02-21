@@ -436,7 +436,7 @@ retry:
                 mbuffer_free(&seg->buf);
         }
 
-        if (offset + size > md->at_size) {
+        if ((offset + size > md->at_size)) {
 #if ENABLE_ATTR_QUEUE
                 if (ng.daemon) {
                         ret = attr_queue_extern(&volid, fileid, size + offset);

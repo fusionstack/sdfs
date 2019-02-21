@@ -21,6 +21,32 @@ static inodeop_t *inodeop = &__inodeop__;
 
 static uint64_t __systemvolid__ = -1;
 
+#if 0
+static int __md_getsize(md_proto_t *_md)
+{
+        int ret;
+        fileinfo_t *md = (void *)_md;
+        chkinfo_t *chkinfo;
+        char _chkinfo[CHK_SIZE(YFS_CHK_REP_MAX)];
+
+        if (md->chknum == 0) {
+                md->at_size = 0;
+                return 0;
+        }
+
+        chkid_t chkid;
+        chkinfo = (void *)_chkinfo;
+        fid2cid(&chkid, &md->fileid, md->chknum - 1);
+        ret = chunkop->load(NULL, chkid, chkinfo);
+        if (ret)
+                GOTO(err_ret, ret);
+
+        return 0;
+err_ret:
+        return ret;
+}
+#endif
+
 int md_getattr(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
 {
         int ret;
@@ -34,6 +60,14 @@ int md_getattr(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
 #if ENABLE_ATTR_QUEUE
         if (ng.daemon) {
                 attr_queue_update(volid, fileid, md);
+        }
+#endif
+
+#if 0
+        if (mdsconf.size_on_md && S_ISREG(md->at_mode)) {
+                ret = __md_getsize(md);
+                if (ret)
+                        GOTO(err_ret, ret);
         }
 #endif
         

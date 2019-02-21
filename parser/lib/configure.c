@@ -157,7 +157,6 @@ int conf_init(const char *conf_path)
         cdsconf.disk_timeout = 60;
         cdsconf.unlink_async = 1;
         cdsconf.prealloc_max = 64 * 4;
-        cdsconf.ec_lock = 0;
         cdsconf.io_sync = 1;
         cdsconf.lvm_qos_refresh = 1;
         cdsconf.queue_depth = 127;
@@ -172,6 +171,7 @@ int conf_init(const char *conf_path)
         strcpy(gloconf.uuid, "f7f67a9bf59e4f8096ff9222a12fa3c0");//fake uuid
         mdsconf.chknew_hardend = 1;
         mdsconf.main_loop_threads = 6;
+        mdsconf.size_on_md = 0;
 
         gloconf.performance_analysis = 0;
         gloconf.cache_size = (128 * 1024 * 1024LL);
@@ -549,8 +549,6 @@ int set_value(const char* key, const char* value, int type)
                 gloconf.cache_size = _value;
         else if (keyis("prealloc_max", key))
                 cdsconf.prealloc_max = _value;
-        else if (keyis("ec_lock", key))
-                cdsconf.ec_lock = _value;
         else if (keyis("io_sync", key))
                 cdsconf.io_sync = _value;
         else if (keyis("lvm_qos_refresh", key))

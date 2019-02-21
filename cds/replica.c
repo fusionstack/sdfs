@@ -96,7 +96,7 @@ static void __callback(void *_iocb, void *_retval)
 
 #define SECTOR_SIZE 512
 
-static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
+static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf, int flag)
 {
         int ret, fd, iov_count;
         task_t task;
@@ -106,7 +106,7 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf)
         ANALYSIS_BEGIN(0);
         
         char path[MAX_PATH_LEN];
-        ret = __replica_getfd(&io->id, io->snapvers, &fd, path, O_CREAT | O_SYNC | O_RDWR);
+        ret = __replica_getfd(&io->id, io->snapvers, &fd, path, O_CREAT | O_RDWR | flag);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -228,7 +228,7 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
 
         DBUG("write "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
 
-        if (io->offset % SECTOR_SIZE == 0 &&
+        if (cdsconf.io_sync && io->offset % SECTOR_SIZE == 0 &&
             io->size % SECTOR_SIZE == 0) {
                 ret = __replica_write_direct(io, buf);
                 if (ret < 0) {
@@ -236,7 +236,7 @@ int IO_FUNC __replica_write__(const io_t *io, const buffer_t *buf)
                         GOTO(err_ret, ret);
                 }
         } else {
-                ret = __replica_write_sync(io, buf);
+                ret = __replica_write_sync(io, buf, cdsconf.io_sync ? O_SYNC : 0);
                 if (ret < 0) {
                         ret = -ret;
                         GOTO(err_ret, ret);
@@ -309,7 +309,7 @@ err_ret:
         return -ret;
 }
 
-static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
+static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf, int flag)
 {
         int ret, iov_count;
         int fd;
@@ -320,8 +320,8 @@ static int IO_FUNC __replica_read_sync(const io_t *io, buffer_t *buf)
         ANALYSIS_BEGIN(0);
         
         DBUG("read "CHKID_FORMAT"\n", CHKID_ARG(&io->id));
-        
-        ret = __replica_getfd(&io->id, io->snapvers, &fd, NULL, O_RDONLY);
+
+        ret = __replica_getfd(&io->id, io->snapvers, &fd, NULL, O_RDONLY | flag);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -374,11 +374,11 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
         DBUG("read "CHKID_FORMAT" offset %ju size %u\n",
               CHKID_ARG(&io->id), io->offset, io->size);
 
-        if (io->offset % SECTOR_SIZE == 0 &&
+        if (cdsconf.io_sync && io->offset % SECTOR_SIZE == 0 &&
             io->size % SECTOR_SIZE == 0) {
                 ret = __replica_read_direct(io, buf);
         } else {
-                ret = __replica_read_sync(io, buf);
+                ret = __replica_read_sync(io, buf, 0);
         }
         if (ret < 0) {
                 ret = -ret;

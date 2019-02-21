@@ -128,6 +128,7 @@ struct mdsconf_t
         int redis_baseport;
         int redis_sharding;
         int redis_replica;
+        int size_on_md;
 };
 
 /* cds configure */
@@ -137,7 +138,6 @@ struct cdsconf_t
         int unlink_async;
         int queue_depth;
         int prealloc_max;
-        int ec_lock;
         int io_sync;
 
         int lvm_qos_refresh;
