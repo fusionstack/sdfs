@@ -658,9 +658,11 @@ static int __nfs3_create(const fileid_t *parent, const char *name, uint32_t cmod
                                 if (ret)
                                         GOTO(err_ret, ret);
 
+#if 0
                                 if (cmode == EXCLUSIVE) {
                                         YASSERT((stbuf.st_mode & 01777) == EXCLUSIVE);
                                 }
+#endif
                                 
                                 if ((stbuf.st_mode & 01777) == EXCLUSIVE
                                     &&stbuf.st_mtime == mtime && stbuf.st_atime == atime) {
@@ -882,6 +884,11 @@ static int __nfs3_mkdir(const fileid_t *parent, const char *name,
         (void) atime;
         
         ret = sdfs_mkdir(NULL, parent, name, NULL, fileid, mode, uid, gid);
+#if 1
+        if (unlikely(ret)) {
+                GOTO(err_ret, ret);
+        }
+#else
         if (ret) {
                 if (ret == EEXIST) {
                         DBUG("dir "FID_FORMAT" %s exist\n", FID_ARG(parent), name);
@@ -902,6 +909,7 @@ static int __nfs3_mkdir(const fileid_t *parent, const char *name,
                 } else
                         GOTO(err_ret, ret);
         }
+#endif
 
         return 0;
 err_ret:
