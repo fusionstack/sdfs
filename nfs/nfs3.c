@@ -658,9 +658,11 @@ static int __nfs3_create(const fileid_t *parent, const char *name, uint32_t cmod
                                 if (ret)
                                         GOTO(err_ret, ret);
 
+#if 0
                                 if (cmode == EXCLUSIVE) {
                                         YASSERT((stbuf.st_mode & 01777) == EXCLUSIVE);
                                 }
+#endif
                                 
                                 if ((stbuf.st_mode & 01777) == EXCLUSIVE
                                     &&stbuf.st_mtime == mtime && stbuf.st_atime == atime) {
