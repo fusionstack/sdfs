@@ -17,10 +17,10 @@
 #include "xdr.h"
 #include "core.h"
 #include "corenet.h"
-#include "nfs_job_context.h"
+#include "nfs_args.h"
 #include "nfs_events.h"
 #include "nfs_conf.h"
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 #include "xdr_nfs.h"
 #include "dbg.h"
 

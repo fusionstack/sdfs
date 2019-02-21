@@ -6,7 +6,7 @@
 #include <rpc/rpc.h>
 #include <unistd.h>
 
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 #include "file_proto.h"
 
 extern int get_postopattr(uint32_t dev, uint64_t ino, const char *path,

@@ -5,7 +5,7 @@
 
 #include "attr.h"
 #include "sdfs_lib.h"
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 
 #define MAX_ENTRIES MAX_READDIR_ENTRIES
 #define MAX_DIRPLUS_ENTRIES MAX_READDIR_ENTRIES

@@ -13,7 +13,7 @@
 
 #include "get_version.h"
 #include "nfs_events.h"
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 #include "ylib.h"
 #include "sunrpc_passive.h"
 #include "sunrpc_proto.h"

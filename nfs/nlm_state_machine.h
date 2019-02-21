@@ -17,7 +17,7 @@
  */
 #ifndef __NLM_STATUS_MACHINE_H__
 #define __NLM_STATUS_MACHINE_H__
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 #include "xdr.h"
 
 #include <rpc/rpc.h>

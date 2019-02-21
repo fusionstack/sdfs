@@ -1,7 +1,7 @@
 #ifndef __YNFS_XDR_H__
 #define __YNFS_XDR_H__
 
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 #include "xdr.h"
 
 /* MOUNT protocol */

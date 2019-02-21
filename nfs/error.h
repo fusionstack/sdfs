@@ -1,7 +1,7 @@
 #ifndef __YNFS_ERROR_H__
 #define __YNFS_ERROR_H__
 
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 
 extern nfs3_stat lookup_err(int syserr);
 extern nfs3_stat rename_err(int syserr);

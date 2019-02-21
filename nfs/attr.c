@@ -6,7 +6,7 @@
 
 #include "attr.h"
 #include "file_proto.h"
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 #include "sdfs_lib.h"
 #include "md_attr.h"
 #include "attr_queue.h"

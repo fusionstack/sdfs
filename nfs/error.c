@@ -4,7 +4,7 @@
 
 #define DBG_SUBSYS S_YNFS
 
-#include "nfs_state_machine.h"
+#include "nfs3.h"
 #include "dbg.h"
 
 static int is_stale(int syserr)
