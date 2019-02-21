@@ -884,6 +884,11 @@ static int __nfs3_mkdir(const fileid_t *parent, const char *name,
         (void) atime;
         
         ret = sdfs_mkdir(NULL, parent, name, NULL, fileid, mode, uid, gid);
+#if 1
+        if (unlikely(ret)) {
+                GOTO(err_ret, ret);
+        }
+#else
         if (ret) {
                 if (ret == EEXIST) {
                         DBUG("dir "FID_FORMAT" %s exist\n", FID_ARG(parent), name);
@@ -904,6 +909,7 @@ static int __nfs3_mkdir(const fileid_t *parent, const char *name,
                 } else
                         GOTO(err_ret, ret);
         }
+#endif
 
         return 0;
 err_ret:
