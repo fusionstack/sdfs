@@ -269,7 +269,6 @@ int md_share_list_byprotocal(share_protocol_t protocol, shareinfo_t **_shareinfo
         arg.protocol = protocol;
         arg.max = 0;
         arg.count = 0;
-        arg.shareinfo = NULL;
 
         ret = kvop->iter(roottype_share, NULL, __md_share_list_byprotocal, &arg);
         if (ret)

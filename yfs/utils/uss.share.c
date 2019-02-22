@@ -314,9 +314,11 @@ static int _share_list(share_protocol_t prot)
         if (ret)
                 GOTO(err_ret, ret);
 
-        _list_share_info(prot, shareinfo, count);
+        if (count) {
+                _list_share_info(prot, shareinfo, count);
 
-        yfree((void **)&shareinfo);
+                yfree((void **)&shareinfo);
+        }
 
         return 0;
 err_ret:

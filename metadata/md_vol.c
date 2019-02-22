@@ -530,7 +530,6 @@ static int __md_rmvol_inode(const char *name)
                 GOTO(err_ret, ret);
 
         //rmove inode
-        UNIMPLEMENTED(__DUMP__);
         ret = inodeop->childcount(NULL, &fileid, &count);
         if (ret) {
                 if (ret == ENOENT) {//already removed
@@ -543,7 +542,6 @@ static int __md_rmvol_inode(const char *name)
                         GOTO(err_ret, ret);
                 }
 
-                UNIMPLEMENTED(__DUMP__);
                 ret = inodeop->unlink(NULL, &fileid, NULL);
                 if (ret) {
                         if (ret == ENOENT) {
@@ -701,11 +699,16 @@ err_ret:
 
 int md_rmvol(const char *name)
 {
-        int ret, sharding, replica, i;
+        int ret, sharding, replica, i, retry = 0;
 
+retry:
         ret = __md_rmvol_inode(name);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (ret) {
+                if (ret == ENOTEMPTY) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 30, (1000 * 1000));
+                } else 
+                        GOTO(err_ret, ret);
+        }
 
         ret = __md_rmvol_config(name, &sharding, &replica);
         if (ret)
