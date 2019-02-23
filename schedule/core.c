@@ -406,10 +406,28 @@ static int __core_worker_init(core_t *core)
 #if ENABLE_COREAIO
         if (core->flag & CORE_FLAG_AIO) {
                 snprintf(name, sizeof(name), "aio[%u]", core->hash);
-                ret = aio_create(name, core->aio_core);
+
+#if ENABLE_COREAIO_THREAD
+                ret = aio_create(name, core->aio_core, NULL);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+#else
+                int efd;
+                ret = aio_create(name, core->aio_core, &efd);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
 
+                sockid_t sockid;
+                sockid.sd = efd;
+                sockid.seq = _random();
+                sockid.type = SOCKID_CORENET;
+                sockid.addr = 456;
+                ret = corenet_tcp_add(core->tcp_net, &sockid, NULL, NULL, NULL, NULL,
+                                      aio_recv, "aio_recv");
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+#endif
+                
                 DINFO("core[%u] aio inited\n", core->hash);
         }
 #endif

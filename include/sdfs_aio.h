@@ -72,9 +72,10 @@ static inline void io_prep_pwritev(struct iocb *iocb, int fd, const struct iovec
 #define AIO_MODE_DIRECT 1
 #define AIO_MODE_SIZE 2
 
-int aio_create(const char *name, int cpu);
+int aio_create(const char *name, int cpu, int *efd);
 void aio_destroy();
 int aio_commit(struct iocb *iocb, size_t size, int prio, int mode);
+void aio_recv(void *arg);
 
 /**
  * @brief 相当于flush或sync操作,在一次调度器循环中,提交剩余的iocb
