@@ -11,13 +11,8 @@
 
 #define DBG_SUBSYS S_LIBSCHEDULE
 
-#include "sysutil.h"
 #include "ylib.h"
-#include "variable.h"
-#include "configure.h"
-#include "schedule.h"
-#include "sdfs_aio.h"
-#include "cpuset.h"
+#include "aio.h"
 #include "core.h"
 #include "dbg.h"
 

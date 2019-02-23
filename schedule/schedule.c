@@ -13,7 +13,6 @@
 #define DBG_SUBSYS S_LIBSCHEDULE
 
 #include "ylib.h"
-#include "sdfs_aio.h"
 #include "schedule.h"
 #include "timer.h"
 #include "net_global.h"

@@ -16,7 +16,7 @@
 #include "sdevent.h"
 #include "../net/xnect.h"
 #include "net_table.h"
-#include "sdfs_aio.h"
+#include "aio.h"
 #include "rpc_table.h"
 #include "configure.h"
 #include "main_loop.h"

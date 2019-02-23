@@ -13,7 +13,7 @@
 #include "md_lib.h"
 #include "diskio.h"
 #include "io_analysis.h"
-#include "sdfs_aio.h"
+#include "aio.h"
 #include "core.h"
 #include "dbg.h"
 

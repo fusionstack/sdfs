@@ -32,7 +32,7 @@
 #include "corenet.h"
 #include "corerpc.h"
 #endif
-#include "sdfs_aio.h"
+#include "aio.h"
 #include "schedule.h"
 #include "bh.h"
 #include "net_global.h"

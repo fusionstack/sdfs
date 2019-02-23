@@ -26,7 +26,7 @@
 #include "ynet_rpc.h"
 #include "yfs_chunk.h"
 #include "sdfs_lib.h"
-#include "sdfs_aio.h"
+#include "aio.h"
 #include "cd_proto.h"
 #include "job_dock.h"
 #include "job_tracker.h"

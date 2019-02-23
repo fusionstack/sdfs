@@ -23,7 +23,7 @@
 #include "schedule.h"
 #include "bh.h"
 #include "core.h"
-#include "sdfs_aio.h"
+#include "aio.h"
 #include "sdfs_lib.h"
 #include "net_global.h"
 #include "cpuset.h"

@@ -26,7 +26,6 @@
 #include "corenet_connect.h"
 #include "corenet.h"
 #include "corerpc.h"
-#include "sdfs_aio.h"
 #include "schedule.h"
 #include "bh.h"
 #include "net_global.h"

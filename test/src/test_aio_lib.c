@@ -16,7 +16,7 @@
 #include "variable.h"
 #include "configure.h"
 #include "schedule.h"
-#include "sdfs_aio.h"
+#include "aio.h"
 #include "cpuset.h"
 #include "core.h"
 #include "dbg.h"
