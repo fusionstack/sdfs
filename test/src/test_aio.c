@@ -216,7 +216,7 @@ static void *__aio_schedule(void *arg)
 #if AIO_LOCAL
         ret = test_aio_create(name, -1);
 #else
-        ret = aio_create(name, -1, NULL);
+        ret = aio_create(name, -1, 0);
 #endif
         if (unlikely(ret))
                 GOTO(err_ret, ret);

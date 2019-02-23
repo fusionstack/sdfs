@@ -21,10 +21,11 @@
 #include "core.h"
 #include "dbg.h"
 
+#if 0
 #define AIO_MODE_SYNC 0
 #define AIO_MODE_DIRECT 1
 #define AIO_MODE_SIZE 2
-
+#endif
 
 #define AIO_EVENT_MAX 1024
 #define AIO_THREAD 1
