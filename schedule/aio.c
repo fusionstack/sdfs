@@ -125,18 +125,24 @@ static void __aio_recv(void *arg)
 void aio_submit()
 {
         int ret;
-        uint64_t e = 1;
         aio_t *__aio__ = aio_self();
         aio_t *aio;
 
         for (int i = 0; i < AIO_MODE_SIZE; i++) {
                 aio = &__aio__[i];
                 if (aio->iocb_count) {
+#if 1
+                        ret = __aio_submit(aio);
+                        if (unlikely(ret))
+                                UNIMPLEMENTED(__DUMP__);
+#else
+                        uint64_t e = 1;
                         ret = write(aio->in_eventfd, &e, sizeof(e));
                         if (ret < 0) {
                                 ret = errno;
                                 YASSERT(0);
                         }
+#endif
                 }
         }
 }
