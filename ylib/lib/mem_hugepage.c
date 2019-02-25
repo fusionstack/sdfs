@@ -205,7 +205,7 @@ static int __mem_hugepage_next(mem_hugepage_t *mem)
 
         if (i == gloconf.memcache_count) {
                 ret = EBUSY;
-                DERROR("ret %d\n", ret);
+                DBUG("ret %d\n", ret);
                 GOTO(err_ret, ret);
         }
 
@@ -260,9 +260,9 @@ err_lock:
         if (unlikely(!mem->private)) {
                 sy_spin_unlock(&mem->lock);
         }
-        DWARN("no memory, count %u, size %u\n", gloconf.memcache_count, gloconf.memcache_seg);
-        //UNIMPLEMENTED(__DUMP__);
-        EXIT(EAGAIN);
+
+        DBUG("no memory, count %u, size %u\n", gloconf.memcache_count,
+             gloconf.memcache_seg);
 err_ret:
         return ret;
 }

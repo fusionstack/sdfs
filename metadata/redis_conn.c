@@ -233,6 +233,7 @@ static int __redis_conn_get_sharding(__conn_sharding_t *sharding, int worker,
 
         //YASSERT(worker <= sharding->count && worker >= 0);
         idx = worker % __redis_conn_pool__;
+        YASSERT(sharding->conn);
         ret = __redis_conn_get__(&sharding->conn[idx], handler);
         if(ret)
                 GOTO(err_lock, ret);
@@ -248,7 +249,8 @@ err_ret:
         return ret;
 }
 
-int redis_conn_get(const volid_t *volid, int sharding, int worker, redis_handler_t *handler)
+int redis_conn_get(const volid_t *volid, int sharding, uint32_t worker,
+                   redis_handler_t *handler)
 {
         int ret, idx;
         redis_vol_t *vol;

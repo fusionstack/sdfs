@@ -41,7 +41,8 @@ typedef struct {
 
 int redis_conn_init();
 int redis_conn_release(const redis_handler_t *handler);
-int redis_conn_get(const volid_t *volid, int sharding, int worker, redis_handler_t *handler);
+int redis_conn_get(const volid_t *volid, int sharding, uint32_t worker,
+                   redis_handler_t *handler);
 int redis_conn_new(const volid_t *volid, uint8_t *idx);
 int redis_conn_close(const redis_handler_t *handler);
 int redis_conn_vol(const volid_t *volid);

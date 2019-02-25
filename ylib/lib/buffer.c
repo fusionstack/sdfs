@@ -82,6 +82,46 @@ static inline void __seg_add(buffer_t *buf, seg_t *seg)
         buf->len += seg->len;
 }
 
+static int __seg_alloc_normal(seg_t *seg, uint32_t size)
+{
+        int ret;
+
+        ret = posix_memalign((void **)&seg->base_ptr, 4096, size);
+        if (ret < 0) {
+                ret = errno;
+                GOTO(err_ret, ret);
+        }
+
+        seg->use_memcache = 0;
+        seg->handler.pool = NULL;
+        seg->handler.idx = -1;
+        seg->handler.ptr = seg->base_ptr;
+
+        return 0;
+err_ret:
+        return ret;
+}
+
+static int __seg_alloc1(seg_t *seg, uint32_t size)
+{
+        int ret;
+
+        ret = mem_hugepage_new(size, &seg->handler);
+        if (unlikely(ret)) {
+                GOTO(err_ret, ret);
+        }
+        
+        DBUG("ptr %p %u\n", seg->handler.ptr, seg->len);
+        seg->use_memcache = 1;
+        YASSERT(seg->handler.ptr);
+        YASSERT(seg->handler.idx != -1);
+        YASSERT(seg->len == size);
+
+        return 0;
+err_ret:
+        return ret;
+}
+
 static seg_t *__seg_alloc(uint32_t size)
 {
         int ret;
@@ -92,32 +132,22 @@ static seg_t *__seg_alloc(uint32_t size)
                 return NULL;
 
         if (use_memcache) {
-                seg->use_memcache = 1;
-                ret = mem_hugepage_new(size, &seg->handler);
-                if (unlikely(ret)) {
-                        mem_cache_free(MEM_CACHE_64, seg);
-                        return NULL;
+                ret = __seg_alloc1(seg, size);
+                if (ret) {
+                        ret = __seg_alloc_normal(seg, size);
+                        if (ret)
+                                GOTO(err_free, ret);
                 }
-        
-                DBUG("ptr %p %u\n", seg->handler.ptr, seg->len);
-                YASSERT(seg->handler.ptr);
-                YASSERT(seg->handler.idx != -1);
-                YASSERT(seg->len == size);
-        } else {
-                ret = posix_memalign((void **)&seg->base_ptr, 4096, size);
-                if (ret < 0) {
-                        ret = errno;
-                        mem_cache_free(MEM_CACHE_64, seg);
-                        return NULL;
-                }
-
-                seg->use_memcache = 0;
-                seg->handler.pool = NULL;
-                seg->handler.idx = -1;
-                seg->handler.ptr = seg->base_ptr;
+        } else { 
+                ret = __seg_alloc_normal(seg, size);
+                if (ret)
+                        GOTO(err_free, ret);
         }
 
         return seg;
+err_free:
+        mem_cache_free(MEM_CACHE_64, seg);
+        return NULL;
 }
 
 static seg_t *__seg_share(seg_t *src)
@@ -469,6 +499,13 @@ void mbuffer_reference(buffer_t *dist, const buffer_t *src)
 
         if (use_memcache == 0) {
                 return __mbuffer_reference_clone(dist, src);
+        }
+
+        list_for_each(pos, &src->list) {
+                seg = (seg_t *)pos;
+                if (seg->use_memcache == 0) {
+                        return __mbuffer_reference_clone(dist, src);
+                }
         }
         
         BUFFER_CHECK(src);

@@ -853,7 +853,7 @@ static int __rm_push__(const nid_t *nid, int _hash, const chkid_t *chkid)
 
         volid_t volid = {sysvolid, 0};
 retry:
-        ret = redis_conn_get(&volid, hash, __redis_workerid__, &handler);
+        ret = redis_conn_get(&volid, hash, ++__seq__, &handler);
         if(ret)
                 GOTO(err_ret, ret);
 

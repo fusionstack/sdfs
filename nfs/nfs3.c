@@ -607,11 +607,11 @@ static int __nfs3_fsinfo_svc(const sockid_t *sockid, const sunrpc_request_t *req
         res.status = NFS3_OK;
         res.u.ok.rtmax = nfsconf.rsize;
         res.u.ok.rtpref = nfsconf.rsize;
-        res.u.ok.rtmult = 4096;
+        res.u.ok.rtmult = 1024;
         res.u.ok.wtmax = nfsconf.wsize;
         res.u.ok.wtpref = nfsconf.wsize;
-        res.u.ok.wtmult = 4096;
-        res.u.ok.dtpref = 4096;
+        res.u.ok.wtmult = 1024;
+        res.u.ok.dtpref = (1024 * 1024);
         res.u.ok.maxfilesize = ((LLU)1024 * 1024 * 1024 * 1024 * 10);
         res.u.ok.time_delta.seconds = 1;
         res.u.ok.time_delta.nseconds = 1;
