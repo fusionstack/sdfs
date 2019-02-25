@@ -479,7 +479,7 @@ int cds_run(void *args)
 
         max_object = (LLU)fsbuf.f_blocks * fsbuf.f_bsize / YFS_CHK_LEN_DEF;
 
-        use_memcache = 1;
+        use_memcache = 0;
         ret = ly_init(daemon, name, max_object * 2 + MAX_OPEN_FILE);
         if (ret)
                 GOTO(err_ret, ret);

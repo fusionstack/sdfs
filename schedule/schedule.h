@@ -229,7 +229,7 @@ typedef struct schedule_t {
         struct list_head running_task_list;
 
         // free task list
-        struct list_head free_task_list;
+        count_list_t free_task;
 
         // 若tasks满，缓存到wait_task
         count_list_t wait_task;
@@ -288,6 +288,7 @@ int schedule_stat(int *sid, int *taskid, int *rq, int *runable, int *wait_task, 
 int schedule_request(schedule_t *schedule, int priority, func_t exec, void *buf, const char *name);
 
 void schedule_task_new(const char *name, func_t func, void *arg, int priority);
+void schedule_task_new1(const char *name, func_t func, void *arg, int priority, int tc);
 
 /** 有副作用，两次schedule_task_get调用之间，必须有schedule_yield
  *

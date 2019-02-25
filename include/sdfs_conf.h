@@ -199,7 +199,7 @@ typedef struct {
 #pragma pack()
 
 #define MAX_NODEID_LEN 128
-#define BUFFER_SEG_SIZE (1024 * 32)
+#define BUFFER_SEG_SIZE (1024 * 1024)
 
 #define SEC_PER_MIN                 (60)
 #define SEC_PER_HOU                 (60 * 60)

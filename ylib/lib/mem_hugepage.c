@@ -355,6 +355,11 @@ int mem_hugepage_private_destoy()
 {
         mem_hugepage_t *__mem_hugepage_private__ = mem_self();
 
+        if (use_memcache == 0) {
+                DINFO("disable memcache\n");
+                return 0;
+        }
+        
         __mem_hugepage_destroy(__mem_hugepage_private__);
         variable_unset(VARIABLE_HUGEPAGE);
         

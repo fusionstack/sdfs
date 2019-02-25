@@ -1699,9 +1699,10 @@ static int __nfs3_write_svc(const sockid_t *sockid, const sunrpc_request_t *req,
         
         get_preopattr1(fileid, &attr);
 
-        DBUG("----NFS3---- write "FID_FORMAT" size %u offset %ju\n",
-              FID_ARG(fileid), args->count, args->offset);
-        
+        DBUG("----NFS3---- write "FID_FORMAT" size %u offset %ju (%ju)\n",
+              FID_ARG(fileid), args->count, args->offset, args->offset / 1024 / 1024);
+
+        YASSERT(args->data.len == args->count);
         if (args->data.len == 0) {
                 DWARN("write "FID_FORMAT" off %llu size %u\n",
                       FID_ARG(fileid), (LLU)args->offset, args->data.len);

@@ -103,3 +103,4 @@ Auto Testing
 FAQ
 ===========================================================
    1.Drectories can only be mounted by nfs or cifs after the share has been created
+   2.Using nfs3 protocol, exec the mount command likes: mount -t nfs -o vers=3 192.168.140.31:/test /mnt/test
