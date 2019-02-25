@@ -248,6 +248,6 @@ typedef struct {
 
 #define ENABLE_LOCK_FREE_LIST 0
 
-#define ENABLE_ATTR_QUEUE 1
+#define ENABLE_ATTR_QUEUE 0
 
 #endif
