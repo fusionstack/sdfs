@@ -48,7 +48,7 @@ static aio_t *aio_self()
         return variable_get(VARIABLE_AIO);
 }
 
-static int __aio_getevent(aio_t *aio, uint64_t left)
+static int __aio_getevent__(aio_t *aio, uint64_t left)
 {
         int ret, r, i, idx = 0, retval;
         struct io_event events[AIO_EVENT_MAX], *ev;
@@ -102,6 +102,24 @@ retry:
         return 0;
 }
 
+static int __aio_getevent(aio_t *aio, uint64_t left)
+{
+        int ret;
+        uint64_t s;
+        
+        while (left) {
+                s = left < AIO_EVENT_MAX ? left : AIO_EVENT_MAX;
+                ret = __aio_getevent__(aio, s);
+                if (unlikely(ret)) {
+                        UNIMPLEMENTED(__DUMP__);
+                }
+
+                left -= s;
+        }
+
+        return 0;
+}
+
 static void __aio_recv(void *arg)
 {
         int ret;
@@ -115,6 +133,7 @@ static void __aio_recv(void *arg)
                 UNIMPLEMENTED(__DUMP__);
         }
 
+        
         ret = __aio_getevent(aio, left);
         if (unlikely(ret)) {
                 UNIMPLEMENTED(__DUMP__);
