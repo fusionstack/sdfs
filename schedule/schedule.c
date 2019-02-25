@@ -254,7 +254,7 @@ int schedule_suspend()
 #if SCHEDULE_RUNNING_TASK_LIST
 static int __schedule_task_hasfree(schedule_t *schedule)
 {
-        return !list_empty(&schedule->free_task_list);
+        return schedule->free_task.count;
 }
 #else
 static int __schedule_task_hasfree(schedule_t *schedule)
@@ -363,7 +363,7 @@ static void __schedule_trampoline(taskctx_t *taskctx)
         YASSERT(schedule->task_count >= 0);
         list_del(&taskctx->running_hook);
         /* list_add better than list_add_tail here, otherwise statck will malloc for each task */
-        list_add(&taskctx->running_hook, &schedule->free_task_list);
+        count_list_add(&taskctx->running_hook, &schedule->free_task);
 
 #ifdef NEW_SCHED
         swapcontext1(&taskctx->ctx, &taskctx->main);
@@ -959,9 +959,11 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
         
         YASSERT(priority >= SCHEDULE_PRIORITY0 && priority < SCHEDULE_PRIORITY_MAX);
         YASSERT(timeout == -1 || (timeout > 0 && timeout < 20));
+        YASSERT(schedule);
 
         //ANALYSIS_BEGIN(0);
 
+        
         if (unlikely(schedule == NULL)) {//run in temporary worker;
                 ret = __schedule_task2job(name, func, arg);
                 if (unlikely(ret))
@@ -970,8 +972,6 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
                 return NULL;
         }
 
-        YASSERT(schedule);
-        //YASSERT(schedule->running);
         tasks = schedule->tasks;
 
         if (unlikely(_parent)) {
@@ -983,16 +983,16 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
 #if SCHEDULE_RUNNING_TASK_LIST
         (void) i;
         (void) tasks;
-        if (list_empty(&schedule->free_task_list)) {
+        if (!schedule->free_task.count) {
                 ret = __schedule_wait_task(name, func, arg, &parent);
                 if (unlikely(ret))
                         UNIMPLEMENTED(__DUMP__);
 
                 return NULL;
         } else {
-                taskctx = list_entry(schedule->free_task_list.next, taskctx_t, running_hook);
+                taskctx = list_entry(schedule->free_task.list.next, taskctx_t, running_hook);
 
-                list_del(&taskctx->running_hook);
+                count_list_del(&taskctx->running_hook, &schedule->free_task);
         }
 
         if (taskctx->stack == NULL) {
@@ -1257,13 +1257,13 @@ static int __schedule_create__(schedule_t **_schedule, const char *name, int idx
         memset(taskctx, 0x0, sizeof(*taskctx) * TASK_MAX);
 
         INIT_LIST_HEAD(&schedule->running_task_list);
-        INIT_LIST_HEAD(&schedule->free_task_list);
+        count_list_init(&schedule->free_task);
 
         for (i = 0; i < TASK_MAX; ++i) {
                 taskctx[i].id = i;
                 taskctx[i].stack = NULL;
                 taskctx[i].state = TASK_STAT_FREE;
-                list_add_tail(&taskctx[i].running_hook, &schedule->free_task_list);
+                count_list_add_tail(&taskctx[i].running_hook, &schedule->free_task);
         }
 
         count_list_init(&schedule->wait_task);
@@ -1306,7 +1306,7 @@ static void __schedule_destroy(schedule_t *schedule)
         YASSERT(list_empty(&schedule->wait_task.list));
 #if SCHEDULE_RUNNING_TASK_LIST
         YASSERT(list_empty(&schedule->running_task_list));
-        list_for_each_entry_safe(taskctx, tasks, &schedule->free_task_list, running_hook) {
+        list_for_each_entry_safe(taskctx, tasks, &schedule->free_task.list, running_hook) {
                 YASSERT(taskctx->state == TASK_STAT_FREE);
                 if (taskctx->stack) {
                         if (schedule->private_mem == NULL)

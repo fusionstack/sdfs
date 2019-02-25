@@ -229,7 +229,7 @@ typedef struct schedule_t {
         struct list_head running_task_list;
 
         // free task list
-        struct list_head free_task_list;
+        count_list_t free_task;
 
         // 若tasks满，缓存到wait_task
         count_list_t wait_task;
