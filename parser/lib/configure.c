@@ -162,7 +162,7 @@ int conf_init(const char *conf_path)
         cdsconf.queue_depth = 127;
         gloconf.network = 0;
         gloconf.solomode = 0;
-        gloconf.memcache_count = 512;
+        gloconf.memcache_count = 1024;
         gloconf.memcache_seg = 1024 * 1024 * 2;
         gloconf.mask = 0;
         gloconf.maxcore = 1;

@@ -18,14 +18,12 @@
 #include "net_global.h"
 #include "mem_cache.h"
 #include "core.h"
-#include "job_dock.h"
 #include "cpuset.h"
 #include "variable.h"
 #include "sdfs_buffer.h"
 #include "cpuset.h"
 
 #define __TASK_MAX__ (TASK_MAX * SCHEDULE_MAX)
-#define SCHEDULE_RUNNING_TASK_LIST TRUE
 
 /**
 //gdb loop
@@ -98,15 +96,14 @@ typedef struct {
         task_t parent;
 } wait_task_t;
 
-static __thread job_t *__running_job__ = NULL;
-
 //globe data
 static schedule_t **__schedule_array__ = NULL;
 static sy_spinlock_t __schedule_array_lock__;
 
 static int __schedule_isfree(taskctx_t *taskctx);
 static void __schedule_fingerprint_new(schedule_t *schedule, taskctx_t *taskctx);
-static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg, int timeout, task_t *_parent, int priority);
+static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
+                                      int timeout, task_t *_parent, int priority, int tc);
 static void __schedule_backtrace__(const char *name, int id, int idx, uint32_t seq);
 static void __schedule_backtrace_set(taskctx_t *taskctx);
 
@@ -251,36 +248,19 @@ int schedule_suspend()
                 return 0;
 }
 
-#if SCHEDULE_RUNNING_TASK_LIST
+#if 0
 static int __schedule_task_hasfree(schedule_t *schedule)
 {
         return schedule->free_task.count;
 }
+
 #else
 static int __schedule_task_hasfree(schedule_t *schedule)
 {
-        int idx = 0, i;
-        taskctx_t *tasks;
-
-        if (likely(schedule == NULL)) {//run in temporary worker;
+        if ((TASK_MAX - schedule->free_task.count) > TASK_MAX / 6)
+                return 0;
+        else
                 return 1;
-        }
-
-        tasks = schedule->tasks;
-
-        if (likely(schedule->size)) {
-                for (i = 0; i < schedule->size; ++i) {
-                        idx = (i + schedule->cursor) % schedule->size;
-                        if (__schedule_isfree(&tasks[idx]))
-                                break;
-                }
-
-                if (i == TASK_MAX) {
-                        return 0;
-                }
-        }
-
-        return 1;
 }
 #endif
 
@@ -301,7 +281,7 @@ static void __schedule_wait_task_resume(schedule_t *schedule)
 
         DBUG("resume wait task %s\n", wait_task->name);
 
-        __schedule_task_new(wait_task->name, wait_task->func, wait_task->arg, -1, &wait_task->parent, -1);
+        __schedule_task_new(wait_task->name, wait_task->func, wait_task->arg, -1, &wait_task->parent, -1, 0);
         yfree((void **)&wait_task);
 }
 
@@ -816,59 +796,6 @@ inline int schedule_status()
         return SCHEDULE_STATUS_RUNNING;
 }
 
-inline static void __schedule_task_stm(job_t *job, int *keep)
-{
-        schedule_task_ctx_t *ctx;
-
-        *keep = 0;
-
-        ctx = job->context;
-
-        YASSERT(__running_job__ == NULL);
-        __running_job__ = job;
-        ctx->func(ctx->arg);
-        __running_job__ = NULL;
-
-        //yfree((void **)&ctx-arg);
-}
-
-static int  __schedule_task2job(const char *name, func_t func, void *arg)
-{
-        (void) name;
-        (void) func;
-        (void) arg;
-
-        UNIMPLEMENTED(__DUMP__);
-
-        return 0;
-#if 0
-        int ret;
-        job_t *job;
-        schedule_task_ctx_t *ctx;
-
-        ret = job_create(&job, &jobtracker, name);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        ret = job_context_create(job, sizeof(*ctx));
-        if (unlikely(ret))
-                GOTO(err_job, ret);
-
-        job->state_machine = __schedule_task_stm;
-        ctx = job->context;
-        ctx->arg = arg;
-        ctx->func = func;
-
-        job_exec(job_handler(job, 0), 0, EXEC_INDIRECT);
-
-        return 0;
-err_job:
-        job_destroy(job);
-err_ret:
-        return ret;
-#endif
-}
-
 /** append to schedule->wait_task
  *
  * @param name
@@ -882,7 +809,7 @@ static int  __schedule_wait_task(const char *name, func_t func, void *arg, task_
         wait_task_t *wait_task;
         schedule_t *schedule = schedule_self();
 
-        DWARN("wait task %s\n", name);
+        DBUG("wait task %s\n", name);
 
         ret = ymalloc((void **)&wait_task, sizeof(*wait_task));
         if (unlikely(ret))
@@ -944,7 +871,7 @@ int schedule_priority(schedule_t *_schedule)
         
 
 static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
-                                      int timeout, task_t *_parent, int _priority)
+                                      int timeout, task_t *_parent, int _priority, int tc)
 {
         int ret, idx = 0, i, priority;
         schedule_t *schedule = schedule_self();
@@ -963,15 +890,6 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
 
         //ANALYSIS_BEGIN(0);
 
-        
-        if (unlikely(schedule == NULL)) {//run in temporary worker;
-                ret = __schedule_task2job(name, func, arg);
-                if (unlikely(ret))
-                        UNIMPLEMENTED(__DUMP__);
-
-                return NULL;
-        }
-
         tasks = schedule->tasks;
 
         if (unlikely(_parent)) {
@@ -980,10 +898,17 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
                 schedule_task_given(&parent);
         }
 
-#if SCHEDULE_RUNNING_TASK_LIST
         (void) i;
         (void) tasks;
-        if (!schedule->free_task.count) {
+
+        if (tc && !__schedule_task_hasfree(schedule)) {
+                ret = __schedule_wait_task(name, func, arg, &parent);
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
+
+                return NULL;
+        } if (!schedule->free_task.count) {
+                UNIMPLEMENTED(__DUMP__);
                 ret = __schedule_wait_task(name, func, arg, &parent);
                 if (unlikely(ret))
                         UNIMPLEMENTED(__DUMP__);
@@ -1006,49 +931,6 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
 
                 memset(taskctx->stack, 0x0, KEEP_STACK_SIZE);
         }
-#else
-        if (likely(schedule->size)) {
-                for (i = 0; i < schedule->size; ++i) {
-                        idx = (i + schedule->cursor) % schedule->size;
-                        if (__schedule_isfree(&tasks[idx]))
-                                break;
-                }
-
-                DBUG("id %u size %u\n", idx, schedule->size);
-
-                if (unlikely(i == TASK_MAX)) {
-                        ret = __schedule_wait_task(name, func, arg, &parent);
-                        if (unlikely(ret))
-                                UNIMPLEMENTED(__DUMP__);
-
-                        return NULL;
-                }
-        } else {
-                idx = 0;
-                i = 0;
-        }
-
-        if (unlikely(i == schedule->size)) {
-                taskctx = &(tasks[schedule->size]);
-
-                if (likely(schedule->private_mem)) {
-                        taskctx->stack = schedule->stack_addr + taskctx->id * DEFAULT_STACK_SIZE;
-                        YASSERT(i == taskctx->id);
-                } else {
-                        ret = ymalloc((void **)&taskctx->stack, DEFAULT_STACK_SIZE);
-                        if (unlikely(ret))
-                                UNIMPLEMENTED(__DUMP__);
-                }
-
-                memset(taskctx->stack, 0x0, KEEP_STACK_SIZE);
-
-                DBUG("cursor %u, size %u, retry %u\n", schedule->cursor, schedule->size, i);
-                idx = schedule->size;
-                schedule->size++;
-        }
-
-        taskctx = &(tasks[idx]);
-#endif
 
         DBUG("%s\n", name);
         strcpy(taskctx->name, name);
@@ -1078,15 +960,6 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
 
         _gettimeofday(&taskctx->ctime, NULL);
 
-#if SCHEDULE_RUNNING_TASK_LIST
-#else
-        schedule->cursor = (idx + 1) % schedule->size;
-
-        if (i > schedule->size / 2) {
-                DBUG("cursor %u, size %u, retry %u\n", schedule->cursor, schedule->size, i);
-        }
-#endif
-
         count_list_add_tail(&taskctx->hook, &schedule->runable[taskctx->priority]);
 
         __schedule_makecontext(schedule, taskctx);
@@ -1095,61 +968,15 @@ static taskctx_t *__schedule_task_new(const char *name, func_t func, void *arg,
         return taskctx;
 }
 
-static void __schedule_task_run_now(schedule_t *schedule, taskctx_t *newtask)
-{
-        taskctx_t *taskctx;
-
-        taskctx = &schedule->tasks[schedule->running_task];
-        taskctx->state = TASK_STAT_SUSPEND;
-
-        schedule->running_task = -1;
-
-        __schedule_exec__(schedule, newtask);
-
-        schedule->running_task = taskctx->id;
-        taskctx->state = TASK_STAT_RUNNING;
-}
-
-void schedule_task_new1(const char *name, func_t func, void *arg, int priority)
-{
-        schedule_t *schedule = schedule_self();
-        taskctx_t *newtask;
-        
-        newtask =  __schedule_task_new(name, func, arg, -1, NULL, priority);
-
-        if (newtask == NULL)
-                return;
-
-        count_list_t *list = &schedule->runable[newtask->priority];
-        count_list_del(&newtask->hook, list);
-        __schedule_task_run_now(schedule, newtask);
-
-#if 0
-        taskctx_t *taskctx;
-        schedule_t *schedule = schedule_self();
-        count_list_t *list = &schedule->runable[newtask->priority];
-
-        taskctx = &schedule->tasks[schedule->running_task];
-        taskctx->state = TASK_STAT_SUSPEND;
-
-        schedule->running_task = -1;
-
-        count_list_del(&newtask->hook, list);
-        __schedule_exec__(schedule, newtask);
-
-        schedule->running_task = taskctx->id;
-        taskctx->state = TASK_STAT_RUNNING;
-#endif
-}
-
 void schedule_task_new(const char *name, func_t func, void *arg, int priority)
 {
-        (void) __schedule_task_new(name, func, arg, -1, NULL, priority);
+        (void) __schedule_task_new(name, func, arg, -1, NULL, priority, 0);
 }
 
-#ifdef ENABLE_SCHEDULE_RUN
-#else
-#endif
+void schedule_task_new1(const char *name, func_t func, void *arg, int priority, int tc)
+{
+        (void) __schedule_task_new(name, func, arg, -1, NULL, priority, tc);
+}
 
 static int __schedule_create__(schedule_t **_schedule, const char *name, int idx, void *private_mem, int *_eventfd)
 {
@@ -1304,7 +1131,6 @@ static void __schedule_destroy(schedule_t *schedule)
                 yfree((void **)&request_queue->requests);
 
         YASSERT(list_empty(&schedule->wait_task.list));
-#if SCHEDULE_RUNNING_TASK_LIST
         YASSERT(list_empty(&schedule->running_task_list));
         list_for_each_entry_safe(taskctx, tasks, &schedule->free_task.list, running_hook) {
                 YASSERT(taskctx->state == TASK_STAT_FREE);
@@ -1315,17 +1141,6 @@ static void __schedule_destroy(schedule_t *schedule)
                                 taskctx->stack = NULL;
                 }
         }
-#else
-        int i;
-        for (i = 0; i < schedule->size; ++i) {
-                taskctx = &tasks[i];
-                YASSERT(taskctx->state == FREE);
-                if (schedule->private_mem == NULL)
-                        yfree((void **)&schedule->tasks[i].stack);
-                else
-                        schedule->tasks[i].stack = NULL;
-        }
-#endif
 
         variable_unset(VARIABLE_SCHEDULE);
         
@@ -1536,7 +1351,7 @@ static void __schedule_request_queue_run(schedule_t *_schedule)
                         request = &_request[i];
                         __schedule_task_new(request->name, request->exec,
                                             request->buf, -1, &request->parent,
-                                            request->priority);
+                                            request->priority, 0);
                 }
         }
 }
@@ -2072,14 +1887,8 @@ void schedule_dump(schedule_t *schedule, int block)
 
         _gettimeofday(&t1, NULL);
 
-#if SCHEDULE_RUNNING_TASK_LIST
         list_for_each_entry_safe(taskctx, tasks, &schedule->running_task_list, running_hook) {
                 i = taskctx->id;
-#else
-        for (i = 0; i < schedule->size; ++i) {
-                taskctx = &tasks[i];
-#endif
-
                 if (taskctx->state != TASK_STAT_FREE) {
                         count ++;
                         used = _time_used(&taskctx->ctime, &t1);
@@ -2118,15 +1927,8 @@ void IO_FUNC schedule_scan(schedule_t *_schedule)
         schedule->scan_seq++;
 
         (void) i;
-#if SCHEDULE_RUNNING_TASK_LIST
         list_for_each_entry_safe(taskctx, tasks, &schedule->running_task_list, running_hook) {
                 i = taskctx->id;
-#else
-        for (i = 0; i < schedule->size; ++i) {
-                taskctx = &tasks[i];
-                DBUG("scan %u, size %u\n", i, schedule->size);
-#endif
-
                 if (taskctx->state != TASK_STAT_FREE) {
                         time_used = gettime() - taskctx->wait_begin;
                         used++;
@@ -2154,15 +1956,8 @@ void schedule_backtrace()
 
         YASSERT(schedule);
 
-#if SCHEDULE_RUNNING_TASK_LIST
         list_for_each_entry_safe(taskctx, tasks, &schedule->running_task_list, running_hook) {
                 i = taskctx->id;
-#else
-        for (i = 0; i < schedule->size; ++i) {
-                taskctx = &tasks[i];
-                DBUG("scan %u, size %u\n", i, schedule->size);
-#endif
-
                 int time_used = gettime() - taskctx->wait_begin;
                 if (taskctx->state != TASK_STAT_FREE) {
                         DINFO("%s[%u][%u] %s status %u time_used %us\n", schedule->name,
@@ -2239,7 +2034,6 @@ static int __schedule_task_cleanup()
         int i, waiting = 0;
         const schedule_t *schedule = schedule_self();
 
-#if SCHEDULE_RUNNING_TASK_LIST
         taskctx_t *taskctx, *tmp;
         list_for_each_entry_safe(taskctx, tmp, &schedule->running_task_list, running_hook) {
                 i = taskctx->id;
@@ -2250,20 +2044,7 @@ static int __schedule_task_cleanup()
                         waiting++;
                 }
         }
-#else
-        taskctx_t *taskctx, *tasks = schedule->tasks;
 
-        for (i = 0; i < schedule->size; ++i) {
-                taskctx = &tasks[i];
-                if (taskctx->state != TASK_STAT_FREE) {
-                        DINFO("task[%u] name %s wait %s state %u\n",
-                              i, tasks[i].name, tasks[i].wait_name, tasks[i].state);
-                        __schedule_backtrace_set(&tasks[i]);
-                        waiting++;
-                }
-        }
-#endif
-        
         DBUG("task finished\n");
 
         return !waiting;

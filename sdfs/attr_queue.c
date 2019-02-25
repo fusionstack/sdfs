@@ -188,7 +188,10 @@ retry:
                         if (ret)
                                 GOTO(err_ret, ret);
 
-                        DWARN("queue "CHKID_FORMAT", retry %u\n", CHKID_ARG(fileid), retry);
+                        if (retry) {
+                                DWARN("queue "CHKID_FORMAT", retry %u\n", CHKID_ARG(fileid), retry);
+                        }
+
                         retry++;
 
                         goto retry;

@@ -197,7 +197,7 @@ int ynfs_srv(void *args)
                 GOTO(err_ret, ret);
 #endif
 
-        use_memcache = 1;
+        use_memcache = 0;
         ret = sdfs_init_verbose("nfs/0", gloconf.polling_core);
         if (ret)
                 GOTO(err_ret, ret);

@@ -1014,7 +1014,7 @@ static int __corenet_tcp_exec(corenet_node_t *node, event_t *ev)
 
         return 0;
 err_ret:
-        corenet_tcp_close(&sockid);
+        corenet_tcp_close(&node->sockid);
         return ret;
 }
 
@@ -1064,7 +1064,7 @@ err_ret:
         return;
 }
 
-static int __corenet_tcp_exec(corenet_node_t *node, event_t *ev)
+static int __corenet_tcp_exec(void *ctx, corenet_node_t *node, event_t *ev)
 {
         int ret;
         sockid_t sockid = node->sockid;
@@ -1090,6 +1090,8 @@ static int __corenet_tcp_exec(corenet_node_t *node, event_t *ev)
         if (ev->events & EPOLLIN) {
                 schedule_task_new("corenet_tcp_recv", __corenet_tcp_exec_recv, node, -1);
         }
+
+        schedule_run(variable_get_byctx(ctx, VARIABLE_SCHEDULE));
 
         return 0;
 err_ret:
@@ -1121,7 +1123,7 @@ int corenet_tcp_poll(void *ctx, int tmo)
                 ev = &events[i];
 
                 node = &__corenet__->array[ev->data.fd];
-                __corenet_tcp_exec(node, ev);
+                __corenet_tcp_exec(ctx, node, ev);
                 //ANALYSIS_QUEUE(0, IO_WARN, "corenet_poll");
         }
 
@@ -1329,7 +1331,7 @@ static int __corenet_tcp_commit(void *ctx, const sockid_t *sockid, buffer_t *buf
 
 #if 1
         schedule_task_new("corenet_tcp_send", __corenet_tcp_exec_send_nowait, node, -1);
-        //schedule_run(NULL);
+        schedule_run(variable_get_byctx(ctx, VARIABLE_SCHEDULE));
 #else   
 #if 0
         ret =  __corenet_tcp_send(node);

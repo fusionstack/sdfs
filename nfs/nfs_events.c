@@ -153,6 +153,6 @@ void nfs_newtask(const sockid_t *sockid, const sunrpc_request_t *req,
         mbuffer_init(&rpc_request->buf, 0);
         mbuffer_merge(&rpc_request->buf, buf);
 
-        schedule_task_new("sunrpc", __nfs_exec, rpc_request, 0);
+        schedule_task_new1("sunrpc", __nfs_exec, rpc_request, 0, 1);
 }
 

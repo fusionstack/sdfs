@@ -193,6 +193,8 @@ static int __redis_conn_get__(__conn_t *conn, redis_handler_t *handler)
 {
         int ret;
 
+        YASSERT(conn);
+        
         if (conn->conn == NULL) {
                 ret = ENOENT;
                 GOTO(err_ret, ret);
