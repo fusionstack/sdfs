@@ -102,16 +102,22 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf, int
         task_t task;
         struct iocb iocb;
         struct iovec iov[Y_MSG_MAX / BUFFER_SEG_SIZE + 1];
+        buffer_t tmp;
 
         ANALYSIS_BEGIN(0);
         
+        mbuffer_init(&tmp, 0);
+        mbuffer_clone1(&tmp, buf);
         char path[MAX_PATH_LEN];
         ret = __replica_getfd(&io->id, io->snapvers, &fd, path, O_CREAT | O_RDWR | flag);
         if (ret)
                 GOTO(err_ret, ret);
 
         iov_count = Y_MSG_MAX / BUFFER_SEG_SIZE + 1;
-        ret = mbuffer_trans(iov, &iov_count, buf);
+        ret = mbuffer_trans(iov, &iov_count, &tmp);
+        if (ret != (int)buf->len) {
+            DERROR("ret %u %u\n", ret, buf->len);
+        }
         //DBUG("ret %u %u\n", ret, buf->len);
         YASSERT(ret == (int)buf->len);
 
@@ -131,6 +137,7 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf, int
                 GOTO(err_fd, ret);
         }
 
+        mbuffer_free(&tmp);
         __replica_release(fd);
         
         if (ret != (int)buf->len) {
@@ -144,6 +151,7 @@ static int IO_FUNC __replica_write_sync(const io_t *io, const buffer_t *buf, int
 err_fd:
         __replica_release(fd);
 err_ret:
+        mbuffer_free(&tmp);
         return -ret;
 }
 
