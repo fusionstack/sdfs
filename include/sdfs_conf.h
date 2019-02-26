@@ -250,4 +250,6 @@ typedef struct {
 
 #define ENABLE_ATTR_QUEUE 1
 
+#define MAX_READDIR_ENTRIES 400
+
 #endif
