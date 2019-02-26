@@ -150,7 +150,7 @@ void aio_submit()
         for (int i = 0; i < AIO_MODE_SIZE; i++) {
                 aio = &__aio__[i];
                 if (aio->iocb_count) {
-#if 1
+#if 0
                         ret = __aio_submit(aio);
                         if (unlikely(ret))
                                 UNIMPLEMENTED(__DUMP__);
