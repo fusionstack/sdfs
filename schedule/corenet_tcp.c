@@ -938,7 +938,7 @@ err_ret:
         return;
 }
 
-static int __corenet_tcp_exec(corenet_node_t *node, event_t *ev)
+static int __corenet_tcp_exec(void *ctx, corenet_node_t *node, event_t *ev)
 {
         int ret;
         args_t *args;
@@ -963,7 +963,7 @@ static int __corenet_tcp_exec(corenet_node_t *node, event_t *ev)
         args->node = node;
         
         schedule_task_new("corenet_tcp_exec", __corenet_tcp_exec__, args, -1);
-        schedule_run(NULL);
+        schedule_run(variable_get_byctx(ctx, VARIABLE_SCHEDULE));
         
         return 0;
 err_ret:
@@ -974,7 +974,7 @@ err_ret:
 #else
 
 #if 0
-static int __corenet_tcp_exec(corenet_node_t *node, event_t *ev)
+static int __corenet_tcp_exec(void *ctx, corenet_node_t *node, event_t *ev)
 {
         int ret, recv_msg;
 
@@ -1459,9 +1459,10 @@ err_ret:
         return ret;
 }
 
-void corenet_tcp_destroy(corenet_tcp_t **_corenet)
+void __corenet_tcp_destroy(void *_finished)
 {
         corenet_tcp_t *corenet = __corenet_get();
+        int *finished = _finished;
 
         struct list_head *pos, *n;
         corenet_fwd_t *corenet_fwd;
@@ -1485,7 +1486,24 @@ void corenet_tcp_destroy(corenet_tcp_t **_corenet)
         corenet->corenet.epoll_fd = -1;
         
         yfree((void **)&corenet);
-        *_corenet = NULL;
 
         variable_unset(VARIABLE_CORENET_TCP);
+
+        *finished = 1;
+}
+
+void corenet_tcp_destroy(corenet_tcp_t **_corenet)
+{
+        int finished = 0;
+        
+        schedule_task_new("corenet_tcp_send", __corenet_tcp_destroy, &finished, -1);
+
+        while (finished) {
+                schedule_run(NULL);
+        }
+
+        DINFO("corenet tcp destroyed\n");
+        
+        *_corenet = NULL;
+       
 }

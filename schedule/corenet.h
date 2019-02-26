@@ -15,7 +15,7 @@
 #include "ynet_net.h"
 
 #define ENABLE_RDMA 0
-#define ENABLE_TCP_THREAD 0
+#define ENABLE_TCP_THREAD 1
 
 #if ENABLE_RDMA
 
