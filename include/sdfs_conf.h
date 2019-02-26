@@ -252,4 +252,8 @@ typedef struct {
 
 #define MAX_READDIR_ENTRIES 400
 
+#define YFS_META_VERSION "meta (2017Q3)\n"
+
+#define FAKE_BLOCK 4096
+
 #endif
