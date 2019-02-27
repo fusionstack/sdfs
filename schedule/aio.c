@@ -355,6 +355,8 @@ void aio_polling()
                 return;
         }
 
+        DINFO("aio polling\n");
+        
         for (int i = 0; i < AIO_THREAD; i++) {
                 aio = &__aio__[i];
                 pfds[i].fd = aio->out_eventfd;
@@ -376,7 +378,7 @@ void aio_polling()
         }
 
         count = ret;
-        DBUG("got event %u\n", count);
+        DINFO("got event %u\n", count);
         for (int i = 0; i < count; i++) {
                 pfd = &pfds[i];
                 if (pfd->revents == 0)
@@ -562,7 +564,7 @@ int aio_create(const char *name, int cpu, int polling)
                 GOTO(err_ret, ret);
 
         for (int i = 0; i < AIO_THREAD; i++) {
-                ret = __aio_create(name, AIO_EVENT_MAX / (AIO_THREAD), &aio[i],
+                ret = __aio_create(name, AIO_EVENT_MAX, &aio[i],
                                    cpu, polling);
                 if (unlikely(ret))
                         GOTO(err_free, ret);
