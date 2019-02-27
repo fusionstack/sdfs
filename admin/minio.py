@@ -18,7 +18,6 @@ import argparse
 from config import Config
 from utils import exec_shell, Exp, dmsg, dwarn,\
                 json_load, json_store, check_process_exists
-from redis_cluster import redis_openlog, redis_log
 
 ERROR_FAILED = -1
 ERROR_SUCCESS = 0
@@ -38,7 +37,7 @@ def _minio_mkdir(path_name, mode=0755):
     except OSError, e:
         if (e.errno != errno.EEXIST):
            minio_log = "mkdir %s failed, %s." % (path_name, os.strerror(e.errno))
-           redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
+           #redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
            return ERROR_FAILED
 
     return ERROR_SUCCESS
@@ -49,16 +48,17 @@ def _minio_cmd(cmd):
         return ERROR_SUCCESS
     except Exp, e:
         minio_log = "%s failed, %s." % (cmd, os.strerror(e.errno))
-        redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
+        #redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
         return e.errno
 
 class Minio:
     def __init__(self):
-        redis_openlog()
+        #redis_openlog()
+        pass
 
     def start(self):
 
-        redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio is start...")
+        #redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio is start...")
 
         #create minio dir
         if (ERROR_FAILED == _minio_mkdir(MINIO_PATH, 0755)):
@@ -74,7 +74,7 @@ class Minio:
                 return ERROR_FAILED
 
         #mount minio dir by nfs, mount failed maybe already mount, so only send log
-        cmd = "mount -t nfs4 127.0.0.1:%s %s" % \
+        cmd = "df -h | grep nfs_minio >/dev/null || mount -t nfs -o vers=3,nolock 127.0.0.1:%s %s" % \
               (NFS_MINIO_PATH, MINIO_PATH)
         _minio_cmd(cmd)
 
@@ -89,7 +89,7 @@ class Minio:
             if (e.errno != errno.EEXIST):
                 minio_log = "%s link to %s failed, %s." % \
                             (MINIO_LINK, minio_path, os.strerror(e.errno))
-                redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
+                #redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
                 return ERROR_FAILED
 
         #start minio server by systemctl command
@@ -97,18 +97,18 @@ class Minio:
         if (ERROR_FAILED == _minio_cmd(cmd)):
             return ERROR_FAILED
 
-        redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio start success")
+        #redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio start success")
         return ERROR_SUCCESS
 
     def stop(self):
-        redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio is stopping...")
+        #redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio is stopping...")
 
         try:
             os.unlink(MINIO_LINK)
         except OSError, e:
             minio_log = "unlink %s failed, %s." % \
                         (MINIO_LINK, os.strerror(e.errno))
-            redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
+            #redis_log(MINIO_LOG_ERR, MINIO_NAME, minio_log)
 
         cmd = "umount -l %s" % MINIO_PATH
         if (ERROR_FAILED == _minio_cmd(cmd)):
@@ -119,7 +119,7 @@ class Minio:
         if (ERROR_FAILED == _minio_cmd(cmd)):
             return ERROR_FAILED
 
-        redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio stop finish.")
+        #redis_log(MINIO_LOG_INFO, MINIO_NAME, "minio stop finish.")
 
         return ERROR_SUCCESS
 
@@ -199,11 +199,12 @@ class Minio:
         if not check_process_exists(key):
             #start user
             data_path = "%s/%s" % (MINIO_PATH, name)
-            if not os.path.isdir(data_path):
-                os.makedirs(data_path)
+            cmd = "mkdir -p %s" % (data_path)
+            exec_shell(cmd)
 
-            abs_conf_path = "%s/%s" % (MINIO_CONF_PATH)
-            cmd = "/opt/minio/minio server --config-dir %s --address 127.0.0.1:%s %s --quiet" % (abs_conf_path, port, data_path)
+            abs_conf_path = "%s/%s" % (MINIO_CONF_PATH, fname)
+            #cmd = "/opt/minio/minio server --config-dir %s --address 127.0.0.1:%s %s --quiet" % (abs_conf_path, port, data_path)
+            cmd = "/opt/minio/minio server --config-dir %s --address :%s %s >/dev/null 2>&1 &" % (abs_conf_path, port, data_path)
             exec_shell(cmd)
             dmsg("tenant %s port %s server start OK !" % (name, port))
         else:
@@ -230,13 +231,13 @@ class Minio:
             if not check_process_exists(key):
                 dmsg("tenant %s already stopped !" % name)
             else:
-                cmd = "ps -ef | grep '%s' | grep -v grep | xargs kill -9" % (key)
+                cmd = "ps -ef | grep '%s' | grep -v grep | awk '{print $2}' | xargs kill -9" % (key)
                 exec_shell(cmd, p=False)
                 dmsg("tenant %s stopped ok!" % (name))
         else:
             #stop all tenants minio
             try:
-                cmd = "ps -ef | grep minio | grep -v grep | xargs kill -9"
+                cmd = "ps -ef | grep minio | grep -v grep | awk '{print $2}' | xargs kill -9"
                 exec_shell(cmd)
                 dmsg("minio server stopped OK !")
             except Exception as e:
