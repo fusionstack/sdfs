@@ -304,8 +304,6 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
                 GOTO(err_fd, ret);
         }
 
-        YASSERT(ret);
-        
         __replica_release(fd);
 
         ANALYSIS_QUEUE(0, IO_INFO, NULL);
