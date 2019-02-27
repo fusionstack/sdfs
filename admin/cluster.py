@@ -394,8 +394,8 @@ class Cluster(object):
                 print y
 
         #stop all node minio service first
-        args = [[self.config.uss_minio, x] for x in self.config.cluster.keys()]
-        mutil_exec(_cluster_stop, args)
+        #args = [[self.config.uss_minio, x] for x in self.config.cluster.keys()]
+        #mutil_exec(_cluster_stop, args)
 
         args = [[self.config.uss_node, x] for x in self.config.cluster.keys()]
         mutil_exec(_cluster_stop, args)

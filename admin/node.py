@@ -72,8 +72,8 @@ class Node:
 
     def _start_service(self):
         #derror("samba, nfs-ganesha start unimplemented")
-        minio = Minio()
-        minio.start()
+        #minio = Minio()
+        #minio.start()
         return
         #start nfs service
         _exec_nfs = "systemctl start nfs-ganesha"
@@ -173,8 +173,8 @@ class Node:
             return i.stop(self.ttyonly)
 
         #first stop minio srevice
-        minio = Minio()
-        minio.stop()
+        #minio = Minio()
+        #minio.stop()
 
         def instance_stop_warp(i):
             i.stop(self.ttyonly)
@@ -211,8 +211,8 @@ class Node:
             return i.stop(self.ttyonly)
 
         #first stop minio srevice
-        minio = Minio()
-        minio.stop()
+        #minio = Minio()
+        #minio.stop()
 
         def instance_stop_warp(i):
             i.stop(self.ttyonly)
