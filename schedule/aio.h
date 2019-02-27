@@ -68,13 +68,11 @@ static inline void io_prep_pwritev(struct iocb *iocb, int fd, const struct iovec
         iocb->aio_offset = offset;
 }
 
-#define AIO_MODE_SYNC 1
-#define AIO_MODE_DIRECT 0
-#define AIO_MODE_SIZE 1
+#define AIO_THREAD 1
 
 int aio_create(const char *name, int cpu, int polling);
 void aio_destroy();
-int aio_commit(struct iocb *iocb, size_t size, int prio, int mode);
+int aio_commit(struct iocb *iocb, int prio);
 void aio_polling();
 
 /**

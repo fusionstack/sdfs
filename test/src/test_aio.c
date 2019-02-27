@@ -145,7 +145,7 @@ static int __test_aio(va_list ap)
 
         test_aio_submit();
 #else
-        ret = aio_commit(&iocb, 4096, 0, AIO_MODE_DIRECT);
+        ret = aio_commit(&iocb, 4096, 0);
         if (ret)
                 GOTO(err_ret, ret);
 
@@ -175,7 +175,7 @@ int test_aio_sdfs()
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = core_init(1, 1, CORE_FLAG_PASSIVE | CORE_FLAG_AIO);
+        ret = core_init(1, CORE_FLAG_PASSIVE | CORE_FLAG_AIO);
         if (ret)
                 GOTO(err_ret, ret);
         

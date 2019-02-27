@@ -139,8 +139,7 @@ struct cdsconf_t
         int queue_depth;
         int prealloc_max;
         int io_sync;
-
-        int lvm_qos_refresh;
+        int cds_polling;
 };
 
 struct logconf_t

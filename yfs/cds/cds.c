@@ -319,7 +319,15 @@ int cds_init(const char *home, int *cds_sd, int servicenum, int diskno, uint64_t
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = core_init(4, 1, CORE_FLAG_PASSIVE | CORE_FLAG_AIO);
+        int flag = CORE_FLAG_PASSIVE | CORE_FLAG_AIO;
+
+#if 0
+        if (cdsconf.cds_polling) {
+                flag |= CORE_FLAG_POLLING;
+        }
+#endif
+
+        ret = core_init(4, flag);
         if (ret)
                 GOTO(err_ret, ret);
         

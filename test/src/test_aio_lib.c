@@ -28,7 +28,6 @@
 #endif
 
 #define AIO_EVENT_MAX 1024
-#define AIO_THREAD 1
 
 typedef struct {
         /*aio cb*/

@@ -94,9 +94,10 @@ typedef struct __core {
 #define CORE_FLAG_AIO     0x0004
 #define CORE_FLAG_REDIS   0x0008
 #define CORE_FLAG_PRIVATE 0x0010
+#define CORE_FLAG_POLLING 0x0020
 
-int core_create(core_t **_core, int hash, int flag);
-int core_init(int polling_core, int polling_timeout, int flag);
+int core_create(core_t **_core, const char *name, int hash, int flag);
+int core_init(int polling_core, int flag);
 
 #if 0
 int core_spdk_init(int flag);

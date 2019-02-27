@@ -100,8 +100,6 @@ static int __core_pipeline_create();
 #endif
 
 static core_t *__core_array__[256];
-static int __polling_core__ = -1;
-static int __polling_timeout__ = -1;
 
 extern __thread struct list_head private_iser_dev_list;
 
@@ -214,7 +212,10 @@ static inline void IO_FUNC __core_worker_run(core_t *core, void *ctx)
         int tmo = core->main_core ? 0 : 1;
         corenet_tcp_poll(ctx, tmo);
 #endif
-
+        if (core->flag & CORE_FLAG_AIO) {
+                aio_polling();
+        }
+        
         schedule_run(core->schedule);
 
 #if ENABLE_ATTR_QUEUE
@@ -262,20 +263,20 @@ static int __core_worker_init(core_t *core)
         int ret;
         char name[MAX_NAME_LEN];
 
-        DINFO("core[%u] init begin\n", core->hash);
+        DINFO("core[%u] init begin, polling %s\n", core->hash, core->flag & CORE_FLAG_POLLING ? "on" : "off");
 
-        if (ng.daemon && __polling_timeout__ == 0) {
+        if (ng.daemon && core->flag & CORE_FLAG_POLLING) {
                 cpuset_getcpu(&core->main_core, &core->aio_core);
                 if (core->main_core) {
-                        snprintf(name, sizeof(name), "core[%u]", core->hash);
+                        snprintf(name, sizeof(name), "%s[%u]", core->name, core->hash);
                         ret = cpuset(name, core->main_core->cpu_id);
                         if (unlikely(ret)) {
                                 DWARN("set cpu fail\n");
                         }
 
-                        DINFO("core[%u] cpu set\n", core->hash);
+                        DINFO("%s[%u] cpu set\n", core->name, core->hash);
                 } else {
-                        DINFO("core[%u] skip cpu set\n", core->hash);
+                        DWARN("%s[%u] skip cpu set\n", core->name, core->hash);
                 }
         } else {
                 core->main_core = NULL;
@@ -284,7 +285,7 @@ static int __core_worker_init(core_t *core)
 #if ENABLE_CORENET
         int *interrupt = !core->main_core ? &core->interrupt_eventfd : NULL;
 
-        snprintf(name, sizeof(name), "core");
+        snprintf(name, sizeof(name), core->name);
         ret = schedule_create(interrupt, name, &core->idx, &core->schedule, NULL);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
@@ -306,20 +307,20 @@ static int __core_worker_init(core_t *core)
                         GOTO(err_ret, ret);
         }
 #else 
-        snprintf(name, sizeof(name), "core");
+        snprintf(name, sizeof(name), core->name);
         ret = schedule_create(NULL, name, &core->idx, &core->schedule, NULL);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
 #endif
 
-        DINFO("core[%u] schedule inited\n", core->hash);
+        DINFO("%s[%u] schedule inited\n", core->name, core->hash);
 
         ret = timer_init(1, core->main_core ? 1 : 0);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        DINFO("core[%u] timer inited\n", core->hash);
+        DINFO("%s[%u] timer inited\n", core->name, core->hash);
 
         ret = gettime_private_init();
         if (unlikely(ret))
@@ -335,9 +336,9 @@ static int __core_worker_init(core_t *core)
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         
-                DINFO("core[%u] mem inited\n", core->hash);
+                DINFO("%s[%u] mem inited\n", core->name, core->hash);
 
-                snprintf(name, sizeof(name), "core[%u]", core->idx);
+                snprintf(name, sizeof(name), "%s[%u]", core->name, core->idx);
                 ret = analysis_private_create(name);
                 if (unlikely(ret)) {
                         GOTO(err_ret, ret);
@@ -352,15 +353,15 @@ static int __core_worker_init(core_t *core)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
         
-        DINFO("core[%u] mem inited\n", core->hash);
+        DINFO("%s[%u] mem inited\n", core->name, core->hash);
 
-        snprintf(name, sizeof(name), "core[%u]", core->idx);
+        snprintf(name, sizeof(name), "%s[%u]", core->idx);
         ret = analysis_private_create(name);
         if (unlikely(ret)) {
                 GOTO(err_ret, ret);
         }
 
-        DINFO("core[%u] analysis inited\n", core->hash);
+        DINFO("%s[%u] analysis inited\n", core->name, core->hash);
 #endif
 
 #if 0
@@ -369,7 +370,7 @@ static int __core_worker_init(core_t *core)
                 UNIMPLEMENTED(__DUMP__);
         }
 
-        DINFO("core[%u] fastrandom inited\n", core->hash);
+        DINFO("%s[%u] fastrandom inited\n", core->name, core->hash);
 #endif
 
 #if ENABLE_CORERPC
@@ -377,7 +378,7 @@ static int __core_worker_init(core_t *core)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        DINFO("core[%u] rpc inited\n", core->hash);
+        DINFO("%s[%u] rpc inited\n", core->name, core->hash);
 
         if (core->flag & CORE_FLAG_ACTIVE) {
                 corenet_maping_t *maping;
@@ -387,7 +388,7 @@ static int __core_worker_init(core_t *core)
 
                 YASSERT(maping);
 
-                DINFO("core[%u] maping inited\n", core->hash);
+                DINFO("%s[%u] maping inited\n", core->name, core->hash);
 
                 core->maping = maping;
         } else {
@@ -401,17 +402,18 @@ static int __core_worker_init(core_t *core)
                 GOTO(err_ret, ret);
 #endif
 
-        DINFO("core[%u] latency inited\n", core->hash);
+        DINFO("%s[%u] latency inited\n", core->name, core->hash);
 
 #if ENABLE_COREAIO
         if (core->flag & CORE_FLAG_AIO) {
-                snprintf(name, sizeof(name), "aio[%u]", core->hash);
+                snprintf(name, sizeof(name), "%s[%u]", core->name, core->hash);
 
-                ret = aio_create(name, core->aio_core, __polling_timeout__ == 0);
+                ret = aio_create(name, core->aio_core, core->flag & CORE_FLAG_POLLING);
+                //ret = aio_create(name, core->aio_core, 0);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
                 
-                DINFO("core[%u] aio inited\n", core->hash);
+                DINFO("%s[%u] aio inited\n", core->name, core->hash);
         }
 #endif
 
@@ -450,8 +452,8 @@ static void * IO_FUNC __core_worker(void *_args)
         int ret;
         core_t *core = _args;
 
-        DINFO("start core[%d] name %s idx %d\n",
-              core->hash, core->name, core->idx);
+        DINFO("start %s idx %d\n",
+              core->name, core->idx);
 
         ret = __core_worker_init(core);
         if (unlikely(ret))
@@ -479,7 +481,7 @@ typedef struct {
 #define REQUEST_SEM 1
 #define REQUEST_TASK 2
 
-int core_create(core_t **_core, int hash, int flag)
+int core_create(core_t **_core, const char *name, int hash, int flag)
 {
         int ret;
         core_t *core;
@@ -490,6 +492,7 @@ int core_create(core_t **_core, int hash, int flag)
 
         memset(core, 0x0, sizeof(*core));
 
+        strcpy(core->name, name);
         core->idx = -1;
         core->hash = hash;
         core->flag = flag;
@@ -520,13 +523,10 @@ err_ret:
         return ret;
 }
 
-int core_init(int polling_core, int polling_timeout, int flag)
+int core_init(int polling_core, int flag)
 {
         int ret, i;
         core_t *core = NULL;
-
-        __polling_timeout__ = polling_timeout;
-        __polling_core__ = polling_core;
 
         ret = cpuset_init(polling_core);
         if (unlikely(ret))
@@ -551,7 +551,7 @@ int core_init(int polling_core, int polling_timeout, int flag)
 
         DINFO("core global latency inited\n");
         for (i = 0; i < cpuset_useable(); i++) {
-                ret = core_create(&core, i, flag);
+                ret = core_create(&core, "core", i, flag);
                 if (unlikely(ret))
                         UNIMPLEMENTED(__DUMP__);
 
@@ -1253,7 +1253,7 @@ int core_worker_exit(core_t *core)
 {
         int ret;
         
-        DINFO("core[%u] destroy begin\n", core->hash);
+        DINFO("%s[%u] destroy begin\n", core->name, core->hash);
 
 #if ENABLE_ATTR_QUEUE
         ret = attr_queue_destroy();

@@ -1953,6 +1953,12 @@ int nfs_ver3(const sockid_t *sockid, const sunrpc_request_t *req,
                         if (ret != ENOENT) {
                                 DERROR("%s (%d) %s\n", name, ret, strerror(ret));
                         }
+                } else if (req->procedure == NFS3_MKDIR
+                           || req->procedure == NFS3_CREATE
+                           || req->procedure == NFS3_MKNOD) {
+                        if (ret != EEXIST) {
+                                DERROR("%s (%d) %s\n", name, ret, strerror(ret));
+                        }
                 } else {
                         DERROR("%s (%d) %s\n", name, ret, strerror(ret));
                 }

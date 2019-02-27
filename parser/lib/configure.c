@@ -158,8 +158,8 @@ int conf_init(const char *conf_path)
         cdsconf.unlink_async = 1;
         cdsconf.prealloc_max = 64 * 4;
         cdsconf.io_sync = 1;
-        cdsconf.lvm_qos_refresh = 1;
-        cdsconf.queue_depth = 127;
+        cdsconf.queue_depth = 128;
+        cdsconf.cds_polling = 1;
         gloconf.network = 0;
         gloconf.solomode = 0;
         gloconf.memcache_count = 1024;
@@ -551,8 +551,8 @@ int set_value(const char* key, const char* value, int type)
                 cdsconf.prealloc_max = _value;
         else if (keyis("io_sync", key))
                 cdsconf.io_sync = _value;
-        else if (keyis("lvm_qos_refresh", key))
-                cdsconf.lvm_qos_refresh = _value;
+        else if (keyis("cds_polling", key))
+                cdsconf.cds_polling = _value;
         /**
          * global configure
          */

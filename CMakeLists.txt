@@ -401,8 +401,8 @@ target_link_libraries(sdfs.touch ${CMAKE_C_LIBS})
 add_executable(sdfs.perf ${CMAKE_CURRENT_SOURCE_DIR}/yfs/utils/uss.perf.c)
 target_link_libraries(sdfs.perf ${CMAKE_C_LIBS})
 
-add_executable(test_aio ${CMAKE_CURRENT_SOURCE_DIR}/test/src/test_aio.c ${CMAKE_CURRENT_SOURCE_DIR}/test/src/test_aio_lib.c)
-target_link_libraries(test_aio ${CMAKE_C_LIBS})
+#add_executable(test_aio ${CMAKE_CURRENT_SOURCE_DIR}/test/src/test_aio.c ${CMAKE_CURRENT_SOURCE_DIR}/test/src/test_aio_lib.c)
+#target_link_libraries(test_aio ${CMAKE_C_LIBS})
 
 set (MDS_SRC_PERF_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/mds/mds/mds_main.c
@@ -577,7 +577,7 @@ install(TARGETS sdfs.share RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.user RUNTIME DESTINATION app/bin)
 install(TARGETS sdfs.group RUNTIME DESTINATION app/bin)
 
-install(TARGETS test_aio RUNTIME DESTINATION app/test)
+#install(TARGETS test_aio RUNTIME DESTINATION app/test)
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/admin DESTINATION app/ FILE_PERMISSIONS OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include DESTINATION app/ FILE_PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ)

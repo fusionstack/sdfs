@@ -52,10 +52,10 @@ typedef struct {
 } level_t;
 
 typedef struct {
-        aio_context_t ctx[DISK_WORKER_MAX];
-        sy_spinlock_t big_lock[DISK_WORKER_MAX];
+        //aio_context_t ctx[DISK_WORKER_MAX];
+        //sy_spinlock_t big_lock[DISK_WORKER_MAX];
 
-        sy_spinlock_t level_lock;
+        //sy_spinlock_t level_lock;
         int chklist_count;
         chklist_t *chklist;
         int level_count;
@@ -177,6 +177,7 @@ int disk_init(const char *home, uint64_t _max_object)
         disk->chklist_count = 0;
         disk->level_count = max + 1;
 
+#if 0
         ret = sy_spin_init(&disk->level_lock);
         if (ret)
                 GOTO(err_ret, ret);
@@ -192,6 +193,7 @@ int disk_init(const char *home, uint64_t _max_object)
                         GOTO(err_ret, ret);
                 }
         }
+#endif
 
         ret = chkinfo_init();
         if (ret)

@@ -238,8 +238,11 @@ void __sunrpc_check__(void *arg1, void *arg2)
         
         (void) arg2;
 
-        DINFO("sunrpc client %s, running %d, socked %d\n",
-              ctx->host, ctx->running, ctx->sockid.sd);
+        DINFO("sunrpc client %s, running %s, polling %s socket %d\n",
+              ctx->host,
+              ctx->running ? "on" : "off",
+              core->flag & CORE_FLAG_POLLING ? "on" : "off",
+              ctx->sockid.sd);
 
         if (ctx->running)
                 return;
@@ -293,9 +296,12 @@ int sunrpc_accept(int srv_sd)
         //int flag = CORE_FLAG_ACTIVE;
 
 #if ENABLE_REDIS_CO
-        flag = flag | CORE_FLAG_REDIS;
+        flag |= CORE_FLAG_REDIS;
 #endif
-        ret = core_create(&core, 0, flag);
+#if 1
+        flag |= CORE_FLAG_POLLING;
+#endif
+        ret = core_create(&core, "sunrpc", sd, flag);
         if (ret)
                 GOTO(err_sd, ret);
 

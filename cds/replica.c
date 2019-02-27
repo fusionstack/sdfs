@@ -190,7 +190,7 @@ static int IO_FUNC __replica_write_direct(const io_t *io, const buffer_t *buf)
         iocb.aio_data = (__u64)&task;
 
 #if 1
-        ret = aio_commit(&iocb, buf->len, 0, AIO_MODE_DIRECT);
+        ret = aio_commit(&iocb, 0);
 #else
         ret = diskio_submit(&iocb, __callback);
         if (ret)
@@ -291,7 +291,7 @@ static int IO_FUNC __replica_read_direct(const io_t *io, buffer_t *buf)
         iocb.aio_data = (__u64)&task;
 
 #if 1
-        ret = aio_commit(&iocb, buf->len, 0, AIO_MODE_DIRECT);
+        ret = aio_commit(&iocb, 0);
 #else 
         ret = diskio_submit(&iocb, __callback);
         if (ret)

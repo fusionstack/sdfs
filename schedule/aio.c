@@ -39,7 +39,7 @@ typedef struct {
         struct iocb *iocb[AIO_EVENT_MAX];
 } aio_t;
 
-#define AIO_SUBMIT_MAX 128
+static int __seq__ = 0;
 
 static int __aio_submit(aio_t *aio);
 
@@ -147,7 +147,7 @@ void aio_submit()
         aio_t *__aio__ = aio_self();
         aio_t *aio;
 
-        for (int i = 0; i < AIO_MODE_SIZE; i++) {
+        for (int i = 0; i < AIO_THREAD; i++) {
                 aio = &__aio__[i];
                 if (aio->iocb_count) {
 #if 0
@@ -174,7 +174,7 @@ static int __aio_submit__(aio_context_t ioctx, int total, struct iocb **iocb)
         offset = 0;
         while (offset < total) {
                 left = total - offset;
-                count = _min(left, AIO_SUBMIT_MAX);
+                count = _min(left, cdsconf.queue_depth);
 
                 //ANALYSIS_BEGIN(0);
 
@@ -187,7 +187,7 @@ static int __aio_submit__(aio_context_t ioctx, int total, struct iocb **iocb)
 
                         _iocb = iocb + offset;
                         for (int i = 0; i < count; i++) {
-                                schedule_resume((void *)_iocb[i]->aio_data, ret, NULL);
+                                schedule_resume((void *)_iocb[i]->aio_data, -errno, NULL);
                         }
                 } else if (unlikely(ret < count)){
                         /* sbumit successful iocbs, maybe less than expectation */
@@ -234,13 +234,11 @@ err_ret:
         return ret;
 }
 
-int aio_commit(struct iocb *iocb, size_t size, int prio, int mode)
+int aio_commit(struct iocb *iocb, int prio)
 {
         int ret;
         aio_t *__aio__ = aio_self(), *aio;
 
-        (void) size;
-        
         if (unlikely(!__aio__)) {
                 ret = ENOSYS;
                 GOTO(err_ret, ret);
@@ -248,10 +246,9 @@ int aio_commit(struct iocb *iocb, size_t size, int prio, int mode)
 
         DBUG("aio\n");
         
-        YASSERT(mode == AIO_MODE_DIRECT || mode == AIO_MODE_SYNC);
-        aio = &__aio__[mode % AIO_MODE_SIZE];
+        aio = &__aio__[++__seq__ % AIO_THREAD];
         YASSERT(aio->iocb_count < AIO_EVENT_MAX);
-
+        
         if (prio)
                 iocb->aio_reqprio = aio->prio_max;
 
@@ -266,7 +263,7 @@ int aio_commit(struct iocb *iocb, size_t size, int prio, int mode)
 
         sy_spin_unlock(&aio->lock);
 
-        if (aio->iocb_count > AIO_SUBMIT_MAX) {
+        if (aio->iocb_count > cdsconf.queue_depth) {
                 aio_submit();
         }
 
@@ -305,7 +302,7 @@ static int __aio_poll_in(aio_t *aio, struct pollfd *pfd)
         //DBUG("aio poll sd (%u, %u)\n", aio->sd, aio->interrupt_eventfd);
         while (1) {
                 ret = poll(pfd, count, 1000);
-                if (ret  < 0)  {
+                if (ret < 0)  {
                         ret = errno;
                         if (ret == EINTR) {
                                 continue;
@@ -330,7 +327,7 @@ static void __aio_event_out(aio_t *array, int fd, int left)
 
         DBUG("left %u\n", left);
         
-        for (i = 0; i < AIO_MODE_SIZE; i++) {
+        for (i = 0; i < AIO_THREAD; i++) {
                 aio = &array[i];
 
                 if (fd == aio->out_eventfd) {
@@ -343,7 +340,7 @@ static void __aio_event_out(aio_t *array, int fd, int left)
                 break;
         }
 
-        YASSERT(i != AIO_MODE_SIZE);
+        YASSERT(i != AIO_THREAD);
         //YASSERT(count == _count);
 }
 
@@ -353,12 +350,12 @@ void aio_polling()
         struct pollfd pfds[2], *pfd;
         aio_t *__aio__ = aio_self(), *aio;
         uint64_t left;
-        
+
         if (__aio__[0].polling == 0) {
                 return;
         }
 
-        for (int i = 0; i < AIO_MODE_SIZE; i++) {
+        for (int i = 0; i < AIO_THREAD; i++) {
                 aio = &__aio__[i];
                 pfds[i].fd = aio->out_eventfd;
                 pfds[i].events = POLLIN;
@@ -366,7 +363,7 @@ void aio_polling()
         }
 
         while (1) {
-                ret = poll(pfds, AIO_MODE_SIZE, 0);
+                ret = poll(pfds, AIO_THREAD, 0);
                 if (ret < 0)  {
                         ret = errno;
                         if (ret == EINTR) {
@@ -513,7 +510,7 @@ static int __aio_create(const char *name, int event_max,  aio_t *aio, int cpu, i
         aio->cpu = cpu; 
         aio->prio_max = sysconf(_SC_AIO_PRIO_DELTA_MAX);
 
-        DINFO("name %s cpu %d aio fd %d prio max %u\n", name, cpu, efd, aio->prio_max);
+        DINFO("name %s cpu %d aio fd %d prio max %u, polling %u\n", name, cpu, efd, aio->prio_max, polling);
 
         ret = sy_spin_init(&aio->lock);
         if (unlikely(ret))
@@ -560,12 +557,12 @@ int aio_create(const char *name, int cpu, int polling)
 
         DINFO("polling mode %s\n", polling ? "on" : "off");
         
-        ret = ymalloc((void **)&aio, sizeof(*aio) * AIO_MODE_SIZE);
+        ret = ymalloc((void **)&aio, sizeof(*aio) * AIO_THREAD);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        for (int i = 0; i < AIO_MODE_SIZE; i++) {
-                ret = __aio_create(name, AIO_EVENT_MAX / (AIO_MODE_SIZE), &aio[i],
+        for (int i = 0; i < AIO_THREAD; i++) {
+                ret = __aio_create(name, AIO_EVENT_MAX / (AIO_THREAD), &aio[i],
                                    cpu, polling);
                 if (unlikely(ret))
                         GOTO(err_free, ret);
@@ -603,7 +600,7 @@ void aio_destroy()
         aio_t *__aio__ = aio_self();
 
         YASSERT(__aio__);
-        for (i = 0; i < AIO_MODE_SIZE; i++) {
+        for (i = 0; i < AIO_THREAD; i++) {
                 __aio_destroy(&__aio__[i]);
         }
         

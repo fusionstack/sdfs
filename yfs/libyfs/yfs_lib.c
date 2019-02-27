@@ -966,8 +966,7 @@ int sdfs_init_verbose(const char *name, int polling_core)
         if (ret)
                 GOTO(err_ret, ret);
 
-        ret = core_init(polling_core, 1,
-                        CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE);
+        ret = core_init(polling_core, CORE_FLAG_ACTIVE | CORE_FLAG_PRIVATE);
         if (ret)
                 GOTO(err_ret, ret);
 
