@@ -35,6 +35,7 @@
 #include "sdfs_lib.h"
 #include "xdr_nfs.h"
 #include "configure.h"
+#include "schedule.h"
 #include "sdfs_lib.h"
 #include "md_lib.h"
 #include "yfs_limit.h"
@@ -501,6 +502,10 @@ int nfs_mount(const sockid_t *sockid, const sunrpc_request_t *req,
                 GOTO(err_ret, ret);
         }
 
+        if (name) {
+                schedule_task_setname(name);
+        }
+        
         xdr.op = __XDR_DECODE;
         xdr.buf = buf;
 

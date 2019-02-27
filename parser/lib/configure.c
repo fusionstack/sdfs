@@ -138,7 +138,7 @@ int conf_init(const char *conf_path)
         sanconf.lun_blk_shift = 9;
         gloconf.write_back = 1;
         gloconf.coredump = 1;
-        gloconf.backtrace = 1;
+        gloconf.backtrace = 0;
         gloconf.testing = 0;
         gloconf.rpc_timeout = 10;
         gloconf.hb_timeout = 5;

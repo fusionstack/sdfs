@@ -1938,6 +1938,10 @@ int nfs_ver3(const sockid_t *sockid, const sunrpc_request_t *req,
                 }
         }
 
+        if (name) {
+                schedule_task_setname(name);
+        }
+        
         DBUG("request %s \n", name);
 
         (void) hash_args;
