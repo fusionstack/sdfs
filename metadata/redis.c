@@ -854,8 +854,12 @@ static int __rm_push__(const nid_t *nid, int _hash, const chkid_t *chkid)
         volid_t volid = {sysvolid, 0};
 retry:
         ret = redis_conn_get(&volid, hash, ++__seq__, &handler);
-        if(ret)
-                GOTO(err_ret, ret);
+        if(ret) {
+                if (ret == EBUSY) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 1000, (10 * 1000));
+                } else 
+                        GOTO(err_ret, ret);
+        }
 
         snprintf(key, MAX_NAME_LEN, "cds[%d]", nid->id);
         base64_encode((void *)chkid, sizeof(*chkid), value);
@@ -956,8 +960,12 @@ static int __rm_pop__(const nid_t *nid, int _hash, chkid_t *array, int *count)
         volid_t volid = {sysvolid, 0};
 retry:
         ret = redis_conn_get(&volid, hash, ++__seq__, &handler);
-        if(ret)
-                GOTO(err_ret, ret);
+        if(ret) {
+                if (ret == EBUSY) {
+                        USLEEP_RETRY(err_ret, ret, retry, retry, 1000, (10 * 1000));
+                } else 
+                        GOTO(err_ret, ret);
+        }
 
         ctx.count = *count;
         ctx.idx = 0;

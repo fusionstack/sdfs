@@ -19,6 +19,7 @@
 static int __conn_magic__ = 0;
 extern int __redis_conn_pool__;
 extern int __use_pipeline__;
+extern __thread int __use_co__;
 
 static int __redis_vol_get(const volid_t *volid, redis_vol_t **_vol, int flag);
 
@@ -105,8 +106,8 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
         int ret, count, i;
         __conn_t *conn;
 
-#if 0
-        count = __use_pipeline__ ? 1 : __redis_conn_pool__;
+#if 1
+        count = __use_co__ ? 1 : 8;
 #else
         count = __redis_conn_pool__;
 #endif
@@ -205,7 +206,7 @@ static int __redis_conn_get__(__conn_t *conn, redis_handler_t *handler)
                 GOTO(err_ret, ret);
         }
 
-#if 0
+#if 1
         if (conn->used) {
                 ret = EBUSY;
                 GOTO(err_ret, ret);
