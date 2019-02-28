@@ -391,13 +391,15 @@ int IO_FUNC __replica_read__(const io_t *io, buffer_t *buf)
                 GOTO(err_ret, ret);
         }
 
+#if 0
         if (ret < (int)buf->len) {
                 mbuffer_droptail(buf, buf->len - ret);
         }
 
         YASSERT(buf->len);
+#endif
         
-        CORE_ANALYSIS_UPDATE(1, IO_WARN, "read");       
+        CORE_ANALYSIS_UPDATE(1, IO_WARN, "read");
         
         return 0;
 err_ret:

@@ -279,6 +279,7 @@ int corerpc_send_and_wait(void *_ctx, const char *name, const sockid_t *sockid,
 
         ret = __corerpc_send(_ctx, &msgid, sockid, request, reqlen, tmp, rbuf, msg_type, msg_size);
         if (unlikely(ret)) {
+                corenet_maping_close(nid, sockid);
 		ret = _errno_net(ret);
 		YASSERT(ret == ENONET || ret == ESHUTDOWN);
 		if (wbuf_seg_count > 1)
@@ -342,7 +343,6 @@ int IO_FUNC corerpc_postwait(const char *name, const nid_t *nid, const void *req
 
         return 0;
 err_ret:
-        corenet_maping_close(nid, &sockid);
         return ret;
 }
 

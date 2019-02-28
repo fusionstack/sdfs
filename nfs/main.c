@@ -252,7 +252,7 @@ retry:
                 GOTO(err_ret, ret);
         }
 
-#if 0
+#if 1
         snprintf(service, MAX_NAME_LEN, "%d", nfsconf.nlm_port);
         ret = sunrpc_tcp_passive(service);
         if (ret)

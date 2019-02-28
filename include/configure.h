@@ -140,6 +140,7 @@ struct cdsconf_t
         int prealloc_max;
         int io_sync;
         int cds_polling;
+        int aio_thread;
 };
 
 struct logconf_t

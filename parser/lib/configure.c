@@ -158,6 +158,7 @@ int conf_init(const char *conf_path)
         cdsconf.unlink_async = 1;
         cdsconf.prealloc_max = 64 * 4;
         cdsconf.io_sync = 1;
+        cdsconf.aio_thread = 0;
         cdsconf.queue_depth = 128;
         cdsconf.cds_polling = 1;
         gloconf.network = 0;
@@ -551,6 +552,8 @@ int set_value(const char* key, const char* value, int type)
                 cdsconf.prealloc_max = _value;
         else if (keyis("io_sync", key))
                 cdsconf.io_sync = _value;
+        else if (keyis("aio_thread", key))
+                cdsconf.aio_thread = _value;
         else if (keyis("cds_polling", key))
                 cdsconf.cds_polling = _value;
         /**

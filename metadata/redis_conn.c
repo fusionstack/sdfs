@@ -106,8 +106,8 @@ inline static int __redis_connect_sharding(const char *volume, __conn_sharding_t
         int ret, count, i;
         __conn_t *conn;
 
-#if 1
-        count = __use_co__ ? 1 : 8;
+#if 0
+        count = __use_co__ ? 1 : __redis_conn_pool__;
 #else
         count = __redis_conn_pool__;
 #endif
@@ -206,14 +206,15 @@ static int __redis_conn_get__(__conn_t *conn, redis_handler_t *handler)
                 GOTO(err_ret, ret);
         }
 
-#if 1
+        if (__use_co__) {
+                YASSERT(conn->used == 0);
+        }
+                
         if (conn->used) {
                 ret = EBUSY;
                 GOTO(err_ret, ret);
         }
-#endif
 
-        YASSERT(conn->used == 0);
         conn->used = 1;
         handler->conn = conn->conn;
         handler->magic = conn->magic;

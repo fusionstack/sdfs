@@ -150,18 +150,18 @@ void aio_submit()
         for (int i = 0; i < AIO_THREAD; i++) {
                 aio = &__aio__[i];
                 if (aio->iocb_count) {
-#if 0
-                        ret = __aio_submit(aio);
-                        if (unlikely(ret))
-                                UNIMPLEMENTED(__DUMP__);
-#else
-                        uint64_t e = 1;
-                        ret = write(aio->in_eventfd, &e, sizeof(e));
-                        if (ret < 0) {
-                                ret = errno;
-                                YASSERT(0);
+                        if (cdsconf.aio_thread) {
+                                uint64_t e = 1;
+                                ret = write(aio->in_eventfd, &e, sizeof(e));
+                                if (ret < 0) {
+                                        ret = errno;
+                                        YASSERT(0);
+                                }
+                        } else {
+                                ret = __aio_submit(aio);
+                                if (unlikely(ret))
+                                        UNIMPLEMENTED(__DUMP__);
                         }
-#endif
                 }
         }
 }
@@ -509,10 +509,11 @@ static int __aio_create(const char *name, int event_max,  aio_t *aio, int cpu, i
 
         strcpy(aio->name, name);
         aio->running = 1;
-        aio->cpu = cpu; 
+        aio->cpu = cpu;
         aio->prio_max = sysconf(_SC_AIO_PRIO_DELTA_MAX);
 
-        DINFO("name %s cpu %d aio fd %d prio max %u, polling %u\n", name, cpu, efd, aio->prio_max, polling);
+        DINFO("name %s cpu %d aio fd %d prio max %u, polling %u\n", name, cpu,
+              efd, aio->prio_max, polling);
 
         ret = sy_spin_init(&aio->lock);
         if (unlikely(ret))
@@ -531,9 +532,11 @@ static int __aio_create(const char *name, int event_max,  aio_t *aio, int cpu, i
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
-        ret = sy_thread_create2(__aio_worker, aio, "__aio_worker");
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
+        if (cdsconf.aio_thread) {
+                ret = sy_thread_create2(__aio_worker, aio, "__aio_worker");
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        }
 
         if (!polling) {
                 sockid_t sockid;

@@ -327,7 +327,7 @@ int cds_init(const char *home, int *cds_sd, int servicenum, int diskno, uint64_t
         }
 #endif
 
-        ret = core_init(1, flag);
+        ret = core_init(4, flag);
         if (ret)
                 GOTO(err_ret, ret);
         

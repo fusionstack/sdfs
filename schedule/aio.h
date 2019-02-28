@@ -68,7 +68,7 @@ static inline void io_prep_pwritev(struct iocb *iocb, int fd, const struct iovec
         iocb->aio_offset = offset;
 }
 
-#define AIO_THREAD 5
+#define AIO_THREAD 1
 
 int aio_create(const char *name, int cpu, int polling);
 void aio_destroy();
