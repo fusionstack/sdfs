@@ -203,8 +203,6 @@ struct gloconf_t
         int write_back;
         uint64_t cache_size;
         int net_crc;
-        int dir_refresh;
-        int file_refresh;
         int wmem_max;
         int rmem_max;
         int check_version;

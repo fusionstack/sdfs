@@ -184,11 +184,9 @@ int conf_init(const char *conf_path)
         gloconf.restart = 1;
         gloconf.valgrind = 0;
         strcpy(gloconf.master_vip, "\0");
-        gloconf.dir_refresh  = 300;
         gloconf.polling_core = 8;
-        gloconf.polling_timeout = 3; //秒
+        gloconf.polling_timeout = 0; //秒
         gloconf.aio_core = 0;
-        gloconf.file_refresh  = 10;
         gloconf.wmem_max = SO_XMITBUF;
         gloconf.rmem_max = SO_XMITBUF;
         netconf.count = 0;
@@ -604,10 +602,6 @@ int set_value(const char* key, const char* value, int type)
                 strncpy(gloconf.nfs_srv, value, MAXSIZE);
         else if (keyis("net_crc", key))
                 gloconf.net_crc  = _value;
-        else if (keyis("dir_refresh", key))
-                gloconf.dir_refresh  = _value;
-        else if (keyis("file_refresh", key))
-                gloconf.file_refresh = _value;
         else if (keyis("polling_core", key))
                 gloconf.polling_core = _value;
         else if (keyis("polling_timeout", key))

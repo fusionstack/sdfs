@@ -32,6 +32,7 @@ typedef struct {
         int prio_max;
         int idx;
         aio_context_t ioctx;
+        int epoll_fd;
         int out_eventfd;
         int in_eventfd;
 
@@ -60,6 +61,9 @@ static int __aio_getevent__(aio_t *aio, uint64_t left)
 retry:
         r = io_getevents(aio->ioctx, left, left, events, NULL);
         if (likely(r > 0)) {
+                YASSERT(r == (int)left);
+
+                DBUG("result %u\n", r);
                 idx = 0;
                 for (i = 0; i < r; i++) {
                         ev = &events[i];
@@ -320,7 +324,7 @@ err_ret:
         return -ret;
 }
 
-static void __aio_event_out(aio_t *array, int fd, int left)
+inline static void __aio_event_out(aio_t *array, int fd, int left)
 {
         int ret, i;
         aio_t *aio;
@@ -347,53 +351,45 @@ static void __aio_event_out(aio_t *array, int fd, int left)
 void aio_polling()
 {
         int ret, count;
-        struct pollfd pfds[2], *pfd;
         aio_t *__aio__ = aio_self(), *aio;
         uint64_t left;
+        struct epoll_event events[AIO_THREAD], *ev;
 
         if (__aio__[0].polling == 0) {
                 return;
         }
 
-        DINFO("aio polling\n");
+        ANALYSIS_BEGIN(0);
         
-        for (int i = 0; i < AIO_THREAD; i++) {
-                aio = &__aio__[i];
-                pfds[i].fd = aio->out_eventfd;
-                pfds[i].events = POLLIN;
-                pfds[i].revents = 0;
+        count = _epoll_wait(__aio__[0].epoll_fd, events, AIO_THREAD, 0);
+        YASSERT(count >= 0);
+
+        if (count == 0) {
+                return;
         }
 
-        while (1) {
-                ret = poll(pfds, AIO_THREAD, 0);
-                if (ret < 0)  {
-                        ret = errno;
-                        if (ret == EINTR) {
-                                continue;
-                        } else
-                                GOTO(err_ret, ret);
-                }
-
-                break;
-        }
-
-        count = ret;
-        DINFO("got event %u\n", count);
+        int res = 0;
         for (int i = 0; i < count; i++) {
-                pfd = &pfds[i];
-                if (pfd->revents == 0)
-                        continue;
+                ev = &events[i];
+                aio = ev->data.ptr;
 
                 // left是完成的iocb事件数量
-                ret = read(pfd->fd, &left, sizeof(left));
+                ret = read(aio->out_eventfd, &left, sizeof(left));
                 if (unlikely(ret  < 0)) {
                         ret = errno;
                         YASSERT(ret == EAGAIN);
                         GOTO(err_ret, ret);
                 }
 
-                __aio_event_out(__aio__, pfd->fd, left);
+                DBUG("ev[%d] %d\n", i, (int)left);
+                YASSERT(left);
+                __aio_getevent(aio, left);
+                res++;
         }
+
+        ANALYSIS_END(0, IO_WARN, NULL);
+        
+        YASSERT(res == count);
 
         return;
 err_ret:
@@ -489,9 +485,10 @@ err_ret:
         return NULL;
 }
 
-static int __aio_create(const char *name, int event_max,  aio_t *aio, int cpu, int polling)
+static int __aio_create(const char *name, int event_max,  aio_t *aio, int cpu, int polling, int epollfd)
 {
         int ret, efd;
+        struct epoll_event ev;
 
         ret = io_setup(event_max, &aio->ioctx);
         if (ret < 0) {
@@ -538,7 +535,13 @@ static int __aio_create(const char *name, int event_max,  aio_t *aio, int cpu, i
                         GOTO(err_ret, ret);
         }
 
-        if (!polling) {
+        if (polling) {
+                ev.data.ptr = (void *)aio;
+                ev.events = EPOLLIN;
+                ret = epoll_ctl(epollfd, EPOLL_CTL_ADD, aio->out_eventfd, &ev);
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
+        } else {
                 sockid_t sockid;
                 sockid.sd = aio->out_eventfd;
                 sockid.seq = _random();
@@ -557,7 +560,7 @@ err_ret:
 
 int aio_create(const char *name, int cpu, int polling)
 {
-        int ret;
+        int ret, efd;
         aio_t *aio;
 
         DINFO("polling mode %s\n", polling ? "on" : "off");
@@ -566,13 +569,21 @@ int aio_create(const char *name, int cpu, int polling)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
+        efd = epoll_create(1);
+        if (efd < 0) {
+                ret = errno;
+                UNIMPLEMENTED(__DUMP__);
+        }
+
         for (int i = 0; i < AIO_THREAD; i++) {
                 ret = __aio_create(name, AIO_EVENT_MAX, &aio[i],
-                                   cpu, polling);
+                                   cpu, polling, efd);
                 if (unlikely(ret))
                         GOTO(err_free, ret);
         }
 
+        aio[0].epoll_fd = efd;
+        
         variable_set(VARIABLE_AIO, aio);
 
         return 0;

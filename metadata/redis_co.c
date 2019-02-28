@@ -303,7 +303,9 @@ STATIC int __redis_utils_co2(redis_handler_t *handler, struct list_head *list, i
         redis_co_ctx_t *ctx;
         redis_conn_t *conn;
 
+#if !REDIS_THREAD
         ANALYSIS_BEGIN(0);
+#endif
 
         if (list_empty(list)) {
                 return 0;
@@ -333,7 +335,9 @@ STATIC int __redis_utils_co2(redis_handler_t *handler, struct list_head *list, i
                 schedule_resume(&ctx->task, ret, NULL);
         }
 
+#if !REDIS_THREAD
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
+#endif
 
         DBUG("----get reply success, retry %u----\n", retry);
         
