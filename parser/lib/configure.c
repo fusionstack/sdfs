@@ -148,6 +148,8 @@ int conf_init(const char *conf_path)
         mdsconf.redis_sharding = 3;
         mdsconf.redis_replica = 2;
         mdsconf.redis_thread = 0;
+        mdsconf.ac_timeout = ATTR_QUEUE_TMO * 2;
+        //mdsconf.ac_timeout = 0;
         mdsconf.redis_baseport = REDIS_BASEPORT;
 
         snprintf(gloconf.workdir, MAX_PATH_LEN, "%s/data", SDFS_HOME);

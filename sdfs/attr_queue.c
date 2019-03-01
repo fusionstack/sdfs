@@ -16,14 +16,13 @@
 #include "md_lib.h"
 #include "io_analysis.h"
 #include "attr_queue.h"
+#include "kv.h"
 #include "xattr.h"
 #include "dbg.h"
 
 #define ATTR_OP_EXTERN    0x00001
 #define ATTR_OP_SETTIME   0x00002
 #define ATTR_OP_TRUNCATE  0x00004
-
-#define ATTR_QUEUE_TMO 5
 
 typedef struct {
         struct list_head hook;
@@ -44,6 +43,8 @@ typedef struct {
         hashtable_t tab;
         struct list_head list;
         int count;
+
+        kv_ctx_t *kv;
 } attr_queue_t;
 
 typedef struct {
@@ -339,9 +340,13 @@ void attr_queue_run(void *var)
         if (attr_queue == NULL) {
                 return;
         }
-        
+
         if (time - attr_queue->update < ATTR_QUEUE_TMO) {
                 return;
+        }
+
+        if (mdsconf.ac_timeout) {
+                kv_expire(attr_queue->kv);
         }
         
         if (list_empty(&attr_queue->list)) {
@@ -389,7 +394,7 @@ static int __attr_queue_init(attr_queue_t *attr_queue)
         INIT_LIST_HEAD(&attr_queue->list);
         attr_queue->update = 0;
         attr_queue->count = 0;
-        
+
         return 0;
 err_ret:
         return ret;
@@ -408,6 +413,12 @@ int attr_queue_init()
         if (ret)
                 GOTO(err_ret, ret);
 
+        if (mdsconf.ac_timeout) {
+                ret = kv_create(&attr_queue->kv);
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
+        
         variable_set(VARIABLE_ATTR_QUEUE, attr_queue);
         
         return 0;
@@ -428,11 +439,93 @@ int attr_queue_destroy()
                 GOTO(err_ret, ret);
         }
 
+        if (mdsconf.ac_timeout) {
+                kv_destory(attr_queue->kv);
+                attr_queue->kv = NULL;
+        }
+        
         hash_destroy_table(attr_queue->tab, NULL, NULL);
         attr_queue->tab = NULL;
+        DINFO("attr queue %p destroy\n", attr_queue);
         yfree((void **)&attr_queue);
-        
         variable_unset(VARIABLE_ATTR_QUEUE);
+        
+        return 0;
+err_ret:
+        return ret;
+}
+
+int attr_cache_update(const volid_t *volid, const chkid_t *chkid, const md_proto_t *md)
+{
+        int ret, buflen;
+        char key[MAX_NAME_LEN];
+        attr_queue_t *attr_queue = variable_get_byctx(NULL, VARIABLE_ATTR_QUEUE);
+        char buf[MAX_BUF_LEN];
+
+        (void) volid;
+
+        if (attr_queue == NULL) {
+                ret = ENOENT;
+                GOTO(err_ret, ret);
+        }
+        
+        snprintf(key, MAX_NAME_LEN, CHKID_FORMAT, CHKID_ARG(chkid));
+
+retry:
+        ret = kv_set(attr_queue->kv, key, md, md->md_size, O_EXCL, mdsconf.ac_timeout);
+        if (ret) {
+                if (ret == EEXIST) {
+                        md_proto_t *md1 = (void *)buf;
+
+                        buflen = MAX_BUF_LEN;
+                        ret = kv_get(attr_queue->kv, key, md1, &buflen);
+                        if (unlikely(ret)) {
+                                if (ret == ENOENT) {
+                                        DWARN("%s maybe expired\n", key);
+                                        goto retry;
+                                } else {
+                                        UNIMPLEMENTED(__DUMP__);
+                                }
+                        }
+
+                        if (md1->md_version >= md->md_version) {
+                                DBUG("%s skip %ju %ju\n", key, md1->md_version, md->md_version);
+                                goto out;
+                        }
+ 
+                        ret = kv_set(attr_queue->kv, key, md, md->md_size, 0, ATTR_QUEUE_TMO * 2);
+                        if (ret)
+                                GOTO(err_ret, ret);
+                } else {
+                        GOTO(err_ret, ret);
+                }
+        }
+        
+out:
+        return 0;
+err_ret:
+        return ret;
+}
+
+int attr_cache_get(const volid_t *volid, const chkid_t *chkid, md_proto_t *md)
+{
+        int ret, buflen;
+        char key[MAX_NAME_LEN];
+        attr_queue_t *attr_queue = variable_get_byctx(NULL, VARIABLE_ATTR_QUEUE);
+
+        (void) volid;
+
+        if (attr_queue == NULL) {
+                ret = ENOENT;
+                GOTO(err_ret, ret);
+        }
+        
+        snprintf(key, MAX_NAME_LEN, CHKID_FORMAT, CHKID_ARG(chkid));
+        
+        buflen = MAX_BUF_LEN;
+        ret = kv_get(attr_queue->kv, key, md, &buflen);
+        if (ret)
+                GOTO(err_ret, ret);
         
         return 0;
 err_ret:

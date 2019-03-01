@@ -13,6 +13,8 @@ void kv_expire(kv_ctx_t *ctx);
 int kv_create(kv_ctx_t **_ctx);
 int kv_get(kv_ctx_t *ctx, const char *key, void *value, int *valuelen);
 int kv_set(kv_ctx_t *ctx, const char *key, const void *value, int valuelen, int flag, int ttl);
+void kv_destory(kv_ctx_t *ctx);
+void kv_iterator(kv_ctx_t *ctx, func1_t func, void *arg);
 
 
 #endif

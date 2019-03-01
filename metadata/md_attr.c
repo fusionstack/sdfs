@@ -250,6 +250,10 @@ void md_attr_update(md_proto_t *md, const setattr_t *setattr)
         } else if (setattr->mtime.set_it == __SET_TO_CLIENT_TIME) {
                 md->at_mtime = setattr->mtime.time;
         }
+
+        if (changed) {
+                md->md_version++;
+        }
 }
 
 int md_attr_init(md_proto_t *md, const setattr_t *setattr, uint32_t type,

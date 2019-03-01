@@ -115,6 +115,7 @@ struct mdsconf_t
         int redis_replica;
         int redis_thread;
         int size_on_md;
+        int ac_timeout;
 };
 
 /* cds configure */

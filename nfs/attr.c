@@ -254,7 +254,7 @@ void get_preopattr1(const fileid_t *fileid, preop_attr *attr)
 
         attr->attr_follow = FALSE;
 
-#if 1
+#if 0
         return;
 #endif
 

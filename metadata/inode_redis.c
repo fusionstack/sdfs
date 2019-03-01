@@ -14,6 +14,7 @@
 #include "redis.h"
 #include "redis_pipeline.h"
 #include "quota.h"
+#include "attr_queue.h"
 #include "md.h"
 #include "md_db.h"
 #include "dbg.h"
@@ -119,7 +120,7 @@ err_ret:
         return ret;
 }
 
-static int __inode_getattr(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
+static int __inode_getattr__(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
 {
         int ret;
         size_t len;
@@ -157,6 +158,33 @@ err_ret:
         return ret;
 }
 
+static int __inode_getattr(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
+{
+        int ret;
+
+        if (mdsconf.ac_timeout == 0) {
+                ret = __inode_getattr__(volid, fileid, md);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
+        } else {
+                ret = attr_cache_get(volid, fileid, md);
+                if (ret) {
+                        if (ret == ENOENT) {
+                                ret = __inode_getattr__(volid, fileid, md);
+                                if (unlikely(ret))
+                                        GOTO(err_ret, ret);
+
+                                attr_cache_update(volid, fileid, md);
+                        } else
+                                GOTO(err_ret, ret);
+                }
+        }
+
+        return 0;
+err_ret:
+        return ret;
+}
+
 static int __inode_setattr(const volid_t *volid, const fileid_t *fileid, const setattr_t *setattr, int force)
 {
         int ret;
@@ -185,6 +213,10 @@ static int __inode_setattr(const volid_t *volid, const fileid_t *fileid, const s
         if (ret)
                 GOTO(err_lock, ret);
 
+        if (mdsconf.ac_timeout) {
+                attr_cache_update(volid, fileid, md);
+        }
+        
         ret = kunlock(volid, fileid);
         if (ret)
                 GOTO(err_ret, ret);

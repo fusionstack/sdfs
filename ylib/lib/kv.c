@@ -8,7 +8,6 @@
 #include "ylib.h"
 #include "dbg.h"
 
-
 typedef struct {
         struct list_head hook;
         int valuelen;
@@ -21,6 +20,8 @@ static int __kv_remove(kv_ctx_t *ctx, const char *key)
 {
         int ret;
         entry_t *ent;
+
+        DBUG("remove %s\n", key);
         
         ret = hash_table_remove(ctx->tab, (void *)key, (void **)&ent);
         if (unlikely(ret))
@@ -40,10 +41,12 @@ static int __kv_create(kv_ctx_t *ctx, const char *key, const void *value, int va
         entry_t *ent;
 
         keylen = strlen(key);
-        if (keylen >= MAX_NAME_LEN) {
+        if (keylen + 1 >= MAX_NAME_LEN) {
                 ret = ENAMETOOLONG;
                 GOTO(err_ret, ret);
         }
+
+        DBUG("create %s\n", key);
         
         ret = ymalloc((void **)&ent, sizeof(*ent) + valuelen);
         if (ret)
@@ -65,12 +68,18 @@ err_ret:
         return ret;
 }
 
-static int __kv_update(kv_ctx_t *ctx, entry_t *ent, const char *key, const void *value, int valuelen, int ttl)
+static int __kv_update(kv_ctx_t *ctx, entry_t *ent, const char *key, const void *value, int valuelen, int flag, int ttl)
 {
         int ret;
+        time_t now = gettime();
 
+        if ((flag & O_EXCL) && (now <= ent->timeout)) {
+                ret = EEXIST;
+                GOTO(err_ret, ret);
+        }
+        
         if (unlikely(ent->valuelen !=  valuelen)) {
-                DWARN("valuelen %u %u\n", ent->valuelen, valuelen);
+                DWARN("drop %s valuelen %u %u\n", key, ent->valuelen, valuelen);
 
                 ret = __kv_remove(ctx, key);
                 if (unlikely(ret))
@@ -80,10 +89,12 @@ static int __kv_update(kv_ctx_t *ctx, entry_t *ent, const char *key, const void 
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         } else {
+                DBUG("update %s\n", key);
+                
                 list_del(&ent->hook);
                 memcpy(ent->value, value, valuelen);
                 ent->valuelen = valuelen;
-                ent->timeout = gettime() + ttl;
+                ent->timeout = now + ttl;
 
                 list_add_tail(&ent->hook, &ctx->list);
         }
@@ -100,14 +111,9 @@ int kv_set(kv_ctx_t *ctx, const char *key, const void *value, int valuelen, int 
 
         ent = hash_table_find(ctx->tab, (void *)key);
         if (ent) {
-                if (flag & O_EXCL) {
-                        ret = EEXIST;
+                ret = __kv_update(ctx, ent, key, value, valuelen, flag, ttl);
+                if (unlikely(ret))
                         GOTO(err_ret, ret);
-                } else {
-                        ret = __kv_update(ctx, ent, key, value, valuelen, ttl);
-                        if (unlikely(ret))
-                                GOTO(err_ret, ret);
-                }
         } else {
                 ret = __kv_create(ctx, key, value, valuelen, ttl);
                 if (unlikely(ret))
@@ -119,11 +125,22 @@ err_ret:
         return ret;
 }
 
+#if 0
+static void __kv_itor(void *arg1, void *arg2)
+{
+        (void) arg1;
+        entry_t *ent = arg2;
+
+        DINFO("(%s)\n", ent->key);
+}
+#endif
+
 int kv_get(kv_ctx_t *ctx, const char *key, void *value, int *valuelen)
 {
         int ret;
         entry_t *ent;
 
+        DBUG("get %s\n", key);
         ent = hash_table_find(ctx->tab, (void *)key);
         if (ent == NULL) {
                 ret = ENOENT;
@@ -143,7 +160,7 @@ int kv_get(kv_ctx_t *ctx, const char *key, void *value, int *valuelen)
                 GOTO(err_ret, ret);
         }
 
-        DINFO("hit %s\n", key);
+        DBUG("hit %s\n", key);
         
         memcpy(value, ent->value, ent->valuelen);
 
@@ -156,7 +173,7 @@ err_ret:
 
 static uint32_t __kv_hash(const void *args)
 {
-        return hash_str(((entry_t *)args)->key);
+        return hash_str((const char *)args);
 }
 
 static int __kv_cmp(const void *v1, const void *v2)
@@ -203,12 +220,34 @@ void kv_expire(kv_ctx_t *ctx)
         list_for_each_safe(pos, n, &ctx->list) {
                 ent = (void *)pos;
 
-                if (ent->timeout >= now) {
-                        DINFO("%s expired\n", ent->key);
+                if (now > ent->timeout) {
+                        DBUG("%s expired\n", ent->key);
                         ret = __kv_remove(ctx, ent->key);
                         YASSERT(ret == 0);
                 } else {
                         break;
                 }
         }
+}
+
+void kv_destory(kv_ctx_t *ctx)
+{
+        int ret;
+        struct list_head *pos, *n;
+        entry_t *ent;
+
+        list_for_each_safe(pos, n, &ctx->list) {
+                ent = (void *)pos;
+                DINFO("%s remove\n", ent->key);
+                ret = __kv_remove(ctx, ent->key);
+                YASSERT(ret == 0);
+        }
+
+        hash_destroy_table(ctx->tab, NULL, NULL);
+        yfree((void **)&ctx);
+}
+
+void kv_iterator(kv_ctx_t *ctx, func1_t func, void *arg)
+{
+        hash_iterate_table_entries(ctx->tab, func, arg);
 }

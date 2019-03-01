@@ -256,4 +256,6 @@ typedef struct {
 
 #define FAKE_BLOCK 4096
 
+#define ATTR_QUEUE_TMO 5
+
 #endif
