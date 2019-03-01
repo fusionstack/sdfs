@@ -147,6 +147,7 @@ int conf_init(const char *conf_path)
         gloconf.lease_timeout = 20;
         mdsconf.redis_sharding = 3;
         mdsconf.redis_replica = 2;
+        mdsconf.redis_thread = 0;
         mdsconf.redis_baseport = REDIS_BASEPORT;
 
         snprintf(gloconf.workdir, MAX_PATH_LEN, "%s/data", SDFS_HOME);
@@ -160,7 +161,7 @@ int conf_init(const char *conf_path)
         cdsconf.io_sync = 1;
         cdsconf.aio_thread = 0;
         cdsconf.queue_depth = 128;
-        cdsconf.cds_polling = 1;
+        cdsconf.cds_polling = 0;
         gloconf.network = 0;
         gloconf.solomode = 0;
         gloconf.memcache_count = 1024;
@@ -533,6 +534,8 @@ int set_value(const char* key, const char* value, int type)
                 mdsconf.redis_sharding = _value;
         else if (keyis("redis_replica", key))
                 mdsconf.redis_replica = _value;
+        else if (keyis("redis_thread", key))
+                mdsconf.redis_thread = _value;
         else if (keyis("main_loop_threads ", key)) {
                 mdsconf.main_loop_threads = _value;
         }

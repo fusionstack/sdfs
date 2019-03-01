@@ -109,25 +109,11 @@ struct mdsconf_t
         char db[MAX_NAME_LEN];
         uint64_t disk_keep;
 
-#if 0
-        int redis_wait;
-        int redis_thread;
-
-        int redis_total;
-        char leveldb[MAX_PATH_LEN];
-        int leveldb_physical_package_id;
-        int schedule_physical_package_id;
-
-        
-        int leveldb_queue; //线程池的个数
-        int leveldb_queue_pb; //线程池中处理Pb任务的个数
-        int leveldb_queue_worker; //每个线程池中，线程个数
-#endif
-
         int main_loop_threads;
         int redis_baseport;
         int redis_sharding;
         int redis_replica;
+        int redis_thread;
         int size_on_md;
 };
 
