@@ -59,7 +59,7 @@ void corerpc_reply_error(const sockid_t *sockid, const msgid_t *msgid, int _erro
 
 int corerpc_recv(void *ctx, void *buf, int *count);
 
-void corerpc_scan();
+void corerpc_scan(void *ctx);
 
 // callback
 void corerpc_close(void *ctx);

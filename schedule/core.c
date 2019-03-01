@@ -238,7 +238,7 @@ static inline void IO_FUNC __core_worker_run(core_t *core, void *ctx)
 #endif
 
 #if ENABLE_CORERPC
-        corerpc_scan();
+        corerpc_scan(ctx);
 #endif
 
         redis_co_run(ctx);

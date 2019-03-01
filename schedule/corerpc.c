@@ -734,14 +734,14 @@ err_ret:
         return ret;
 }
 
-void corerpc_scan()
+void corerpc_scan(void *ctx)
 {
-        rpc_table_t *__rpc_table_private__ = corerpc_self();
+        rpc_table_t *__rpc_table_private__ = corerpc_self_byctx(ctx);
 
         if (likely(__rpc_table_private__)) {
 #if 1
                 rpc_table_scan(__rpc_table_private__, _ceil(_get_timeout(), 10), 1);
-                schedule_run(NULL);
+                schedule_run(variable_get_byctx(ctx, VARIABLE_SCHEDULE));
 #else
                 rpc_table_scan(__rpc_table_private__, _ceil(_get_timeout(), 10), 0);
 #endif
