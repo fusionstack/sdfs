@@ -24,6 +24,7 @@
 
 typedef struct redis_co_ctx {
         struct list_head hook;
+        int retval;
         fileid_t fileid;
         volid_t volid;
         const char *format;
@@ -65,15 +66,19 @@ typedef struct {
 #else
         sy_spinlock_t lock;
         struct list_head queue2;
+        struct list_head res1;
+        struct list_head res2;
 #endif
         int running;
+        int polling;
         struct list_head queue1;
 } co_t;
 
 __thread int __use_co__ = 0;
 
 static int __redis_co_run(void *ctx, struct list_head *list);
-static void __redis_co_recv(arg2_t *array, redis_handler_t *handler_array, int count);
+static void __redis_co_recv(co_t *co, arg2_t *array,
+                            redis_handler_t *handler_array, int count);
 
 static void *__redis_co_worker(void *arg)
 {
@@ -127,21 +132,33 @@ static void *__redis_co_worker(void *arg)
 
                 list_for_each_safe(pos, n, &list) {
                         arg1 = (void *)pos;
-                        __redis_co_recv(arg1->array, arg1->handler_array, arg1->count);
+                        __redis_co_recv(co, arg1->array, arg1->handler_array, arg1->count);
                 }
 
-                schedule_resume(&arg1->task, 0, NULL);
+                if (co->polling) {
+                        ret = sy_spin_lock(&co->lock);
+                        if (ret)
+                                UNIMPLEMENTED(__DUMP__);
+                        
+                        list_add_tail(&arg1->hook, &co->res2);
+
+                        sy_spin_unlock(&co->lock);
+                } else {
+                        schedule_resume(&arg1->task, 0, NULL);
+                }
         }
 
         pthread_exit(NULL);
 }
 
-int redis_co_init()
+int redis_co_init(int polling)
 {
         int ret;
         co_t *co;
 
-        DINFO("co start\n");
+        DINFO("redis co start, redis_thread %s, polling %s\n",
+              mdsconf.redis_thread ? "on" : "off",
+              polling ? "on" : "off");
         
         ret = ymalloc((void **)&co, sizeof(*co));
         if (ret)
@@ -151,6 +168,7 @@ int redis_co_init()
 
         INIT_LIST_HEAD(&co->queue1);
         co->running = 1;
+        co->polling = polling;
 
         ret = plock_init(&co->plock, "redis_co");
         if (ret)
@@ -161,6 +179,8 @@ int redis_co_init()
                 LL_INIT(&(co->list));
 #else
                 INIT_LIST_HEAD(&co->queue2);
+                INIT_LIST_HEAD(&co->res1);
+                INIT_LIST_HEAD(&co->res2);
 
                 ret = sy_spin_init(&co->lock);
                 if (ret)
@@ -291,7 +311,8 @@ STATIC int __redis_utils_co1(const arg2_t *arg2, redis_handler_t *handler,
         return 0;
 }
 
-STATIC int __redis_utils_co2(redis_handler_t *handler, struct list_head *list, int retry)
+STATIC int __redis_utils_co2(co_t *co, redis_handler_t *handler,
+                             struct list_head *list, int retry)
 {
         int ret;
         struct list_head *pos, *n;
@@ -323,7 +344,19 @@ STATIC int __redis_utils_co2(redis_handler_t *handler, struct list_head *list, i
                 }
 
                 list_del(pos);
-                schedule_resume(&ctx->task, ret, NULL);
+
+                if (co->polling && mdsconf.redis_thread) {
+                        ret = sy_spin_lock(&co->lock);
+                        if (ret)
+                                UNIMPLEMENTED(__DUMP__);
+                        
+                        ctx->retval = ret;
+                        list_add_tail(&ctx->hook, &co->res1);
+
+                        sy_spin_unlock(&co->lock);
+                } else {
+                        schedule_resume(&ctx->task, ret, NULL);
+                }
         }
 
         DBUG("----get reply success, retry %u----\n", retry);
@@ -331,7 +364,8 @@ STATIC int __redis_utils_co2(redis_handler_t *handler, struct list_head *list, i
         return 0;
 }
 
-static void __redis_co_recv(arg2_t *array, redis_handler_t *handler_array, int count)
+static void __redis_co_recv(co_t *co, arg2_t *array,
+                            redis_handler_t *handler_array, int count)
 {
         arg2_t *arg2;
         redis_handler_t *handler;
@@ -346,7 +380,7 @@ static void __redis_co_recv(arg2_t *array, redis_handler_t *handler_array, int c
                         handler = &handler_array[i];
                         arg2 = &array[i];
 
-                        fail += __redis_utils_co2(handler, &arg2->list, retry);
+                        fail += __redis_utils_co2(co, handler, &arg2->list, retry);
                 }
 
                 DBUG("------------fail %u------------\n", fail);
@@ -378,6 +412,7 @@ STATIC int __redis_co_exec(void *core_ctx, arg2_t *array, int count)
 {
         int ret, i;
         redis_handler_t handler_array[512], *handler;
+        co_t *co = variable_get_byctx(core_ctx, VARIABLE_REDIS);
         arg2_t *arg2;
 
         ANALYSIS_BEGIN(0);
@@ -397,7 +432,6 @@ STATIC int __redis_co_exec(void *core_ctx, arg2_t *array, int count)
                 arg1.handler_array = handler_array;
                 arg1.count = count;
                 arg1.task = schedule_task_get();
-                co_t *co = variable_get_byctx(core_ctx, VARIABLE_REDIS);
         
                 ret = sy_spin_lock(&co->lock);
                 if(ret)
@@ -419,7 +453,7 @@ STATIC int __redis_co_exec(void *core_ctx, arg2_t *array, int count)
                         UNIMPLEMENTED(__DUMP__);
         } else {
                 (void) core_ctx;
-                __redis_co_recv(array, handler_array, count);
+                __redis_co_recv(co, array, handler_array, count);
         }
         
         __redis_co_release(handler_array, count);
@@ -504,20 +538,71 @@ static void __redis_co_run_task(void *ctx)
         plock_unlock(&co->plock);
 }
 
-int redis_co_run(void *ctx)
+int redis_co_run(void *var)
 {
-        co_t *co = variable_get_byctx(ctx, VARIABLE_REDIS);
+        int ret;
+        co_t *co = variable_get_byctx(var, VARIABLE_REDIS);
+        struct list_head list, *pos, *n;
 
         if (co == NULL) {
                 return 0;
         }
 
-        if (list_empty(&co->queue1)) {
-                return 0;
+        if (!list_empty(&co->queue1)) {
+                schedule_task_new("redis_co_run", __redis_co_run_task, var, -1);
+                schedule_run(variable_get_byctx(var, VARIABLE_SCHEDULE));
         }
 
-        schedule_task_new("redis_co_run", __redis_co_run_task, ctx, -1);
-        schedule_run(variable_get_byctx(ctx, VARIABLE_SCHEDULE));
+        if (!co->polling || !mdsconf.redis_thread) {
+                return 0;
+        }
+        
+        if (!list_empty(&co->res1)) {
+                redis_co_ctx_t *ctx;
+                INIT_LIST_HEAD(&list);
+
+                ret = sy_spin_lock(&co->lock);
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
+
+                list_splice_init(&co->res1, &list);
+                
+                sy_spin_unlock(&co->lock);
+
+                list_for_each_safe(pos, n, &list) {
+                        ctx = (redis_co_ctx_t *)pos;
+                        list_del(pos);
+                        schedule_resume(&ctx->task, ctx->retval, NULL);
+                        DBUG("resume res1\n");
+                }
+
+                schedule_run(variable_get_byctx(var, VARIABLE_SCHEDULE));
+        }
+
+        if (!list_empty(&co->res2)) {
+                arg1_t *arg1;
+                
+                INIT_LIST_HEAD(&list);
+
+                ret = sy_spin_lock(&co->lock);
+                if (unlikely(ret))
+                        UNIMPLEMENTED(__DUMP__);
+
+                list_splice_init(&co->res2, &list);
+                
+                sy_spin_unlock(&co->lock);
+
+                list_for_each_safe(pos, n, &list) {
+                        arg1 = (arg1_t *)pos;
+                        list_del(pos);
+                        schedule_resume(&arg1->task, 0, NULL);
+                        DBUG("resume res2\n");
+                }
+
+                schedule_run(variable_get_byctx(var, VARIABLE_SCHEDULE));
+        }
+        
+        return 0;
         
 #if 0        
         
@@ -554,10 +639,7 @@ int redis_co_run(void *ctx)
         }
 
 #endif
-        
-        return 0;
 }
-
 
 int co_hget(const volid_t *volid, const fileid_t *fileid, const char *key,
                   void *buf, size_t *len)

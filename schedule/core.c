@@ -276,7 +276,9 @@ static int __core_worker_init(core_t *core)
 
                         DINFO("%s[%u] cpu set\n", core->name, core->hash);
                 } else {
-                        DWARN("%s[%u] skip cpu set\n", core->name, core->hash);
+                        core->flag ^= CORE_FLAG_POLLING;
+                        DWARN("%s[%u] polling fail, flag 0x%o\n", core->name,
+                              core->hash, core->flag);
                 }
         } else {
                 core->main_core = NULL;
@@ -419,7 +421,7 @@ static int __core_worker_init(core_t *core)
 
 #if ENABLE_REDIS_CO
         if (core->flag & CORE_FLAG_REDIS) {
-                ret = redis_co_init();
+                ret = redis_co_init(core->flag & CORE_FLAG_POLLING);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
         }
