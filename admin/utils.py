@@ -1002,20 +1002,6 @@ def kill9_self():
     self_pid = os.getpid()
     exec_shell("kill -9 %s" % (self_pid))
 
-"""
-author : jiangyang
-date : 201703.09
-install minio.service for systemctl for centos7
-"""
-def _init_minio_c7(home):
-    src = os.path.join(home, "app/admin/minio_init_centos_7")
-    dst = "/usr/lib/systemd/system/minio.service"
-    cmd = 'cp -rf %s %s' % (src, dst)
-    os.system(cmd)
-    cmd = "chmod 644 %s" % (dst)
-    os.system(cmd)
-    cmd = "systemctl daemon-reload"
-    os.system(cmd)
 
 def _install_init_ussd(home):
     dwarn("systemd disable\n")
@@ -1049,7 +1035,6 @@ def _install_init_ussd(home):
             os.system(cmd)
             cmd = "systemctl enable ussd.service"
             os.system(cmd)
-            _init_minio_c7(home)
         else:
             raise Exception("not support %s %s %s" % (distro, release, codename))
     else:
