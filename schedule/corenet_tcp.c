@@ -706,6 +706,8 @@ static int __corenet_tcp_thread_send(int fd, buffer_t *buf, struct iovec *iov, i
         int ret;
         struct msghdr msg;
 
+        ANALYSIS_BEGIN(0);
+        
         iov_count = CORE_IOV_MAX / 10;
         ret = mbuffer_trans(iov, &iov_count, buf);
         //YASSERT(ret == (int)newbuf.len);
@@ -720,6 +722,8 @@ static int __corenet_tcp_thread_send(int fd, buffer_t *buf, struct iovec *iov, i
                 GOTO(err_ret, ret);
         }
 
+        ANALYSIS_QUEUE(0, 10 * 1000, NULL);
+
         return ret;
 err_ret:
         return -ret;
@@ -729,6 +733,8 @@ static int __corenet_tcp_thread_recv(int fd, buffer_t *buf, struct iovec *iov, i
 {
         int ret;
         struct msghdr msg;
+
+        ANALYSIS_BEGIN(0);
 
         ret = mbuffer_trans(iov, &iov_count,  buf);
         YASSERT(ret == (int)buf->len);
@@ -742,6 +748,8 @@ static int __corenet_tcp_thread_recv(int fd, buffer_t *buf, struct iovec *iov, i
                 DWARN("sd %u %u %s\n", fd, ret, strerror(ret));
                 GOTO(err_ret, ret);
         }
+
+        ANALYSIS_QUEUE(0, 10 * 1000, NULL);
 
         return ret;
 err_ret:

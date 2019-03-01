@@ -267,7 +267,7 @@ int redis_co(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
 
         *reply = ctx.reply;
 
-        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        ANALYSIS_QUEUE(0, 10 * 1000, NULL);
         
         return 0;
 err_ret:

@@ -49,6 +49,8 @@
 #define ANALYSIS_BEGIN(mark)                    \
         struct timeval t1##mark, t2##mark;      \
         int used##mark;                         \
+        static time_t __warn__##mark;           \
+        (void ) __warn__##mark;                 \
                                                 \
         if (unlikely(gloconf.performance_analysis)) {\
                 _gettimeofday(&t1##mark, NULL); \
@@ -80,10 +82,14 @@
                 _gettimeofday(&t2##mark, NULL);                         \
                 used##mark = _time_used(&t1##mark, &t2##mark);          \
                 if (used##mark > (__usec)) {                            \
-                        if (used##mark > 1000 * 1000 * gloconf.rpc_timeout) {            \
-                                DWARN_PERF("analysis used %f s %s, timeout\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
-                        } else {                                        \
-                                DINFO_PERF("analysis used %f s %s\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
+                        time_t __now__##mark = gettime();                         \
+                        if (__now__##mark - __warn__##mark > 5) {       \
+                                __warn__##mark = __now__##mark;         \
+                                if (used##mark > 1000 * 1000 * gloconf.rpc_timeout) { \
+                                        DWARN_PERF("analysis used %f s %s, timeout\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
+                                } else {                                \
+                                        DINFO_PERF("analysis used %f s %s\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
+                                }                                       \
                         }                                               \
                 } \
         }
@@ -101,10 +107,14 @@
                 used##mark = _time_used(&t1##mark, &t2##mark);          \
                 analysis_private_queue(__str ? __str : __FUNCTION__, NULL, used##mark); \
                 if (used##mark > (__usec)) {                            \
-                        if (used##mark > 1000 * 1000 * gloconf.rpc_timeout) { \
-                                DWARN_PERF("analysis used %f s %s, timeout\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
-                        } else {                                        \
-                                DINFO_PERF("analysis used %f s %s\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
+                        time_t __now__##mark = gettime();               \
+                        if (__now__##mark - __warn__##mark > 5) {       \
+                                __warn__##mark = __now__##mark;         \
+                                if (used##mark > 1000 * 1000 * gloconf.rpc_timeout) { \
+                                        DWARN_PERF("analysis used %f s %s, timeout\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
+                                } else {                                \
+                                        DINFO_PERF("analysis used %f s %s\n", (double)(used##mark) / 1000 / 1000, (__str) ? (__str) : ""); \
+                                }                                       \
                         }                                               \
                 }                                                       \
         }

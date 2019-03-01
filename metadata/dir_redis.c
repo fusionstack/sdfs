@@ -65,7 +65,8 @@ static int dir_newrec(const volid_t *volid, const fileid_t *parent, const char *
 
         ret = hset(volid, parent, name, &ent, sizeof(dir_entry_t), flag);
         if (ret) {
-                DBUG(""FID_FORMAT" / "FID_FORMAT" name %s\n", FID_ARG(parent), FID_ARG(fileid), name);
+                DBUG(""FID_FORMAT" / "FID_FORMAT" name %s\n", FID_ARG(parent),
+                     FID_ARG(fileid), name);
                 GOTO(err_ret, ret);
         }
 

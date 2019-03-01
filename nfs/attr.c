@@ -253,6 +253,11 @@ void get_preopattr1(const fileid_t *fileid, preop_attr *attr)
         DBUG("pre op attr\n");
 
         attr->attr_follow = FALSE;
+
+#if 1
+        return;
+#endif
+
         retry = 0;
 retry:
         ret = sdfs_getattr(NULL, fileid, &stbuf);
