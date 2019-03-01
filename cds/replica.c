@@ -419,9 +419,16 @@ int IO_FUNC replica_read(const io_t *io, buffer_t *buf)
 {
         int ret;
 
-        ret = core_request(io->id.id, -1, "replica_read", __replica_read, io, buf);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (likely(core_self())) {
+                ret = __replica_read__(io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        } else {
+                ret = core_request(io->id.id, -1, "replica_read",
+                                   __replica_read, io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
 
         YASSERT(buf->len);
         
@@ -442,9 +449,16 @@ int IO_FUNC replica_write(const io_t *io, const buffer_t *buf)
 {
         int ret;
 
-        ret = core_request(io->id.id, -1, "replica_write", __replica_write, io, buf);
-        if (ret)
-                GOTO(err_ret, ret);
+        if (likely(core_self())) {
+                ret = __replica_write__(io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        } else {
+                ret = core_request(io->id.id, -1, "replica_write",
+                                   __replica_write, io, buf);
+                if (ret)
+                        GOTO(err_ret, ret);
+        }
 
         return 0;
 err_ret:
