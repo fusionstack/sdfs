@@ -19,7 +19,7 @@
 #include "ylock.h"
 #include "ypath.h"
 #include "cache.h"
-#include "heap.h"
+#include "kv.h"
 #include "sysutil.h"
 #include "mini_hashtb.h"
 
@@ -214,14 +214,6 @@ extern int conf_init(const char *conf_path);
 extern int nfs_config_init(const char *conf_path);
 extern int yftp_config_init(const char *conf_path);
 extern int conf_destroy(void);
-
-/* heap.c */
-int heap_init(struct heap_t *heap, gt_func gt, heap_drop_func drop,
-                heap_print_func print, uint32_t max_element, void *min);
-int heap_insert(struct heap_t *heap, void *data);
-int heap_pop(struct heap_t *heap, void **data);
-void heap_print(struct heap_t *heap);
-uint32_t heap_len(struct heap_t *heap);
 
 int config_import(addr_t *addr, int *_count, const char *pattern);
 

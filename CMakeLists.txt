@@ -78,6 +78,7 @@ add_library(sdfs SHARED
 
     #------ylib------
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/kv.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/timer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/redis_util.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ylib/lib/worker.c
