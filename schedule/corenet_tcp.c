@@ -5,6 +5,7 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <signal.h>
+#include <netinet/tcp.h>
 #include <errno.h>
 
 #define DBG_SUBSYS S_LIBSCHEDULE
@@ -451,6 +452,8 @@ static int __corenet_tcp_recv__(corenet_node_t *node, int toread)
         int ret;
         buffer_t buf;
 
+        ANALYSIS_BEGIN(0);
+        
         ret = mbuffer_init(&buf, toread);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -472,6 +475,8 @@ static int __corenet_tcp_recv__(corenet_node_t *node, int toread)
         mbuffer_merge(&node->recv_buf, &buf);
         DBUG("new recv %u, left %u\n", buf.len, node->recv_buf.len);
 
+        ANALYSIS_QUEUE(0, 10 * 1000, NULL);
+        
         return 0;
 err_free:
         mbuffer_free(&buf);
@@ -484,7 +489,7 @@ static int __corenet_tcp_recv(corenet_node_t *node, int *count)
         int ret, toread;
         uint64_t left, cp;
 
-        //ANALYSIS_BEGIN(0);
+        ANALYSIS_BEGIN(0);
         
         ret = ioctl(node->sockid.sd, FIONREAD, &toread);
         if (ret < 0) {
@@ -514,13 +519,14 @@ static int __corenet_tcp_recv(corenet_node_t *node, int *count)
                 left -= cp;
         }
 
-        //ANALYSIS_QUEUE(0, IO_WARN, "recvmsg");
-
         // __iscsi_newtask_core
         // corerpc_recv
         ret = node->exec(node->ctx, &node->recv_buf, count);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
+
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+
         return 0;
 err_ret:
         return ret;
@@ -531,7 +537,7 @@ static int __corenet_tcp_send(corenet_node_t *node)
         int ret;
         buffer_t *buf, tmp;
         
-        //ANALYSIS_BEGIN(0);
+        ANALYSIS_BEGIN(0);
         
         buf = &node->send_buf;
         if (likely(buf->len)) {
@@ -556,7 +562,7 @@ static int __corenet_tcp_send(corenet_node_t *node)
                 mbuffer_free(&tmp);
         }
 
-        //ANALYSIS_QUEUE(0, IO_WARN, "sendmsg");
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 err_ret:
@@ -586,7 +592,7 @@ typedef struct {
         struct list_head list;
 } corenet_tcp_worker_t;
 
-#define __TCP_WORKER_COUNT__ 2
+#define __TCP_WORKER_COUNT__ 7
 
 static __thread corenet_tcp_worker_t *__worker__;
 
@@ -715,12 +721,24 @@ static int __corenet_tcp_thread_send(int fd, buffer_t *buf, struct iovec *iov, i
         msg.msg_iov = iov;
         msg.msg_iovlen = iov_count;
 
+        do {
+                struct timeval __tv__;                                
+                gettimeofday(&__tv__, NULL);                          
+                DBUG("begin timeval %u.%llu, buf %u\n", __tv__.tv_sec, (LLU)__tv__.tv_usec, buf->len);
+        } while (0);
+
         ret = _sendmsg(fd, &msg, MSG_DONTWAIT);
         if (ret < 0) {
                 ret = -ret;
                 DWARN("sd %u %u %s\n", fd, ret, strerror(ret));
                 GOTO(err_ret, ret);
         }
+
+        do {
+                struct timeval __tv__;                                
+                gettimeofday(&__tv__, NULL);                          
+                DBUG("end timeval %u.%llu, buf %u\n", __tv__.tv_sec, (LLU)__tv__.tv_usec, buf->len);
+        } while (0);
 
         ANALYSIS_QUEUE(0, 10 * 1000, NULL);
 
@@ -742,6 +760,12 @@ static int __corenet_tcp_thread_recv(int fd, buffer_t *buf, struct iovec *iov, i
         msg.msg_iov = iov;
         msg.msg_iovlen = iov_count;
 
+        do {
+                struct timeval __tv__;                                
+                gettimeofday(&__tv__, NULL);                          
+                DBUG("begin timeval %u.%llu, buf %u\n", __tv__.tv_sec, (LLU)__tv__.tv_usec, buf->len);
+        } while (0);
+        
         ret = _recvmsg(fd, &msg, MSG_DONTWAIT);
         if (ret < 0) {
                 ret = -ret;
@@ -749,6 +773,12 @@ static int __corenet_tcp_thread_recv(int fd, buffer_t *buf, struct iovec *iov, i
                 GOTO(err_ret, ret);
         }
 
+        do {
+                struct timeval __tv__;                                
+                gettimeofday(&__tv__, NULL);                          
+                DBUG("end timeval %u.%llu, buf %u\n", __tv__.tv_sec, (LLU)__tv__.tv_usec, buf->len);
+        } while (0);
+        
         ANALYSIS_QUEUE(0, 10 * 1000, NULL);
 
         return ret;
@@ -847,6 +877,8 @@ static int __corenet_tcp_remote(int fd, buffer_t *buf, int op)
         sr_ctx_t ctx;
         corenet_tcp_worker_t *worker = &__worker__[fd % __TCP_WORKER_COUNT__];
 
+        ANALYSIS_BEGIN(0);
+        
         ctx.task = schedule_task_get();
         ctx.buf = buf;
         ctx.fd = fd;
@@ -874,6 +906,8 @@ static int __corenet_tcp_remote(int fd, buffer_t *buf, int op)
                 GOTO(err_ret, ret);
         }
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return ret;
 err_ret:
         return -ret;
@@ -1200,6 +1234,8 @@ int corenet_tcp_send(void *ctx, const sockid_t *sockid, buffer_t *buf, int flag)
         corenet_node_t *node;
         corenet_tcp_t *__corenet__ = __corenet_get_byctx(ctx);
 
+        ANALYSIS_BEGIN(0);
+        
         YASSERT(sockid->type == SOCKID_CORENET);
         //YASSERT(sockid->addr);
 
@@ -1212,6 +1248,8 @@ int corenet_tcp_send(void *ctx, const sockid_t *sockid, buffer_t *buf, int flag)
 
         __corenet_tcp_queue(__corenet__, sockid, buf, flag);
 
+        ANALYSIS_QUEUE(0, 10 * 1000, NULL);
+        
         return 0;
 err_ret:
         return ret;
@@ -1368,8 +1406,9 @@ void corenet_tcp_commit(void *ctx)
                 corenet_fwd = (void *)pos;
                 list_del(pos);
 
-                DBUG("forward to %s @ %u\n",
-                     _inet_ntoa(corenet_fwd->sockid.addr), corenet_fwd->sockid.sd);
+                DBUG("forward to %s @ %u, buf %u\n",
+                      _inet_ntoa(corenet_fwd->sockid.addr), corenet_fwd->sockid.sd,
+                      corenet_fwd->buf.len);
 
                 __corenet_tcp_commit(ctx, &corenet_fwd->sockid, &corenet_fwd->buf);
 

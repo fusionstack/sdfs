@@ -151,7 +151,8 @@ err_ret:
         return ret;
 }
 
-int md_setattr(const volid_t *volid, const fileid_t *fileid, const setattr_t *setattr, int force)
+int md_setattr(const volid_t *volid, const fileid_t *fileid,
+               const setattr_t *setattr, int force)
 {
         int ret;
 

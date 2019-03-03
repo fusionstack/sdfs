@@ -538,6 +538,8 @@ int set_value(const char* key, const char* value, int type)
                 mdsconf.redis_replica = _value;
         else if (keyis("redis_thread", key))
                 mdsconf.redis_thread = _value;
+        else if (keyis("ac_timeout", key))
+                mdsconf.ac_timeout = _value;
         else if (keyis("main_loop_threads ", key)) {
                 mdsconf.main_loop_threads = _value;
         }

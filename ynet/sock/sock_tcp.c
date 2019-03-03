@@ -682,8 +682,6 @@ err_ret:
         return ret;
 }
 
-#if 1
-
 static int __tcp_sock_getaddr(uint32_t network, uint32_t mask, uint32_t *_addr)
 {
         int ret, sd, i, done;
@@ -721,10 +719,11 @@ static int __tcp_sock_getaddr(uint32_t network, uint32_t mask, uint32_t *_addr)
 
         done = 0;
         for (i = ifc.ifc_len / sizeof(struct ifreq); --i >= 0; ifcreq++) {
-
                 _strncpy(ifr.ifr_name, ifcreq->ifr_name,
                          _strlen(ifcreq->ifr_name) + 1);
 
+                DBUG("ifname[%u] %s\n", i, ifcreq->ifr_name);
+                
                 ret = ioctl(sd, SIOCGIFFLAGS, &ifr);
                 if (unlikely(ret)) {
                         ret = errno;
@@ -737,11 +736,11 @@ static int __tcp_sock_getaddr(uint32_t network, uint32_t mask, uint32_t *_addr)
 
                 sin = (struct sockaddr_in *)&ifcreq->ifr_addr;
                 addr = sin->sin_addr.s_addr;
-                DBUG("ifname %s, %s\n", ifcreq->ifr_name, _inet_ntoa(addr));
+                DBUG("ifname[%u] %s, %s, count (%u)\n", i, ifcreq->ifr_name,
+                      _inet_ntoa(addr), ifc.ifc_len);
                 //DBUG("got sock info %s %u %s\n", _inet_ntoa(addr), i, ifcreq->ifr_name);
                 if ((addr & mask) == (network & mask)) {
                         DINFO("ifname %s, %s\n", ifcreq->ifr_name, _inet_ntoa(addr));
-                        //DINFO("got sock info %u & %u  %u & %u\n", addr, mask, network, mask);
                         done = 1;
                         break;
                 }
@@ -799,118 +798,6 @@ int tcp_sock_getaddr(uint32_t *info_count, ynet_sock_info_t *info,
 err_ret:
         return ret;
 }
-
-
-
-#else
-
-int tcp_sock_getaddr(uint32_t *info_count, ynet_sock_info_t *info,
-                     uint32_t info_count_max, uint32_t port)
-{
-        int ret, sd, i, j, done;
-        uint32_t count, addr;
-        char buf[MAX_BUF_LEN];
-        struct ifconf ifc;
-        struct ifreq *ifcreq, ifr;
-        struct sockaddr_in localaddr, *sin;
-
-        ret = inet_aton(YNET_LOCALHOST, &localaddr.sin_addr);
-        if (ret == 0) {
-                ret = EINVAL;
-                DERROR("ret (%d) %s\n", ret, strerror(ret));
-                GOTO(err_ret, ret);
-        }
-
-        sd = socket(PF_INET, SOCK_STREAM, 0);
-        if (sd == -1) {
-                ret = errno;
-                DERROR("%d - %s\n", ret, strerror(ret));
-                GOTO(err_ret, ret);
-        }
-
-        ifc.ifc_len = MAX_BUF_LEN;
-        ifc.ifc_buf = buf;
-
-        ret = ioctl(sd, SIOCGIFCONF, &ifc);
-        if (ret == -1) {
-                ret = errno;
-                DERROR("%d - %s\n", ret, strerror(ret));
-                GOTO(err_sd, ret);
-        }
-
-        ifcreq = ifc.ifc_req;
-
-        count = 0;
-
-        for (i = ifc.ifc_len / sizeof(struct ifreq); --i >= 0; ifcreq++) {
-
-                _strncpy(ifr.ifr_name, ifcreq->ifr_name,
-                         _strlen(ifcreq->ifr_name) + 1);
-
-                ret = ioctl(sd, SIOCGIFFLAGS, &ifr);
-                if (unlikely(ret)) {
-                        ret = errno;
-                        DERROR("ret (%d) %s\n", ret, strerror(ret));
-                        GOTO(err_sd, ret);
-                }
-
-                if ((ifr.ifr_flags & IFF_UP) == 0)
-                        continue;
-
-                sin = (struct sockaddr_in *)&ifcreq->ifr_addr;
-                addr = sin->sin_addr.s_addr;
-                DBUG("ifname %s, %s\n", ifcreq->ifr_name, _inet_ntoa(addr));
-
-                done = 0;
-                //DBUG("got sock info %s %u %s\n", _inet_ntoa(addr), i, ifcreq->ifr_name);
-
-                for (j = 0; j < netconf.count; j++) {
-                        if ((addr & netconf.network[j].mask)
-                            == (netconf.network[j].network & netconf.network[j].mask)) {
-                                DBUG("got sock info %u & %u  %u & %u\n",
-                                      addr, netconf.network[j].mask,
-                                      netconf.network[j].network, netconf.network[j].mask);
-
-                                done = 1;
-                                break;
-                        }
-                }
-
-                if (done) {
-                        info[count].addr = addr;
-                        info[count].port = htons(port);
-
-                        DINFO("got sock info %s:%u\n",
-                              _inet_ntoa(info[count].addr), port);
-
-                        count++;
-                }
-        }
-
-        (void) info_count_max;
-
-        YASSERT(count <= netconf.count);
-        
-        ret = sy_close(sd);
-        if (unlikely(ret))
-                GOTO(err_ret, ret);
-
-        if (count != 0)
-                *info_count = count;
-        else {
-                ret = ECONNREFUSED;
-                DINFO("connect refused\n");
-                GOTO(err_ret, ret);
-        }
-
-        return 0;
-err_sd:
-        (void) sy_close(sd);
-err_ret:
-        return ret;
-}
-
-#endif
 
 int tcp_sock_hostconnect(net_handle_t *nh, const char *host,
                          const char *service, int nonblock, int timeout, int tuning)

@@ -218,13 +218,13 @@ int attr_queue_settime(const volid_t *volid, const fileid_t *fileid, const void 
 
 int attr_queue_extern(const volid_t *volid, const fileid_t *fileid, uint64_t size)
 {
-        DBUG("set "CHKID_FORMAT"\n", CHKID_ARG(fileid));
+        DBUG("set "CHKID_FORMAT" size %ju\n", CHKID_ARG(fileid), size);
         return __attr_queue(volid, fileid, ATTR_OP_EXTERN, &size);
 }
 
 int attr_queue_truncate(const volid_t *volid, const fileid_t *fileid, uint64_t size)
 {
-        DBUG("set "CHKID_FORMAT"\n", CHKID_ARG(fileid));
+        DBUG("set "CHKID_FORMAT" size %ju\n", CHKID_ARG(fileid), size);
         return __attr_queue(volid, fileid, ATTR_OP_TRUNCATE, &size);
 }
 
@@ -250,7 +250,8 @@ int attr_queue_update(const volid_t *volid, const fileid_t *fileid, void *_md)
         if (ent->size.set_it == __SET_EXTERN) {
                 md->at_size = (md->at_size > ent->size.size)
                         ? md->at_size : ent->size.size;
-                DBUG("update "CHKID_FORMAT" size\n", CHKID_ARG(&ent->fileid));
+                DBUG("update "CHKID_FORMAT" size %u\n",
+                      CHKID_ARG(&ent->fileid), md->at_size);
         } else if (ent->size.set_it == __SET_TRUNCATE) {
                 md->at_size = ent->size.size;
         }
@@ -353,7 +354,7 @@ void attr_queue_run(void *var)
                 return;
         }
 
-        DINFO("attr queue count %u\n", attr_queue->count);
+        DBUG("attr queue count %u\n", attr_queue->count);
         attr_queue->update = time;
         schedule_task_new("attr_queue_run", __attr_queue_run_task, var, -1);
         schedule_run(variable_get_byctx(var, VARIABLE_SCHEDULE));
@@ -446,7 +447,7 @@ int attr_queue_destroy()
         
         hash_destroy_table(attr_queue->tab, NULL, NULL);
         attr_queue->tab = NULL;
-        DINFO("attr queue %p destroy\n", attr_queue);
+        DBUG("attr queue %p destroy\n", attr_queue);
         yfree((void **)&attr_queue);
         variable_unset(VARIABLE_ATTR_QUEUE);
         
@@ -496,6 +497,8 @@ retry:
                         ret = kv_set(attr_queue->kv, key, md, md->md_size, 0, ATTR_QUEUE_TMO * 2);
                         if (ret)
                                 GOTO(err_ret, ret);
+
+                        DBUG(CHKID_FORMAT" nlink %d\n", CHKID_ARG(chkid), md->at_nlink);
                 } else {
                         GOTO(err_ret, ret);
                 }
@@ -526,6 +529,9 @@ int attr_cache_get(const volid_t *volid, const chkid_t *chkid, md_proto_t *md)
         ret = kv_get(attr_queue->kv, key, md, &buflen);
         if (ret)
                 GOTO(err_ret, ret);
+
+        DBUG(CHKID_FORMAT" nlink %d, size %ju\n", CHKID_ARG(&md->fileid),
+              md->at_nlink, md->at_size);
         
         return 0;
 err_ret:

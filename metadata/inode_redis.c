@@ -31,13 +31,21 @@ static int __md_set(const volid_t *volid, const md_proto_t *md, int flag)
         ret = hset(volid, &md->fileid, SDFS_MD, md, md->md_size, flag);
         if (ret)
                 GOTO(err_ret, ret);
+
+        DBUG(CHKID_FORMAT" nlink %d, size %ju\n", CHKID_ARG(&md->fileid),
+              md->at_nlink, md->at_size);
+        
+        if (mdsconf.ac_timeout) {
+                attr_cache_update(volid, &md->fileid, md);
+        }
         
         return 0;
 err_ret:
         return ret;
 }
 
-static int __inode_setlock(const volid_t *volid, const fileid_t *fileid, const void *opaque, size_t len, int flag)
+static int __inode_setlock(const volid_t *volid, const fileid_t *fileid,
+                           const void *opaque, size_t len, int flag)
 {
         int ret;
 
@@ -55,7 +63,8 @@ err_ret:
         return ret;
 }
 
-static int __inode_getlock(const volid_t *volid, const fileid_t *fileid, void *opaque, size_t *len)
+static int __inode_getlock(const volid_t *volid, const fileid_t *fileid,
+                           void *opaque, size_t *len)
 {
         int ret;
 
@@ -81,7 +90,8 @@ static void __inode_getxattrid(const fileid_t *fileid, fileid_t *xattrid, int fl
         xattrid->type = ftype_xattr;
 }
 
-static int __inode_create(const volid_t *volid, const fileid_t *parent, const setattr_t *setattr,
+static int __inode_create(const volid_t *volid, const fileid_t *parent,
+                          const setattr_t *setattr,
                           int type, fileid_t *_fileid)
 {
         int ret;
@@ -120,7 +130,7 @@ err_ret:
         return ret;
 }
 
-static int __inode_getattr__(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
+static int __md_get(const volid_t *volid, const fileid_t *fileid, md_proto_t *md)
 {
         int ret;
         size_t len;
@@ -163,14 +173,17 @@ static int __inode_getattr(const volid_t *volid, const fileid_t *fileid, md_prot
         int ret;
 
         if (mdsconf.ac_timeout == 0) {
-                ret = __inode_getattr__(volid, fileid, md);
+                ret = __md_get(volid, fileid, md);
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
+
+                DBUG(CHKID_FORMAT" nlink %d, size %ju\n", CHKID_ARG(fileid),
+                      md->at_nlink, md->at_size);
         } else {
                 ret = attr_cache_get(volid, fileid, md);
                 if (ret) {
                         if (ret == ENOENT) {
-                                ret = __inode_getattr__(volid, fileid, md);
+                                ret = __md_get(volid, fileid, md);
                                 if (unlikely(ret))
                                         GOTO(err_ret, ret);
 
@@ -178,6 +191,9 @@ static int __inode_getattr(const volid_t *volid, const fileid_t *fileid, md_prot
                         } else
                                 GOTO(err_ret, ret);
                 }
+
+                DBUG(CHKID_FORMAT" nlink %d, size %ju\n", CHKID_ARG(fileid),
+                      md->at_nlink, md->at_size);
         }
 
         return 0;
@@ -185,7 +201,8 @@ err_ret:
         return ret;
 }
 
-static int __inode_setattr(const volid_t *volid, const fileid_t *fileid, const setattr_t *setattr, int force)
+static int __inode_setattr(const volid_t *volid, const fileid_t *fileid,
+                           const setattr_t *setattr, int force)
 {
         int ret;
         char buf[MAX_BUF_LEN] = {0};
@@ -205,18 +222,16 @@ static int __inode_setattr(const volid_t *volid, const fileid_t *fileid, const s
         ret = __inode_getattr(volid, fileid, md);
         if (ret)
                 GOTO(err_lock, ret);
-
+        
         md_attr_update(md, setattr);
+        DBUG(CHKID_FORMAT" nlink %d, size %ju\n", CHKID_ARG(fileid),
+              md->at_nlink, md->at_size);
         YASSERT(md->at_mode);
         
         ret = __md_set(volid, md, 0);
         if (ret)
                 GOTO(err_lock, ret);
 
-        if (mdsconf.ac_timeout) {
-                attr_cache_update(volid, fileid, md);
-        }
-        
         ret = kunlock(volid, fileid);
         if (ret)
                 GOTO(err_ret, ret);
@@ -273,6 +288,7 @@ retry:
 
                 md->at_size = size;
                 md->chknum = _get_chknum(md->at_size, md->split);
+                md->md_version++;
                 ret = __md_set(volid, md, 0);
                 if (ret)
                         GOTO(err_lock, ret);
@@ -437,17 +453,18 @@ static int __inode_link(const volid_t *volid, const fileid_t *fileid)
         int ret;
         md_proto_t *md;
         char buf[MAX_BUF_LEN];
-
+        
         ret = klock(volid, fileid, 10, 1);
         if (ret)
                 GOTO(err_ret, ret);
-
+        
         md = (void *)buf;
         ret = __inode_getattr(volid, fileid, md);
         if (ret)
                 GOTO(err_lock, ret);
 
         md->at_nlink++;
+        md->md_version++;
 
         ret = __md_set(volid, md, 0);
         if (ret)
@@ -484,6 +501,7 @@ static int __inode_unlink(const volid_t *volid, const fileid_t *fileid, md_proto
                 GOTO(err_lock, ret);
 
         md->at_nlink--;
+        md->md_version++;
 
         DBUG(CHKID_FORMAT" nlink %d\n", CHKID_ARG(fileid), md->at_nlink);
 
@@ -531,6 +549,7 @@ static int __inode_symlink(const volid_t *volid, const fileid_t *fileid, const c
 
         strcpy(md->name, link_target);
         md->md_size += (strlen(link_target) + 1);
+        md->md_version++;
 
         DBUG(CHKID_FORMAT" link %s\n", CHKID_ARG(fileid), md->name);
         
@@ -554,7 +573,7 @@ static int __inode_readlink(const volid_t *volid, const fileid_t *fileid, char *
         if (ret)
                 GOTO(err_ret, ret);
 
-        DINFO(CHKID_FORMAT" link %s\n", CHKID_ARG(fileid), md->name);
+        DBUG(CHKID_FORMAT" link %s\n", CHKID_ARG(fileid), md->name);
         
         strcpy(link_target, md->name);
 

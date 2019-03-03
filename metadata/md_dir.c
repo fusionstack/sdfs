@@ -17,6 +17,7 @@
 #include "quota.h"
 #include "schedule.h"
 #include "redis_conn.h"
+#include "attr_queue.h"
 #include "sdfs_quota.h"
 #include "dbg.h"
 
@@ -34,9 +35,15 @@ inline static int __md_update_time(const volid_t *volid, const fileid_t *fileid,
                             mt ? __SET_TO_SERVER_TIME : __DONT_CHANGE, NULL,
                             ct ? __SET_TO_SERVER_TIME : __DONT_CHANGE, NULL);
 
+#if ENABLE_ATTR_QUEUE
+        ret = attr_queue_settime(volid, fileid, &setattr);
+        if (ret)
+                GOTO(err_ret, ret);
+#else
         ret = inodeop->setattr(volid, fileid, &setattr, 0);
         if (ret)
                 GOTO(err_ret, ret);
+#endif
 
         return 0;
 err_ret:
@@ -94,7 +101,8 @@ err_ret:
         return ret;
 }
 
-int md_create(const volid_t *volid, const fileid_t *parent, const char *name, const setattr_t *setattr, fileid_t *fileid)
+int md_create(const volid_t *volid, const fileid_t *parent, const char *name,
+              const setattr_t *setattr, fileid_t *fileid)
 {
         int ret;
 
@@ -111,7 +119,8 @@ err_ret:
         return ret;
 }
 
-int md_mkdir(const volid_t *volid, const fileid_t *parent, const char *name, const setattr_t *setattr, fileid_t *fileid)
+int md_mkdir(const volid_t *volid, const fileid_t *parent, const char *name,
+             const setattr_t *setattr, fileid_t *fileid)
 {
         int ret;
 
@@ -128,7 +137,8 @@ err_ret:
         return ret;
 }
 
-int md_readdir(const volid_t *volid, const fileid_t *fileid, off_t offset, void **de, int *delen)
+int md_readdir(const volid_t *volid, const fileid_t *fileid, off_t offset,
+               void **de, int *delen)
 {
         int ret, len;
         char buf[MAX_BUF_LEN];
@@ -191,8 +201,9 @@ static int __md_redirplus(const volid_t *volid, void *buf, int buflen)
                         continue;
                 }
 
-                DBUG("load file "CHKID_FORMAT " chknum %u, size %llu \n", CHKID_ARG(&md->fileid),
-                      md->chknum, md->at_size);
+                DBUG("load file "CHKID_FORMAT " chknum %u, size %llu \n",
+                     CHKID_ARG(&md->fileid),
+                     md->chknum, md->at_size);
                 memcpy(pos, md, sizeof(*md));
         }
 
@@ -269,7 +280,8 @@ err_ret:
         return ret;
 }
 
-int md_lookup(const volid_t *volid, fileid_t *fileid, const fileid_t *parent, const char *name)
+int md_lookup(const volid_t *volid, fileid_t *fileid, const fileid_t *parent,
+              const char *name)
 {
         int ret;
         uint32_t type;
@@ -357,7 +369,8 @@ err_ret:
         return ret;
 }
 
-int md_unlink(const volid_t *volid, const fileid_t *parent, const char *name, md_proto_t *_md)
+int md_unlink(const volid_t *volid, const fileid_t *parent, const char *name,
+              md_proto_t *_md)
 {
         int ret;
         fileid_t fileid;
@@ -432,7 +445,8 @@ err_ret:
         return ret;
 }
 
-int md_symlink(const volid_t *volid, const fileid_t *parent, const char *name, const char *link_target,
+int md_symlink(const volid_t *volid, const fileid_t *parent, const char *name,
+               const char *link_target,
                uint32_t mode, uint32_t uid, uint32_t gid)
 {
         int ret;

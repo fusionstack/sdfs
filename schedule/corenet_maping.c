@@ -424,6 +424,7 @@ int corenet_maping(void *ctx, const nid_t *nid, sockid_t *sockid)
         int ret;
         corenet_maping_t *entry;
 
+        ANALYSIS_BEGIN(0);
 retry:
         entry = &__corenet_maping_get_byctx(ctx)[nid->id];
         YASSERT(entry);
@@ -463,6 +464,8 @@ retry:
                 goto retry;
         }
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return 0;
 err_lock:
         sy_spin_unlock(&entry->lock);

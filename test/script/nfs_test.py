@@ -396,7 +396,7 @@ def t_read(mount_point, uid):
     try:
         res = fd.read()
         if (res != uid):
-            logging.error('t_read cmp %s failed, need %s, got %s\n' % (fn, res, uid))
+            logging.error('t_read cmp %s failed, need %s, got %s\n' % (fn, uid, res))
             sys.exit(-1)
     except Exception as e:
         logging.error('t_read %s failed\n' % (fn))

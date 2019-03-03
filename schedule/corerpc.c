@@ -96,6 +96,8 @@ STATIC int __corerpc_getsolt(void *_ctx, msgid_t *msgid, rpc_ctx_t *ctx, const c
         int ret;
         rpc_table_t *__rpc_table_private__ = corerpc_self_byctx(_ctx);
 
+        ANALYSIS_BEGIN(0);
+        
         ret = rpc_table_getsolt(__rpc_table_private__, msgid, name);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -107,12 +109,15 @@ STATIC int __corerpc_getsolt(void *_ctx, msgid_t *msgid, rpc_ctx_t *ctx, const c
         if (unlikely(ret))
                 UNIMPLEMENTED(__DUMP__);
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return 0;
 err_ret:
         return ret;
 }
 
-STATIC int __corerpc_wait__(const nid_t *nid, const char *name, buffer_t *rbuf, rpc_ctx_t *ctx, int timeout)
+STATIC int __corerpc_wait__(const nid_t *nid, const char *name, buffer_t *rbuf,
+                            rpc_ctx_t *ctx, int timeout)
 {
         int ret;
 
@@ -139,7 +144,7 @@ STATIC int __corerpc_wait__(const nid_t *nid, const char *name, buffer_t *rbuf, 
         timeout = _max(timeout, _get_rpc_timeout());
         ANALYSIS_ASSERT(0, 1000 * 1000 * (timeout * 3), name);
 #else
-        ANALYSIS_END(0, IO_WARN, name);
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
 #endif
 
         return 0;
@@ -187,6 +192,8 @@ STATIC int __corerpc_send(void *ctx, msgid_t *msgid, const sockid_t *sockid, con
         int ret;
         buffer_t buf;
 
+        ANALYSIS_BEGIN(0);
+        
 #if ENABLE_RDMA
         if (likely(sockid->rdma_handler > 0)) {
 
@@ -232,6 +239,7 @@ STATIC int __corerpc_send(void *ctx, msgid_t *msgid, const sockid_t *sockid, con
                 GOTO(err_free, ret);
         }
 #endif
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
         
         return 0;
 err_free:
@@ -264,6 +272,10 @@ int corerpc_send_and_wait(void *_ctx, const char *name, const sockid_t *sockid,
         buffer_t cbuf;
         int wbuf_seg_count = 0;
 
+        ANALYSIS_BEGIN(0);
+
+        DBUG("%s\n", name);
+        
         ret = __corerpc_getsolt(_ctx, &msgid, &ctx, name, sockid, nid, timeout);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -277,7 +289,8 @@ int corerpc_send_and_wait(void *_ctx, const char *name, const sockid_t *sockid,
 		}
 	}
 
-        ret = __corerpc_send(_ctx, &msgid, sockid, request, reqlen, tmp, rbuf, msg_type, msg_size);
+        ret = __corerpc_send(_ctx, &msgid, sockid, request, reqlen, tmp, rbuf,
+                             msg_type, msg_size);
         if (unlikely(ret)) {
                 corenet_maping_close(nid, sockid);
 		ret = _errno_net(ret);
@@ -314,6 +327,8 @@ int corerpc_send_and_wait(void *_ctx, const char *name, const sockid_t *sockid,
 	if (unlikely(wbuf_seg_count > 1))
 		mbuffer_free(&cbuf);
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return 0;
 
 err_free:
@@ -331,6 +346,8 @@ int IO_FUNC corerpc_postwait(const char *name, const nid_t *nid, const void *req
         void *ctx = variable_get_ctx();
         //rpc_table_t *__rpc_table_private__ = corerpc_self();
 
+        ANALYSIS_BEGIN(0);
+        
         ret = corenet_maping(ctx, nid, &sockid);
         if (unlikely(ret))
                 GOTO(err_ret, ret);
@@ -341,6 +358,8 @@ int IO_FUNC corerpc_postwait(const char *name, const nid_t *nid, const void *req
                 GOTO(err_ret, ret);
         }
 
+        ANALYSIS_QUEUE(0, IO_WARN, NULL);
+        
         return 0;
 err_ret:
         return ret;

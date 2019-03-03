@@ -67,8 +67,9 @@ err_ret:
         return ret;
 }
 
-int sdfs_rename(sdfs_ctx_t *ctx, const fileid_t *fparent, const char *fname, const fileid_t *tparent,
-               const char *tname)
+int sdfs_rename(sdfs_ctx_t *ctx, const fileid_t *fparent, const char *fname,
+                const fileid_t *tparent,
+                const char *tname)
 {
         int ret, retry = 0;
         fileid_t src_fileid, dist_fileid;

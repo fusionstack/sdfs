@@ -471,8 +471,8 @@ class Cluster(object):
         '''
         移动集采 暂时关闭
         '''
-        cmd = "sdfs.mkdir /nfs_minio"
-        exec_shell(cmd)
+        #cmd = "sdfs.mkdir /nfs_minio"
+        #exec_shell(cmd)
 
         #test nfs-ganesha
         if self.config.testing:

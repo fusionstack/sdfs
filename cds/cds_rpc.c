@@ -34,8 +34,6 @@ typedef enum {
         CDS_NULL = 400,
         CDS_WRITE,
         CDS_READ,
- 
- 
         CDS_MAX,
 } cds_op_t;
 
@@ -224,6 +222,8 @@ int cds_rpc_read(const nid_t *nid, const io_t *io, buffer_t *_buf)
                 GOTO(err_ret, ret);
 #endif
 
+        DBUG("read return\n");
+        
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
         mem_cache_free(MEM_CACHE_4K, buf);
@@ -301,6 +301,8 @@ int cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
 
         req->buflen = count;
 
+        DBUG("write %u\n", sizeof(*req) + count + _buf->len);
+        
 #if ENABLE_CORERPC
         if (likely(ng.daemon)) {
                 DBUG("corenet write\n");
@@ -327,6 +329,8 @@ int cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
         
 #endif
 
+        DBUG("write return\n");
+        
         ANALYSIS_QUEUE(0, IO_WARN, NULL);
 
         mem_cache_free(MEM_CACHE_4K, buf);
