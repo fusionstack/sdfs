@@ -103,7 +103,6 @@ static int __attr_queue_create(attr_queue_t *attr_queue, const volid_t *volid,
 
         ent->volid = *volid;
         ent->fileid = *fileid;
-        YASSERT(ent->fileid.type);
         YASSERT(fileid->type);
         
         __attr_queue_update(ent, op, arg);
@@ -289,7 +288,6 @@ static void __attr_queue_run__(entry_t *ent)
                 setattr.mtime = ent->mtime;
         }
 
-        YASSERT(ent->fileid.type);
 retry:
         ret = md_setattr(&ent->volid, &ent->fileid, &setattr, 1);
         

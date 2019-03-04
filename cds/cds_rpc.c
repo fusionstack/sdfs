@@ -277,7 +277,7 @@ err_ret:
         return ret;
 }
 
-static int __cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
+int cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
 {
         int ret;
         char *buf = mem_cache_calloc1(MEM_CACHE_4K, PAGE_SIZE);
@@ -339,25 +339,6 @@ static int __cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_bu
 err_ret:
         mem_cache_free(MEM_CACHE_4K, buf);
         return ret;
-}
-
-int IO_FUNC __cds_rpc_write_task(va_list ap)
-{
-        const nid_t *nid = va_arg(ap, const nid_t *);
-        const io_t *io = va_arg(ap, const io_t *);
-        const buffer_t*buf = va_arg(ap, buffer_t *);
-
-        return __cds_rpc_write(nid, io, buf);
-}
-
-int cds_rpc_write(const nid_t *nid, const io_t *io, const buffer_t *_buf)
-{
-#if 1
-        return __cds_rpc_write(nid, io, _buf);
-#else
-        return core_request(fileid_hash(&io->id), -1, "cds_rpc_write", __cds_rpc_write_task, nid, io, _buf);
-#endif
-        
 }
 
 int cds_rpc_init()

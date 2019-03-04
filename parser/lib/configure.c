@@ -502,7 +502,6 @@ int set_value(const char* key, const char* value, int type)
         /**
          * yiscsi configure
          */
-#if 0
         else if (keyis("iqn", key))
                 strncpy(sanconf.iqn, value, MAXSIZE);
         else if (keyis("lun_blk_shift", key)) {
@@ -511,7 +510,6 @@ int set_value(const char* key, const char* value, int type)
                 } else
                         sanconf.lun_blk_shift = _value;
         }
-#endif
 
         /**
          * yweb configure

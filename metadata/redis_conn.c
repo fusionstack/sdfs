@@ -544,8 +544,6 @@ static int __redis_vol_getnamebyid(const volid_t *_volid,
                         *sharding = atoi(value);
                         
                         break;
-                } else {
-                        DBUG("volid %ju:%ju, snapvers %ju:%ju\n", volid, _volid->volid, snapvers, _volid->snapvers);
                 }
         }        
 

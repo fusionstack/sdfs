@@ -5,7 +5,6 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <signal.h>
-#include <sys/eventfd.h>
 #include <netinet/tcp.h>
 #include <errno.h>
 
@@ -589,7 +588,7 @@ typedef struct {
 
 typedef struct {
         sy_spinlock_t lock;
-        int eventfd;
+        sem_t sem;
         struct list_head list;
 } corenet_tcp_worker_t;
 
@@ -795,7 +794,6 @@ static void *__corenet_tcp_thread(void *args)
         struct list_head list, *pos, *n;
         sr_ctx_t *ctx;
         struct iovec *iov;
-        uint64_t left;
 
         INIT_LIST_HEAD(&list);
 
@@ -806,34 +804,29 @@ static void *__corenet_tcp_thread(void *args)
         iov_count = CORE_IOV_MAX;
         
         while (1) {
-                eventfd_poll(worker->eventfd, 1, &left);
+                ret = _sem_wait(&worker->sem);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
 
-                while (!list_empty(&worker->list)) {
-                        ANALYSIS_BEGIN(0);
-                
-                        ret = sy_spin_lock(&worker->lock);
-                        if (unlikely(ret))
-                                GOTO(err_ret, ret);
+                ret = sy_spin_lock(&worker->lock);
+                if (unlikely(ret))
+                        GOTO(err_ret, ret);
 
-                        list_splice_init(&worker->list, &list);
+                list_splice_init(&worker->list, &list);
 
-                        sy_spin_unlock(&worker->lock);
+                sy_spin_unlock(&worker->lock);
 
-                        list_for_each_safe(pos, n, &list) {
-                                list_del(pos);
-                                ctx = (void *)pos;
-                                if (ctx->op == __OP_SEND__) {
-                                        ctx->retval = __corenet_tcp_thread_send(ctx->fd, ctx->buf,
-                                                                                iov, iov_count);
-                                } else {
-                                        ctx->retval = __corenet_tcp_thread_recv(ctx->fd, ctx->buf,
-                                                                                iov, iov_count);
-                                }
-
-                                schedule_resume(&ctx->task, 0, NULL);
+                list_for_each_safe(pos, n, &list) {
+                        list_del(pos);
+                        ctx = (void *)pos;
+                        if (ctx->op == __OP_SEND__) {
+                                ctx->retval = __corenet_tcp_thread_send(ctx->fd, ctx->buf,
+                                                                        iov, iov_count);
+                        } else {
+                                ctx->retval = __corenet_tcp_thread_recv(ctx->fd, ctx->buf,
+                                                                        iov, iov_count);
                         }
-
-                        ANALYSIS_QUEUE(0, 10 * 1000, NULL);
+                        schedule_resume(&ctx->task, 0, NULL);
                 }
         }
 
@@ -862,14 +855,10 @@ static int __corenet_tcp_thread_init()
 
                 INIT_LIST_HEAD(&worker->list);
 
-                ret = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-                if (unlikely(ret < 0)) {
-                        ret = errno;
+                ret = sem_init(&worker->sem, 0, 0);
+                if (unlikely(ret))
                         GOTO(err_ret, ret);
-                }
 
-                worker->eventfd = ret;
-                
                 ret = sy_thread_create2(__corenet_tcp_thread, worker, "__tcp_thread_worker");
                 if (unlikely(ret))
                         GOTO(err_ret, ret);
@@ -904,12 +893,7 @@ static int __corenet_tcp_remote(int fd, buffer_t *buf, int op)
 
         sy_spin_unlock(&worker->lock);
 
-        uint64_t e = 1;
-        ret = write(worker->eventfd, &e, sizeof(e));
-        if (ret < 0) {
-                ret = errno;
-                UNIMPLEMENTED(__DUMP__);
-        }
+        sem_post(&worker->sem);
 
         ret = schedule_yield1(op == __OP_SEND__ ? "send" : "recv", NULL, NULL, NULL, -1);
         if (unlikely(ret)) {
