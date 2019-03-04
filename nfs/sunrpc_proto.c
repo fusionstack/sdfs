@@ -396,8 +396,8 @@ static int __sunrpc_request_handler(const sockid_t *sockid,
                                     buffer_t *buf)
 {
         int ret;
-        uid_t uid;
-        gid_t gid;
+        uid_t uid = 0;
+        gid_t gid = 0;
         sunrpc_request_t req;
         auth_head_t cred, veri;
         auth_unix_t auth_unix;

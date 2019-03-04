@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
         int ret, daemon = 1, maxcore __attribute__((unused)) = 0;
         int c_opt;
         ynfs_args_t ynfs_args;
-        char name[MAX_NAME_LEN], *home;
+        char name[MAX_NAME_LEN], *home = NULL;
 
         while (srv_running) {
                 int option_index = 0;

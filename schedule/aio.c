@@ -462,7 +462,7 @@ static void *__aio_worker(void *arg)
 
         DINFO("start aio %s[%u]...\n", aio->name, aio->idx);
 
-#if 1
+#if 0
         if (aio->cpu != -1) {
                 ret = cpuset(aio->name, aio->cpu);
                 if (unlikely(ret)) {
@@ -492,7 +492,8 @@ static int __aio_create(const char *name, int event_max,  aio_t *aio, int cpu, i
 
         ret = io_setup(event_max, &aio->ioctx);
         if (ret < 0) {
-                ret = -ret;
+                ret = errno;
+                DWARN("errno %u, event %u\n", errno, event_max);
                 GOTO(err_ret, ret);
         }
 

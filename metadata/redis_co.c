@@ -18,6 +18,8 @@
 #include "variable.h"
 #include "dbg.h"
 
+#define ARG_ARRAY 512
+
 #if ENABLE_LOCK_FREE_LIST
 #include <ll.h>
 #endif
@@ -84,7 +86,7 @@ static void *__redis_co_worker(void *arg)
 {
         co_t *co = arg;
         struct list_head list, *pos, *n;
-        arg1_t *arg1;
+        arg1_t *arg1 = NULL;
 
         DINFO("co worker start %u\n", co->running);
 
@@ -253,6 +255,8 @@ int redis_co(const volid_t *volid, const fileid_t *fileid, redisReply **reply,
         ctx.format = format;
         ctx.fileid = *fileid;
         ctx.volid = *volid;
+        YASSERT(volid->volid);
+        YASSERT(ctx.volid.volid);
         ctx.co = co;
         ctx.task = schedule_task_get();
         va_start(ctx.ap, format);
@@ -282,6 +286,9 @@ STATIC int __redis_utils_co1(const arg2_t *arg2, redis_handler_t *handler,
         redis_co_ctx_t *ctx;
         redis_conn_t *conn;
 
+        YASSERT(arg2->volid.volid);
+        DBUG("volid %ju,%ju\n", arg2->volid.volid, arg2->volid.snapvers);
+        
         ret = redis_conn_get(&arg2->volid, arg2->fileid.sharding, 0, handler);
         if(ret)
                 UNIMPLEMENTED(__DUMP__);
@@ -411,7 +418,7 @@ static void __redis_co_release(redis_handler_t *handler_array, int count)
 STATIC int __redis_co_exec(void *core_ctx, arg2_t *array, int count)
 {
         int ret, i;
-        redis_handler_t handler_array[512], *handler;
+        redis_handler_t handler_array[ARG_ARRAY], *handler;
         co_t *co = variable_get_byctx(core_ctx, VARIABLE_REDIS);
         arg2_t *arg2;
 
@@ -467,19 +474,20 @@ static int __redis_co_run(void *core_ctx, struct list_head *list)
         int ret, count = 0;
         struct list_head *pos, *n;
         redis_co_ctx_t *ctx;
-        arg2_t *arg, array[512];
+        arg2_t *arg, array[ARG_ARRAY];
 
         ANALYSIS_BEGIN(0);
         count = 0;
         while (!list_empty(list)) {
                 arg = &array[count];
                 count++;
-                YASSERT(count < 512);
+                YASSERT(count < ARG_ARRAY);
 
                 pos = (void *)list->next;
                 ctx = (redis_co_ctx_t *)pos;
                 arg->fileid = ctx->fileid;
                 arg->volid = ctx->volid;
+                YASSERT(ctx->volid.volid);
                 arg->finished = 0;
                 INIT_LIST_HEAD(&arg->list);
                 list_del(pos);

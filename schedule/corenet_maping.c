@@ -576,7 +576,7 @@ void corenet_maping_close(const nid_t *nid, const sockid_t *sockid)
 static int __corenet_maping_getlost(corenet_maping_t *entry, const ynet_net_info_t *info,
                                      ynet_sock_info_t *array, int *_lost)
 {
-        int ret, i, count;
+        int ret, i, count = 0;
         const ynet_sock_info_t *sock;
         sockid_t *sockid;
         int lost = 0;

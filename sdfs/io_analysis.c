@@ -113,7 +113,7 @@ err_ret:
 
 int io_analysis(analysis_op_t op, int count)
 {
-        int ret, next, cnt, i;
+        int ret, next = 0, cnt, i;
         time_t now;
 
         if (__io_analysis__ == NULL) {

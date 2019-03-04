@@ -949,7 +949,7 @@ int nfs_nlm4(const sockid_t *sockid, const sunrpc_request_t *req,
         hash_args_t hash_args = NULL;
         nfsarg_t nfsarg;
         xdr_t xdr;
-        const char *name;
+        const char *name = NULL;
 
         switch (req->procedure) {
         case PNLM4_NULL:
