@@ -25,7 +25,7 @@
 #define LOG_DRBD_CHECK  SDFS_HOME"/log/drbd_check.log"
 #define LOG_REDIS  SDFS_HOME"/log/redis.log"
 
-#define NODECTL_PREFIX "/dev/shm/uss/"
+#define NODECTL_PREFIX "/dev/shm/sdfs/"
 
 
 int nodectl_get(const char *key, char *value, const char *_default)
