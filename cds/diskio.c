@@ -51,12 +51,12 @@ static diskio_mt_t  *diskio;
 static int __diskio_submit()
 {
         int ret, retval;
-        iocb_mt_t *iocb_mt;
+        iocb_mt_t *iocb_mt = NULL;
         struct iocb *iocb;
 
         ret = sy_spin_lock(&diskio->lock);
         if (unlikely(ret))
-                GOTO(err_ret, ret);
+                UNIMPLEMENTED(__DUMP__);
 
         YASSERT(!list_empty(&diskio->list));
         iocb_mt = (void *)diskio->list.next;

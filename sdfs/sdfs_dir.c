@@ -205,6 +205,8 @@ static int __etcd_listvol__(const char *_key, const etcd_node_t *array,
         md_proto_t *md;
         etcd_node_t *node;
 
+        (void) _key;
+
         de = (void *)buf;
         buflen = *_buflen;
         for (i = 0; i < array->num_node; i++) {
@@ -231,8 +233,8 @@ static int __etcd_listvol__(const char *_key, const etcd_node_t *array,
                         __etcd_getattr(key, md);
                 }
 
-                DBUG("%s : (%s) fileid "CHKID_FORMAT" reclen %u\n", _key,
-                      de->d_name, CHKID_ARG(&md->fileid), de->d_reclen);
+                //DBUG("%s : (%s) fileid "CHKID_FORMAT" reclen %u\n", _key,
+                //de->d_name, CHKID_ARG(&md->fileid), de->d_reclen);
 
                 de = (void *)de + len;
         }

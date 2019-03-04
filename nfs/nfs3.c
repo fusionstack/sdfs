@@ -703,7 +703,7 @@ static int __nfs3_create_svc(const sockid_t *sockid, const sunrpc_request_t *req
 {
         int ret;
         mode_t flags = O_RDWR | O_CREAT | O_EXCL;
-        uint32_t mode, mtime, atime;
+        uint32_t mode, mtime, atime, *_mtime;
         create_args *args = &_arg->create_arg;
         fileid_t *parent = (fileid_t *)args->where.dir.val;
         create_ret res;
@@ -742,7 +742,8 @@ static int __nfs3_create_svc(const sockid_t *sockid, const sunrpc_request_t *req
 
                 tmp1 = (uint32_t *)args->how.verf;
                 atime = *tmp1;
-                mtime = *(uint32_t *)&args->how.verf[4];
+                _mtime = (uint32_t *)&args->how.verf[4];
+                mtime = *_mtime;
                 uid = 0;
                 gid = 0;
 
@@ -1782,7 +1783,7 @@ int nfs_ver3(const sockid_t *sockid, const sunrpc_request_t *req,
         hash_args_t hash_args = NULL;
         nfsarg_t nfsarg;
         xdr_t xdr;
-        const char *name;
+        const char *name = NULL;
 
         switch (req->procedure) {
         case NFS3_NULL:

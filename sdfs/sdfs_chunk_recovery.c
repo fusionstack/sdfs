@@ -155,7 +155,7 @@ err_ret:
 
 static int __sdfs_chunk_sync(const fileinfo_t *md, const chkinfo_t *chkinfo)
 {
-        int ret, fd, i, chksize;
+        int ret, fd = -1, i, chksize;
         int dist_count = 0, src_count = 0;
         nid_t dist[YFS_CHK_REP_MAX], src[YFS_CHK_REP_MAX];
         const nid_t *nid;

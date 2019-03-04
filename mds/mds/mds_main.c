@@ -393,7 +393,7 @@ int mds_run(void *args)
         if (ret)
                 GOTO(err_ret, ret);
 
-        nid_t nid;
+        nid_t nid = {0, 0, 0, 0};
         nid.id = id;
         net_setnid(&nid);
 

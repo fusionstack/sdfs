@@ -103,6 +103,7 @@ static int __attr_queue_create(attr_queue_t *attr_queue, const volid_t *volid,
 
         ent->volid = *volid;
         ent->fileid = *fileid;
+        YASSERT(ent->fileid.type);
         YASSERT(fileid->type);
         
         __attr_queue_update(ent, op, arg);
@@ -175,9 +176,9 @@ static int __attr_queue(const volid_t *volid, const fileid_t *fileid, int op, co
         
         DBUG("queue "CHKID_FORMAT"\n", CHKID_ARG(fileid));
 
+        volid_t _volid = {fileid->volid, 0};
         if (unlikely(volid == NULL)) {
                 //UNIMPLEMENTED(__WARN__);
-                volid_t _volid = {fileid->volid, 0};
                 volid = &_volid;
         }
 
@@ -288,6 +289,7 @@ static void __attr_queue_run__(entry_t *ent)
                 setattr.mtime = ent->mtime;
         }
 
+        YASSERT(ent->fileid.type);
 retry:
         ret = md_setattr(&ent->volid, &ent->fileid, &setattr, 1);
         

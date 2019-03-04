@@ -1078,6 +1078,7 @@ void mbuffer_trans2(struct iovec *_iov, int *iov_count, uint32_t offset, uint32_
         *iov_count = seg_count;
 }
 
+#if 0
 int mbuffer_compress2(buffer_t *buf, uint32_t max_seg_len)
 {
         int ret;
@@ -1135,6 +1136,7 @@ int mbuffer_compress2(buffer_t *buf, uint32_t max_seg_len)
 err_ret:
         return ret;
 }
+#endif
 
 int mbuffer_iszero(const buffer_t *buf)
 {
@@ -1212,9 +1214,11 @@ int mbuffer_ncompare(const buffer_t *buf, uint32_t offset, const buffer_t *cmp, 
         return ret;
 }
 
+#if 0
 int mbuffer_compress(buffer_t *buf) {
         return mbuffer_compress2(buf, BUFFER_SEG_SIZE);
 }
+#endif
 
 int mbuffer_compare(const buffer_t *buf, const buffer_t *cmp)
 {

@@ -304,7 +304,7 @@ int main(int argc, char *argv[])
 {
         int ret, daemon = 1, maxcore __attribute__((unused)) = 0;
         char *service, c_opt;
-        char name[MAX_NAME_LEN], *home;
+        char name[MAX_NAME_LEN], *home = NULL;
         yftp_args_t yftp_args;
 
         service = YFTP_SERVICE_DEF;

@@ -717,7 +717,7 @@ err_ret:
 static int __health_dump()
 {
         int ret, i;
-        etcd_node_t *array, *node;
+        etcd_node_t *array, *node = NULL;
 
         ret = etcd_list(ETCD_VOLUME, &array);
         if (ret)

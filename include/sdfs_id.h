@@ -78,8 +78,6 @@ typedef struct {
         data_prop_t data_prop;
 } msgid_t;
 
-#pragma pack()
-
 typedef struct {
         uint64_t id;
         uint32_t status; /*dirty*/
@@ -112,6 +110,8 @@ typedef enum {
         ftype_root = 9,
         ftype_max = 10,
 } ftype_t;
+
+#pragma pack()
 
 static inline const char *ftype(const chkid_t *t)
 {

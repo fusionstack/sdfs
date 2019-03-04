@@ -439,8 +439,8 @@ int main(int argc, char *argv[])
         char c_opt, *prog, *path, *f_time = NULL, *t_time = NULL;
         uint32_t from_time = 0, to_time = 0;
         filter_t *filter = NULL, _filter;
-        off_t off;
-        size_t size;
+        off_t off = 0;
+        size_t size = 0;
 
         prog = strrchr(argv[0], '/');
         if (prog)
