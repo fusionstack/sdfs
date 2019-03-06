@@ -584,7 +584,7 @@ class ProcessList(DumpableObject):
                 thread.mark = True
         """
 
-        self.refresh_data(['cds', 'nfs', 'ganesha', 'cifs'])
+        self.refresh_data(['cds', 'nfs', 'ganesha', 'samba'])
         #self.refresh_data(['nfs', 'ganesha', 'cifs'])
         #self.io_cds, self.total_cds = self.update_total_io(self.total_cds, ["cds"])
         #self.io_fs, self.total_fs = self.update_total_io(self.total_fs, ["nfs", "ganesha", "samba"])

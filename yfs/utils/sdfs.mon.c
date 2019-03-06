@@ -23,7 +23,7 @@
 
 void usage(const char *prog)
 {
-        printf("%s --type <cds/nfs/ganesha>\n", prog);
+        printf("%s --type <cds/nfs/ganesha/samba>\n", prog);
 }
 
 
