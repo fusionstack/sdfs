@@ -58,6 +58,8 @@ static int __mem_hugepage_init(mem_hugepage_t **_mem, int private)
         if (unlikely(ret))
                 GOTO(err_ret, ret);
 
+        //memset(mem, 0x0, sizeof(mem_hugepage_t) + sizeof(entry_t) * gloconf.memcache_count);
+        
         for (i = 0; i < gloconf.memcache_count; i++) {
                 ent = &mem->array[i];
 
@@ -342,6 +344,7 @@ static int __mem_hugepage_destroy(mem_hugepage_t *mem)
                 if (ent->ref == 0) {
                         yfree((void **)&ent->addr);
                 } else {
+                        DWARN("ref %d, idx %u\n", ent->ref, i);
                         UNIMPLEMENTED(__DUMP__);
                 }
         }
@@ -364,4 +367,20 @@ int mem_hugepage_private_destoy()
         variable_unset(VARIABLE_HUGEPAGE);
         
         return 0;
+}
+
+void mem_hugepage_private_dump()
+{
+        mem_hugepage_t *mem = mem_self();
+
+        if (use_memcache == 0 || mem == NULL) {
+                return;
+        }
+
+        for (int i = 0; i < gloconf.memcache_count; i++) {
+                entry_t *ent = &mem->array[i];
+                if (ent->ref != 0) {
+                        DINFO("mem[%u] ref %u\n", i, ent->ref)
+                }
+        }
 }

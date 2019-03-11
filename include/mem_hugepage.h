@@ -11,5 +11,6 @@ int mem_hugepage_new(uint32_t size, mem_handler_t *mem_handler);
 
 int mem_hugepage_ref(mem_handler_t *mem_handler);
 int mem_hugepage_deref(mem_handler_t *mem_handler);
+void mem_hugepage_private_dump();
 
 #endif

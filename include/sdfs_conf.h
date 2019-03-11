@@ -258,4 +258,6 @@ typedef struct {
 
 #define ATTR_QUEUE_TMO 5
 
+#define ENABLE_MEM_CACHE1 0
+
 #endif

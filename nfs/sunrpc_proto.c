@@ -21,6 +21,7 @@
 #include "nfs_events.h"
 #include "nfs_conf.h"
 #include "nfs3.h"
+#include "mem_hugepage.h"
 #include "xdr_nfs.h"
 #include "dbg.h"
 
@@ -244,6 +245,8 @@ void __sunrpc_check__(void *arg1, void *arg2)
               core->flag & CORE_FLAG_POLLING ? "on" : "off",
               ctx->sockid.sd);
 
+        mem_hugepage_private_dump();
+        
         if (ctx->running)
                 return;
 
