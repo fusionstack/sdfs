@@ -46,11 +46,11 @@ from collections import OrderedDict
 
 from mon_data import ProcessList, Stats
 #from iotop.data import find_uids, TaskStatsNetlink, ProcessList, Stats
-"""
 from iotop.data import ThreadInfo
-from iotop.version import VERSION
 from iotop import ioprio
 from iotop.ioprio import IoprioSetError
+"""
+from iotop.version import VERSION
 """
 #
 # Utility functions for the UI
