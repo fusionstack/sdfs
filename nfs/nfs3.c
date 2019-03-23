@@ -1350,7 +1350,7 @@ static int __nfs3_remove_svc(const sockid_t *sockid, const sunrpc_request_t *req
 
         get_preopattr1(&fileid, &res.dir_wcc.before);
 
-#if 1
+#if ENABLE_MD_POSIX
         ret = nfs_remove(parent, args->obj.name);
         if (ret) {
                 GOTO(err_rep, ret);
